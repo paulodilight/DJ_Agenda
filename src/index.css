@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Controlo dos cabeçalhos/rodapés de impressão (substitui os defaults do Chrome) */
+@page {
+  @top-left    { content: none; }
+  @top-center  { content: none; }
+  @top-right   { content: none; }
+  @bottom-left {
+    content: "Created by PauloDiLight";
+    font-family: Inter, sans-serif;
+    font-size: 8pt;
+    color: #aaa;
+  }
+  @bottom-center { content: none; }
+  @bottom-right  { content: none; }
+}
+
+@media print {
+  /* Esconde toda a interface da app */
+  aside,
+  header,
+  .print\:hidden { display: none !important; }
+
+  /* Remove fundo e cores da app */
+  body, html { background: white !important; }
+
+  /* Todos os wrappers da árvore React têm de ter altura auto
+     para não clippar o conteúdo ao tamanho de uma página */
+  html, body, #root, main, [class*="flex-col"], [class*="overflow"] {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+  }
+  main { padding: 0 !important; }
+
+  /* Documento Comunicação */
+  #documento-comunicacao {
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Documento Agenda — mostrar e esconder app */
+  #agenda-app { display: none !important; }
+  #documento-agenda-mes {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Linhas da tabela não partem a meio */
+  #documento-agenda-mes tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Documento Contas — mostrar e esconder app */
+  #contas-app { display: none !important; }
+  #documento-contas-espaco {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+}
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: #0a0a0a;
+    color: #ffffff;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Scrollbar minimalista */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2e2e2e;
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3e3e3e;
+  }
+
+  /* Scrollbar horizontal mais grossa (gráficos) */
+  .scrollbar-h-thick::-webkit-scrollbar {
+    height: 8px;
+  }
+  .scrollbar-h-thick::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.04);
+    border-radius: 4px;
+  }
+  .scrollbar-h-thick::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.18);
+    border-radius: 4px;
+  }
+  .scrollbar-h-thick::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.30);
+  }
+}

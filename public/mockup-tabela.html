@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8" />
+<title>Mockup Tabela</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0a;
+    color: #fff;
+    font-family: Inter, system-ui, sans-serif;
+    font-size: 12px;
+    padding: 32px;
+  }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: #666; margin-bottom: 12px; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 40px;
+  }
+
+  /* ── Cabeçalho ── */
+  th {
+    padding: 8px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #666;
+    border-bottom: 2px solid #2e2e2e;
+    border-right: 1px solid #1e1e1e;
+    background: #111;
+    text-align: center;
+  }
+  th.espaco-col { text-align: left; min-width: 130px; }
+  th.weekend { background: rgba(96,165,250,.07); color: #93c5fd; }
+
+  /* ── Linhas alternadas ── */
+  tr.par  td { background: #0f0f0f; }
+  tr.impar td { background: #151515; }
+
+  /* Fim de semana — coluna */
+  td.weekend { background: rgba(96,165,250,.06) !important; }
+  tr.par  td.weekend { background: rgba(96,165,250,.09) !important; }
+  tr.impar td.weekend { background: rgba(96,165,250,.07) !important; }
+
+  td {
+    padding: 6px 8px;
+    border-right: 1px solid #1e1e1e;
+    border-bottom: 1px solid #1a1a1a;
+    vertical-align: middle;
+  }
+  td.espaco-col {
+    font-weight: 500;
+    color: #999;
+    white-space: nowrap;
+    padding-left: 12px;
+  }
+
+  /* ── Chips ── */
+  .chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid;
+    min-height: 34px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: opacity .15s;
+    text-align: center;
+  }
+
+  /* Vazio */
+  .chip-vazio {
+    background: #1c1c1c;
+    border-color: #2a2a2a;
+    border-style: dashed;
+    color: #444;
+    font-size: 14px;
+    font-weight: 300;
+  }
+
+  /* Sem DJ */
+  .chip-semdj {
+    background: rgba(255,255,255,.06);
+    border-color: rgba(255,255,255,.15);
+    border-style: solid;
+    color: #888;
+    font-style: italic;
+  }
+
+  /* Confirmado */
+  .chip-confirmado {
+    background: rgba(34,197,94,.14);
+    border-color: rgba(34,197,94,.35);
+    color: #4ade80;
+    font-weight: 600;
+  }
+
+  /* Proposta */
+  .chip-proposta {
+    background: rgba(139,92,246,.18);
+    border-color: rgba(139,92,246,.40);
+    color: #a78bfa;
+    font-weight: 600;
+  }
+
+  /* Externo */
+  .chip-externo {
+    background: rgba(250,204,21,.12);
+    border-color: rgba(250,204,21,.35);
+    color: #fde047;
+    font-weight: 600;
+  }
+
+  /* Lock */
+  .chip-lock {
+    background: rgba(59,130,246,.14);
+    border-color: rgba(59,130,246,.35);
+    color: #60a5fa;
+    font-weight: 600;
+  }
+
+  /* ── Legenda ── */
+  .legenda {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .leg-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #666; }
+  .leg-dot { width: 10px; height: 10px; border-radius: 3px; border: 1px solid; }
+</style>
+</head>
+<body>
+
+<div class="legenda">
+  <div class="leg-item"><div class="leg-dot" style="background:#1c1c1c;border-color:#2a2a2a"></div> Vazio</div>
+  <div class="leg-item"><div class="leg-dot" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.15)"></div> Sem DJ</div>
+  <div class="leg-item"><div class="leg-dot" style="background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.35)"></div> Confirmado</div>
+  <div class="leg-item"><div class="leg-dot" style="background:rgba(139,92,246,.18);border-color:rgba(139,92,246,.40)"></div> Proposta</div>
+  <div class="leg-item"><div class="leg-dot" style="background:rgba(250,204,21,.12);border-color:rgba(250,204,21,.35)"></div> Externo</div>
+  <div class="leg-item"><div class="leg-dot" style="background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.35)"></div> Lock</div>
+  <div class="leg-item"><div class="leg-dot" style="background:rgba(96,165,250,.09);border-color:rgba(96,165,250,.2)"></div> Sex / Sáb</div>
+</div>
+
+<h2>Vista Semana — Agenda / Dashboard</h2>
+<table>
+  <thead>
+    <tr>
+      <th class="espaco-col">Espaço</th>
+      <th>Seg 26</th>
+      <th>Ter 27</th>
+      <th>Qua 28</th>
+      <th>Qui 29</th>
+      <th class="weekend">Sex 30</th>
+      <th class="weekend">Sáb 31</th>
+      <th>Dom 1</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="par">
+      <td class="espaco-col">Golf</td>
+      <td><div class="chip chip-vazio">+</div></td>
+      <td><div class="chip chip-semdj">Sem DJ</div></td>
+      <td><div class="chip chip-confirmado">David Guetta</div></td>
+      <td><div class="chip chip-vazio">+</div></td>
+      <td class="weekend"><div class="chip chip-confirmado">Martin Garrix</div></td>
+      <td class="weekend"><div class="chip chip-proposta">Tiësto</div></td>
+      <td><div class="chip chip-vazio">+</div></td>
+    </tr>
+    <tr class="impar">
+      <td class="espaco-col">Frou Frou</td>
+      <td><div class="chip chip-semdj">Sem DJ</div></td>
+      <td><div class="chip chip-confirmado">Calvin Harris</div></td>
+      <td><div class="chip chip-vazio">+</div></td>
+      <td><div class="chip chip-proposta">Armin</div></td>
+      <td class="weekend"><div class="chip chip-externo">Pedro Silva ★</div></td>
+      <td class="weekend"><div class="chip chip-confirmado">Hardwell</div></td>
+      <td><div class="chip chip-vazio">+</div></td>
+    </tr>
+    <tr class="par">
+      <td class="espaco-col">Avenida</td>
+      <td><div class="chip chip-confirmado">Avicii</div></td>
+      <td><div class="chip chip-vazio">+</div></td>
+      <td><div class="chip chip-semdj">Sem DJ</div></td>
+      <td><div class="chip chip-lock">LOCK</div></td>
+      <td class="weekend"><div class="chip chip-proposta">Nicky Romero</div></td>
+      <td class="weekend"><div class="chip chip-externo">João Costa ★</div></td>
+      <td><div class="chip chip-semdj">Sem DJ</div></td>
+    </tr>
+    <tr class="impar">
+      <td class="espaco-col">Delibar</td>
+      <td><div class="chip chip-vazio">+</div></td>
+      <td><div class="chip chip-vazio">+</div></td>
+      <td><div class="chip chip-confirmado">Afrojack</div></td>
+      <td><div class="chip chip-vazio">+</div></td>
+      <td class="weekend"><div class="chip chip-confirmado">Deadmau5</div></td>
+      <td class="weekend"><div class="chip chip-lock">LOCK</div></td>
+      <td><div class="chip chip-vazio">+</div></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Vista Mês — Distribuição (linhas = dias)</h2>
+<table>
+  <thead>
+    <tr>
+      <th style="text-align:left;width:100px">Dia</th>
+      <th style="text-align:left;width:70px">Data</th>
+      <th>DJ</th>
+      <th>Horário</th>
+      <th>Valor</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="par"><td style="color:#666;padding-left:12px">Segunda</td><td style="color:#666">26 Mai</td><td><div class="chip chip-confirmado">David Guetta</div></td><td style="text-align:center;color:#666">22:00–02:00</td><td style="text-align:center;color:#666">€500</td></tr>
+    <tr class="impar"><td style="color:#666;padding-left:12px">Terça</td><td style="color:#666">27 Mai</td><td><div class="chip chip-semdj">Sem DJ</div></td><td style="text-align:center;color:#555">—</td><td style="text-align:center;color:#555">—</td></tr>
+    <tr class="par"><td style="color:#666;padding-left:12px">Quarta</td><td style="color:#666">28 Mai</td><td><div class="chip chip-vazio">+</div></td><td style="text-align:center;color:#555">—</td><td style="text-align:center;color:#555">—</td></tr>
+    <tr class="par" style="background:rgba(96,165,250,.07)!important"><td style="color:#93c5fd;padding-left:12px">Sexta</td><td style="color:#93c5fd">30 Mai</td><td><div class="chip chip-proposta">Tiësto</div></td><td style="text-align:center;color:#666">23:00–03:00</td><td style="text-align:center;color:#666">€800</td></tr>
+    <tr class="impar" style="background:rgba(96,165,250,.09)!important"><td style="color:#93c5fd;padding-left:12px">Sábado</td><td style="color:#93c5fd">31 Mai</td><td><div class="chip chip-confirmado">Martin Garrix</div></td><td style="text-align:center;color:#666">23:00–04:00</td><td style="text-align:center;color:#666">€1200</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>
