@@ -256,23 +256,27 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 </Field>
               </div>
 
-              {/* Valores — valor artístico só para tipos com artista */}
+              {/* Valores — apoio técnico sempre visível; artístico só para tipos com artista */}
               {(() => {
                 const tipoSel    = tipos.find(t => t.nome === form.tipo)
                 const temArtista = tipoSel?.tem_artista ?? false
                 const labelArt   = form.tipo ? `Valor ${form.tipo} (€)` : 'Valor Artístico (€)'
-                if (!temArtista) return null
                 return (
-                  <div className="grid grid-cols-2 gap-3 p-3 bg-surface-2/60 rounded-lg border border-border/50">
-                    <Field label={labelArt}>
-                      <input
-                        type="number" min="0" step="0.01"
-                        className={inputCls}
-                        value={form.valor_artistico}
-                        onChange={(e) => set('valor_artistico', e.target.value)}
-                        placeholder="0,00"
-                      />
-                    </Field>
+                  <div className={clsx(
+                    'grid gap-3 p-3 bg-surface-2/60 rounded-lg border border-border/50',
+                    temArtista ? 'grid-cols-2' : 'grid-cols-1 max-w-xs'
+                  )}>
+                    {temArtista && (
+                      <Field label={labelArt}>
+                        <input
+                          type="number" min="0" step="0.01"
+                          className={inputCls}
+                          value={form.valor_artistico}
+                          onChange={(e) => set('valor_artistico', e.target.value)}
+                          placeholder="0,00"
+                        />
+                      </Field>
+                    )}
                     <Field label="Valor Apoio Técnico (€)">
                       <input
                         type="number" min="0" step="0.01"

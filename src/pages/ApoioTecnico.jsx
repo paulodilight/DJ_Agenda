@@ -156,8 +156,25 @@ function ModalFolga({ aberto, data, tecnicos, folgasHoje, agendamentos, onFechar
   )
 }
 
-// Colunas de um grupo de evento
-const GROUP_COLS = ['Técnico', 'Espaço', 'Evento', 'Hora Inst.', 'Hora Início', 'DJ']
+// ── Chip de técnico (draggable) ───────────────────────────────────────────────
+function TecnicoChip({ nome, isDragging, onDragStart, onDragEnd }) {
+  if (!nome) return <span className="text-border/30 text-[10px]">+ atribuir</span>
+  return (
+    <span
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={clsx(
+        'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold select-none',
+        'bg-status-confirmado/15 text-status-confirmado border border-status-confirmado/30',
+        'cursor-grab active:cursor-grabbing transition-opacity duration-150',
+        isDragging ? 'opacity-25 scale-95' : 'opacity-100',
+      )}
+    >
+      {nome}
+    </span>
+  )
+}
 
 // ── Página principal ──────────────────────────────────────────────────────────
 export function ApoioTecnico() {
@@ -173,7 +190,11 @@ export function ApoioTecnico() {
   const [filtroEspaco, setFiltroEspaco]   = useState('')
   const [filtroTecnico, setFiltroTecnico] = useState('')
   const [pesquisa, setPesquisa]           = useState('')
-  const [vista, setVista]                 = useState('colunas') // 'colunas' | 'linhas'
+  const [vista, setVista]                 = useState('colunas')
+
+  // ── Drag state ──────────────────────────────────────────────────────────────
+  const [dragSource, setDragSource] = useState(null)  // { dropKey, tecnicoId, eventoId, agId }
+  const [dragOver, setDragOver]     = useState(null)  // dropKey string
 
   const { dataInicio, dataFim, dias } = useMemo(() => {
     const [ano, mes] = anoMes.split('-').map(Number)
@@ -232,7 +253,6 @@ export function ApoioTecnico() {
   const djIdx = useMemo(() => {
     const idx = {}
     slots.forEach(s => {
-      // Nome: nome artístico do join > nome do join > dj_nome em texto livre
       const nome = s.djs?.nome_artistico ?? s.djs?.nome ?? s.dj_nome
       if (!nome) return
       const k = `${s.data}|${s.espaco_id}`
@@ -260,7 +280,7 @@ export function ApoioTecnico() {
         const ag      = agIdx[k] ?? null
         const tecId   = ev?.tecnico_id ?? ag?.tecnico_id ?? null
         const tecNome = tecId ? tecnicos.find(t => t.id === tecId)?.nome ?? null : null
-        linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev, djs: dj ?? [], ag, tecNome })
+        linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev, djs: dj ?? [], ag, tecNome, tecId })
       })
       if (linhas.length === 0) return
       result.push({ dataStr, dia, linhas, folgas: folgasIdx[dataStr] ?? [] })
@@ -270,7 +290,6 @@ export function ApoioTecnico() {
 
   const linhasPorDia = useMemo(() => {
     const q = pesquisa.trim().toLowerCase()
-    // ID do técnico seleccionado
     const tecFiltroId = filtroTecnico
       ? tecnicos.find(t => t.nome === filtroTecnico)?.id ?? null
       : null
@@ -280,8 +299,6 @@ export function ApoioTecnico() {
 
       if (filtroEspaco) linhas = linhas.filter(l => l.espaco_id === filtroEspaco)
 
-      // Filtro por técnico: mostra linhas onde este técnico está atribuído
-      // OU dias onde está de folga (mantém o dia visível mesmo que sem linha activa)
       if (tecFiltroId) {
         linhas = linhas.filter(l => {
           const tecId = l.ev?.tecnico_id ?? l.ag?.tecnico_id ?? null
@@ -296,7 +313,6 @@ export function ApoioTecnico() {
         (l.tecNome ?? '').toLowerCase().includes(q)
       )
 
-      // Se filtro por técnico: manter o dia se tem folga desse técnico mesmo sem linhas
       const temFolgaDoTecnico = tecFiltroId && (grupo.folgas ?? []).includes(tecFiltroId)
       if (linhas.length === 0 && !temFolgaDoTecnico) return null
 
@@ -304,15 +320,126 @@ export function ApoioTecnico() {
     }).filter(Boolean)
   }, [linhasBrutas, filtroEspaco, filtroTecnico, pesquisa, tecnicos])
 
-  // Número máximo de eventos num único dia (define quantos grupos de colunas criar)
   const maxGrupos = useMemo(() =>
     Math.max(1, ...linhasPorDia.map(g => g.linhas.length))
   , [linhasPorDia])
 
+  // ── Handlers de drag & drop ──────────────────────────────────────────────────
+  const handleDragStart = useCallback((e, linha) => {
+    e.dataTransfer.effectAllowed = 'move'
+    // Ghost image minimalista
+    const ghost = document.createElement('span')
+    ghost.textContent = linha.tecNome
+    ghost.style.cssText = 'position:fixed;top:-100px;left:-100px;padding:2px 10px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:999px;font-size:11px;font-weight:600;'
+    document.body.appendChild(ghost)
+    e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 12)
+    setTimeout(() => document.body.removeChild(ghost), 0)
+
+    setDragSource({
+      dropKey:   `${linha.dataStr}|${linha.espaco_id}`,
+      tecnicoId: linha.tecId,
+      eventoId:  linha.ev?.id ?? null,
+      agId:      linha.ag?.id ?? null,
+    })
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    setDragSource(null)
+    setDragOver(null)
+  }, [])
+
+  const handleDragOver = useCallback((e, key) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOver(key)
+  }, [])
+
+  const handleDragLeave = useCallback((e) => {
+    // Só limpa se sair do td, não dos filhos
+    if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(null)
+  }, [])
+
+  const handleDrop = useCallback(async (e, linha) => {
+    e.preventDefault()
+    setDragOver(null)
+    const src = dragSource
+    setDragSource(null)
+    if (!src?.tecnicoId) return
+    const dstKey = `${linha.dataStr}|${linha.espaco_id}`
+    if (src.dropKey === dstKey) return   // mesma célula
+
+    try {
+      // 1. Atribuir ao destino
+      if (linha.ev?.id) {
+        await supabase.from('supa_eventos')
+          .update({ tecnico_id: src.tecnicoId })
+          .eq('id', linha.ev.id)
+      } else if (linha.ag?.id) {
+        await supabase.from('agendamentos_tecnicos')
+          .update({ tecnico_id: src.tecnicoId })
+          .eq('id', linha.ag.id)
+      } else {
+        await supabase.from('agendamentos_tecnicos').insert({
+          data: linha.dataStr, espaco_id: linha.espaco_id,
+          tecnico_id: src.tecnicoId, folga: false,
+        })
+      }
+      // 2. Limpar origem
+      if (src.eventoId) {
+        await supabase.from('supa_eventos')
+          .update({ tecnico_id: null })
+          .eq('id', src.eventoId)
+      } else if (src.agId) {
+        await supabase.from('agendamentos_tecnicos').delete().eq('id', src.agId)
+      }
+      carregar()
+    } catch (err) { console.error(err) }
+  }, [dragSource, carregar])
+
   if (loading) return <LoadingPage />
 
-  const thCls = 'px-2 py-2 text-left text-[10px] font-bold text-accent-subtle uppercase tracking-widest whitespace-nowrap'
+  const thCls    = 'px-2 py-2 text-left text-[10px] font-bold text-accent-subtle uppercase tracking-widest whitespace-nowrap'
   const sepThCls = 'w-0.5 p-0 bg-border'
+
+  // Helper: renderiza a célula de técnico (draggable + drop zone)
+  const renderTecCell = (linha, extraCls = '') => {
+    if (!linha) return <td className={clsx('px-2 py-2', extraCls)} />
+    const dropKey   = `${linha.dataStr}|${linha.espaco_id}`
+    const isSrc     = dragSource?.dropKey === dropKey
+    const isDst     = dragOver === dropKey && dragSource && dragSource.dropKey !== dropKey
+    const isDraggingAny = !!dragSource
+
+    return (
+      <td
+        key={`tec-${dropKey}`}
+        onDragOver={(e) => handleDragOver(e, dropKey)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, linha)}
+        onClick={!isDraggingAny
+          ? () => setModalAtrib({
+              data: linha.dataStr, espaco_id: linha.espaco_id,
+              espaco: linha.espacoNome, agendamento: linha.ag,
+              evento: linha.ev, dj: linha.djs?.join(', '),
+            })
+          : undefined
+        }
+        className={clsx(
+          'px-2 py-1.5 whitespace-nowrap transition-all duration-100',
+          extraCls,
+          isDst
+            ? 'bg-status-confirmado/10 outline outline-1 outline-inset outline-status-confirmado/50'
+            : !isDraggingAny && 'cursor-pointer hover:bg-status-confirmado/5',
+        )}
+      >
+        <TecnicoChip
+          nome={linha.tecNome}
+          isDragging={isSrc}
+          onDragStart={(e) => handleDragStart(e, linha)}
+          onDragEnd={handleDragEnd}
+        />
+      </td>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -400,7 +527,7 @@ export function ApoioTecnico() {
               {Array.from({ length: maxGrupos }, (_, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && <col style={{ width: 2 }} />}
-                  <col style={{ width: 95 }} />
+                  <col style={{ width: 100 }} />
                   <col style={{ width: 140 }} />
                   <col style={{ width: 150 }} />
                   <col style={{ width: 78 }} />
@@ -433,7 +560,10 @@ export function ApoioTecnico() {
               {linhasPorDia.map(({ dataStr, dia, linhas, folgas }) => {
                 const nomesEmFolga = folgas.map(tid => tecnicos.find(t => t.id === tid)?.nome ?? '?').join(' · ')
                 return (
-                  <tr key={dataStr} className={clsx('border-b border-border/30 hover:bg-surface-2/20 transition-colors align-middle', isFds(dataStr) ? 'bg-blue-400/[0.04]' : 'bg-surface-0')}>
+                  <tr key={dataStr} className={clsx(
+                    'border-b border-border/30 hover:bg-surface-2/20 transition-colors align-middle',
+                    isFds(dataStr) ? 'bg-blue-400/[0.04]' : 'bg-surface-0'
+                  )}>
                     <td onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
                       className="px-3 py-2 text-accent-muted capitalize font-medium whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors">
                       {format(dia, 'EEE', { locale: pt })}
@@ -446,11 +576,8 @@ export function ApoioTecnico() {
                       const linha = linhas[i] ?? null
                       return [
                         i > 0 && <td key={`sep-${dataStr}-${i}`} className="p-0 bg-border w-0.5" />,
-                        <td key={`tec-${dataStr}-${i}`}
-                          onClick={linha ? () => setModalAtrib({ data: dataStr, espaco_id: linha.espaco_id, espaco: linha.espacoNome, agendamento: linha.ag, evento: linha.ev, dj: linha.djs?.join(', ') }) : undefined}
-                          className={clsx('px-2 py-2 whitespace-nowrap', i > 0 && 'pl-3', linha ? 'cursor-pointer hover:bg-status-confirmado/5 transition-colors' : '')}>
-                          {linha?.tecNome ? <span className="text-status-confirmado font-semibold">{linha.tecNome}</span> : linha ? <span className="text-border/30 text-[10px]">+ atribuir</span> : null}
-                        </td>,
+                        // Técnico — draggable
+                        renderTecCell(linha, i > 0 ? 'pl-3' : ''),
                         <td key={`esp-${dataStr}-${i}`} className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>,
                         <td key={`ev-${dataStr}-${i}`} className="px-2 py-2 text-accent-muted max-w-0"><span className="block truncate">{linha?.ev?.evento ?? ''}</span></td>,
                         <td key={`ins-${dataStr}-${i}`} className="px-2 py-2 text-center text-accent-subtle tabular-nums whitespace-nowrap">
@@ -481,7 +608,7 @@ export function ApoioTecnico() {
             <colgroup>
               <col style={{ width: 52 }} />
               <col style={{ width: 50 }} />
-              <col style={{ width: 95 }} />
+              <col style={{ width: 105 }} />
               <col style={{ width: 140 }} />
               <col />
               <col style={{ width: 78 }} />
@@ -517,25 +644,20 @@ export function ApoioTecnico() {
                       isFds(dataStr) ? 'bg-blue-400/[0.04]' : 'bg-surface-0'
                     )}
                   >
-                    {/* Dia — rowSpan */}
                     {li === 0 && (
                       <td rowSpan={rowSpan} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
                         className="px-3 py-2 text-accent-muted capitalize font-medium whitespace-nowrap align-top border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors">
                         {format(dia, 'EEE', { locale: pt })}
                       </td>
                     )}
-                    {/* Data — rowSpan */}
                     {li === 0 && (
                       <td rowSpan={rowSpan} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
                         className="px-2 py-2 text-accent-subtle tabular-nums whitespace-nowrap align-top border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors">
                         {format(dia, 'dd/MM')}
                       </td>
                     )}
-                    {/* Técnico */}
-                    <td onClick={() => setModalAtrib({ data: dataStr, espaco_id: linha.espaco_id, espaco: linha.espacoNome, agendamento: linha.ag, evento: linha.ev, dj: linha.djs?.join(', ') })}
-                      className="px-2 py-2 cursor-pointer hover:bg-status-confirmado/5 transition-colors whitespace-nowrap">
-                      {linha.tecNome ? <span className="text-status-confirmado font-semibold">{linha.tecNome}</span> : <span className="text-border/30 text-[10px]">+ atribuir</span>}
-                    </td>
+                    {/* Técnico — draggable */}
+                    {renderTecCell(linha)}
                     {/* Espaço */}
                     <td className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha.espacoNome}</td>
                     {/* Evento */}
