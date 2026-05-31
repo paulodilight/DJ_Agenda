@@ -748,12 +748,13 @@ export function ApoioTecnico() {
               {linhasPorDia.length === 0 && (
                 <tr><td colSpan={99} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
               )}
-              {linhasPorDia.map(({ dataStr, dia, linhas, folgas }) => {
+              {linhasPorDia.map(({ dataStr, dia, linhas, folgas }, dayIdx) => {
                 const tecsFolga = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
+                const zebraCls  = dayIdx % 2 === 1 ? 'bg-white/[0.025]' : ''
                 return (
                   <tr key={dataStr} className={clsx(
                     'border-b border-border/30 hover:bg-surface-2/20 transition-colors align-middle',
-                    isFds(dataStr) ? 'bg-blue-400/[0.04]' : 'bg-surface-0'
+                    isFds(dataStr) ? 'bg-blue-400/[0.04]' : zebraCls
                   )}>
                     <td onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
                       className="px-3 py-2 text-accent-muted capitalize font-medium whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors">
@@ -850,9 +851,10 @@ export function ApoioTecnico() {
               {linhasPorDia.length === 0 && (
                 <tr><td colSpan={9} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
               )}
-              {linhasPorDia.map(({ dataStr, dia, linhas, folgas }) => {
+              {linhasPorDia.map(({ dataStr, dia, linhas, folgas }, dayIdx) => {
                 const tecsFolga = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
                 const rowSpan   = linhas.length || 1
+                const zebraCls  = dayIdx % 2 === 1 ? 'bg-white/[0.025]' : ''
                 // cor de fundo da linha: primeiro técnico com folga, se existir
                 const folgaRowCls = tecsFolga.length > 0
                   ? (tecCorMap[tecsFolga[0].id]?.row ?? 'bg-orange-400/[0.06]')
@@ -863,7 +865,7 @@ export function ApoioTecnico() {
                     className={clsx(
                       'hover:bg-surface-2/20 transition-colors',
                       li < rowsToRender.length - 1 ? 'border-b border-border/10' : 'border-b border-border/30',
-                      folgaRowCls ?? (isFds(dataStr) ? 'bg-blue-400/[0.04]' : 'bg-surface-0')
+                      folgaRowCls ?? (isFds(dataStr) ? 'bg-blue-400/[0.04]' : zebraCls)
                     )}
                   >
                     {li === 0 && (
