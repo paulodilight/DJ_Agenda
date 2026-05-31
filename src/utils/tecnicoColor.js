@@ -16,7 +16,7 @@ const ESTILOS = {
     btn:    'bg-status-confirmado/15 text-status-confirmado border-status-confirmado/30',
     dot:    'bg-status-confirmado',
     text:   'text-status-confirmado',
-    row:    'bg-status-confirmado/[0.06]',
+    row:    'bg-status-confirmado/[0.18]',
   },
   red:    {
     chip:   'bg-red-400/15 text-red-400 border-red-400/30',
@@ -24,7 +24,7 @@ const ESTILOS = {
     btn:    'bg-red-400/15 text-red-400 border-red-400/30',
     dot:    'bg-red-400',
     text:   'text-red-400',
-    row:    'bg-red-400/[0.06]',
+    row:    'bg-red-400/[0.18]',
   },
   blue:   {
     chip:   'bg-blue-400/15 text-blue-400 border-blue-400/30',
@@ -32,7 +32,7 @@ const ESTILOS = {
     btn:    'bg-blue-400/15 text-blue-400 border-blue-400/30',
     dot:    'bg-blue-400',
     text:   'text-blue-400',
-    row:    'bg-blue-400/[0.06]',
+    row:    'bg-blue-400/[0.18]',
   },
   violet: {
     chip:   'bg-violet-400/15 text-violet-400 border-violet-400/30',
@@ -40,7 +40,7 @@ const ESTILOS = {
     btn:    'bg-violet-400/15 text-violet-400 border-violet-400/30',
     dot:    'bg-violet-400',
     text:   'text-violet-400',
-    row:    'bg-violet-400/[0.06]',
+    row:    'bg-violet-400/[0.18]',
   },
   amber:  {
     chip:   'bg-amber-400/15 text-amber-400 border-amber-400/30',
@@ -48,7 +48,7 @@ const ESTILOS = {
     btn:    'bg-amber-400/15 text-amber-400 border-amber-400/30',
     dot:    'bg-amber-400',
     text:   'text-amber-400',
-    row:    'bg-amber-400/[0.06]',
+    row:    'bg-amber-400/[0.18]',
   },
   cyan:   {
     chip:   'bg-cyan-400/15 text-cyan-400 border-cyan-400/30',
@@ -56,7 +56,7 @@ const ESTILOS = {
     btn:    'bg-cyan-400/15 text-cyan-400 border-cyan-400/30',
     dot:    'bg-cyan-400',
     text:   'text-cyan-400',
-    row:    'bg-cyan-400/[0.06]',
+    row:    'bg-cyan-400/[0.18]',
   },
   pink:   {
     chip:   'bg-pink-400/15 text-pink-400 border-pink-400/30',
@@ -64,7 +64,7 @@ const ESTILOS = {
     btn:    'bg-pink-400/15 text-pink-400 border-pink-400/30',
     dot:    'bg-pink-400',
     text:   'text-pink-400',
-    row:    'bg-pink-400/[0.06]',
+    row:    'bg-pink-400/[0.18]',
   },
   orange: {
     chip:   'bg-orange-400/15 text-orange-400 border-orange-400/30',
@@ -72,7 +72,7 @@ const ESTILOS = {
     btn:    'bg-orange-400/15 text-orange-400 border-orange-400/30',
     dot:    'bg-orange-400',
     text:   'text-orange-400',
-    row:    'bg-orange-400/[0.06]',
+    row:    'bg-orange-400/[0.18]',
   },
 }
 
