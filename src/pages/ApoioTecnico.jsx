@@ -315,6 +315,24 @@ function VistaEstatisticas({ tecnicos, eventos, agendamentos, tecCorMap }) {
   )
 }
 
+// ── FolgaChip — chip draggable para folgas ────────────────────────────────────
+function FolgaChip({ tecnico, cor, dataStr, onDragStart, isDragging }) {
+  return (
+    <span
+      draggable
+      onDragStart={e => onDragStart(e, dataStr, tecnico.id)}
+      onDragEnd={() => {}}
+      className={clsx(
+        'inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border select-none cursor-grab active:cursor-grabbing transition-opacity',
+        cor?.chip ?? 'bg-orange-400/15 text-orange-400 border-orange-400/30',
+        isDragging ? 'opacity-30' : 'opacity-100'
+      )}
+    >
+      {tecnico.nome}
+    </span>
+  )
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 export function ApoioTecnico() {
   const { anoMes } = useMesStore()
@@ -331,9 +349,35 @@ export function ApoioTecnico() {
   const [pesquisa, setPesquisa]           = useState('')
   const [vista, setVista]                 = useState('colunas')
 
-  // ── Drag state ──────────────────────────────────────────────────────────────
+  // ── Drag state (técnico) ────────────────────────────────────────────────────
   const [dragSource, setDragSource] = useState(null)  // { dropKey, tecnicoId, eventoId, agId }
   const [dragOver, setDragOver]     = useState(null)  // dropKey string
+
+  // ── Drag state (folga) ──────────────────────────────────────────────────────
+  const [dragFolga, setDragFolga]   = useState(null)  // { data, tecnicoId }
+  const [dragOverFolga, setDragOverFolga] = useState(null)  // dataStr
+
+  const handleFolgaDragStart = useCallback((e, data, tecnicoId) => {
+    e.stopPropagation()
+    e.dataTransfer.effectAllowed = 'move'
+    setDragFolga({ data, tecnicoId })
+  }, [])
+
+  const handleFolgaDrop = useCallback(async (e, targetData) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!dragFolga || dragFolga.data === targetData) { setDragFolga(null); setDragOverFolga(null); return }
+    try {
+      // Remove folga do dia de origem
+      const folgaOrigem = agendamentos.find(a => a.data === dragFolga.data && a.tecnico_id === dragFolga.tecnicoId && a.folga)
+      if (folgaOrigem) await supabase.from('agendamentos_tecnicos').delete().eq('id', folgaOrigem.id)
+      // Adiciona folga no dia destino (se não existir já)
+      const jaExiste = agendamentos.find(a => a.data === targetData && a.tecnico_id === dragFolga.tecnicoId && a.folga)
+      if (!jaExiste) await supabase.from('agendamentos_tecnicos').insert({ data: targetData, tecnico_id: dragFolga.tecnicoId, folga: true })
+      carregar()
+    } catch (err) { console.error(err) }
+    finally { setDragFolga(null); setDragOverFolga(null) }
+  }, [dragFolga, agendamentos, carregar])
 
   const { dataInicio, dataFim, dias } = useMemo(() => {
     const [ano, mes] = anoMes.split('-').map(Number)
@@ -750,14 +794,22 @@ export function ApoioTecnico() {
                         </td>,
                       ]
                     })}
-                    <td onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
-                      className="px-2 py-2 border-l border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors whitespace-nowrap">
+                    <td
+                      onClick={() => setModalFolga({ data: dataStr })}
+                      onDragOver={e => { e.preventDefault(); setDragOverFolga(dataStr) }}
+                      onDragLeave={() => setDragOverFolga(null)}
+                      onDrop={e => handleFolgaDrop(e, dataStr)}
+                      title="Gerir folgas · arrastar para mover folga"
+                      className={clsx(
+                        'px-2 py-2 border-l border-border/40 cursor-pointer transition-colors whitespace-nowrap',
+                        dragOverFolga === dataStr ? 'bg-orange-400/10 outline outline-1 outline-orange-400/40' : 'hover:bg-orange-400/5'
+                      )}>
                       {tecsFolga.length > 0
-                        ? <span className="inline-flex flex-wrap gap-x-1.5 gap-y-0.5">
+                        ? <span className="inline-flex flex-wrap gap-x-1 gap-y-1">
                             {tecsFolga.map(t => (
-                              <span key={t.id} className={clsx('font-medium text-[11px]', tecCorMap[t.id]?.text ?? 'text-accent-muted')}>
-                                {t.nome}
-                              </span>
+                              <FolgaChip key={t.id} tecnico={t} cor={tecCorMap[t.id]}
+                                dataStr={dataStr} onDragStart={handleFolgaDragStart}
+                                isDragging={dragFolga?.data === dataStr && dragFolga?.tecnicoId === t.id} />
                             ))}
                           </span>
                         : <span className="text-border/20 text-[10px]">—</span>
@@ -843,14 +895,22 @@ export function ApoioTecnico() {
                     <td className="px-2 py-2 text-accent-muted whitespace-nowrap" />
                     {/* Folga — rowSpan */}
                     {li === 0 && (
-                      <td rowSpan={rowSpan} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
-                        className="px-2 py-2 align-top border-l border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors whitespace-nowrap">
+                      <td rowSpan={rowSpan}
+                        onClick={() => setModalFolga({ data: dataStr })}
+                        onDragOver={e => { e.preventDefault(); setDragOverFolga(dataStr) }}
+                        onDragLeave={() => setDragOverFolga(null)}
+                        onDrop={e => handleFolgaDrop(e, dataStr)}
+                        title="Gerir folgas · arrastar para mover folga"
+                        className={clsx(
+                          'px-2 py-2 align-top border-l border-border/40 cursor-pointer transition-colors whitespace-nowrap',
+                          dragOverFolga === dataStr ? 'bg-orange-400/10 outline outline-1 outline-orange-400/40' : 'hover:bg-orange-400/5'
+                        )}>
                         {tecsFolga.length > 0
-                          ? <span className="inline-flex flex-wrap gap-x-1.5 gap-y-0.5">
+                          ? <span className="inline-flex flex-wrap gap-x-1 gap-y-1">
                               {tecsFolga.map(t => (
-                                <span key={t.id} className={clsx('font-medium text-[11px]', tecCorMap[t.id]?.text ?? 'text-accent-muted')}>
-                                  {t.nome}
-                                </span>
+                                <FolgaChip key={t.id} tecnico={t} cor={tecCorMap[t.id]}
+                                  dataStr={dataStr} onDragStart={handleFolgaDragStart}
+                                  isDragging={dragFolga?.data === dataStr && dragFolga?.tecnicoId === t.id} />
                               ))}
                             </span>
                           : <span className="text-border/20 text-[10px]">—</span>

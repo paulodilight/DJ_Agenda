@@ -242,6 +242,9 @@ export const agendaApi = {
     const { djs, espacos, dj_nome: _djNomeDisplay, dj_tier, dj_presskit, dj_instagram,
             espaco_nome, espaco_tipo, dj_externo,
             id: _id, criado_em, actualizado_em, ...dados } = slot
+    // Converte strings vazias para null em campos UUID
+    dados.dj_id     = dados.dj_id     || null
+    dados.espaco_id = dados.espaco_id || null
     // Se não há dj_id, guarda o nome livre (DJ convidado/externo) em dj_nome
     dados.dj_nome = dados.dj_id ? null : (dj_externo?.trim() || null)
     const { data, error } = await supabase
@@ -258,6 +261,9 @@ export const agendaApi = {
     const { djs, espacos, dj_nome: _djNomeDisplay, dj_tier, dj_presskit, dj_instagram,
             espaco_nome, espaco_tipo, dj_externo,
             id: _id, criado_em, actualizado_em, ...dados } = alteracoes
+    // Converte strings vazias para null em campos UUID
+    dados.dj_id     = dados.dj_id     || null
+    dados.espaco_id = dados.espaco_id || null
     // Se não há dj_id, guarda o nome livre (DJ convidado/externo) em dj_nome
     dados.dj_nome = dados.dj_id ? null : (dj_externo?.trim() || null)
     const { data, error } = await supabase
@@ -268,6 +274,15 @@ export const agendaApi = {
       .single()
     if (error) throw error
     return data
+  },
+
+  // Muda apenas a confirmação WPP sem tocar nos restantes campos
+  async mudarConfirmacaoWpp(id, confirmacao_wpp) {
+    const { error } = await supabase
+      .from('agenda')
+      .update({ confirmacao_wpp, actualizado_em: new Date().toISOString() })
+      .eq('id', id)
+    if (error) throw error
   },
 
   // Muda apenas o estado sem tocar nos restantes campos (evita limpar dj_nome)
@@ -303,22 +318,19 @@ export const agendaApi = {
     if (error) throw error
   },
 
-  async contarPorDJ() {
+  async contarPorDJ(mesFiltro) {
     const { data, error } = await supabase
       .from('agenda')
       .select('dj_id, data, valor')
       .not('dj_id', 'is', null)
     if (error) throw error
     const agora = new Date()
-    const mes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`
-    const proxData = new Date(agora.getFullYear(), agora.getMonth() + 1, 1)
-    const mesProx = `${proxData.getFullYear()}-${String(proxData.getMonth() + 1).padStart(2, '0')}`
+    const mes = mesFiltro ?? `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`
     const counts = {}
     data.forEach((s) => {
-      if (!counts[s.dj_id]) counts[s.dj_id] = { total: 0, mesCorrente: 0, mesSeguinte: 0, valorCorrente: 0, valorSeguinte: 0 }
+      if (!counts[s.dj_id]) counts[s.dj_id] = { total: 0, mesCorrente: 0, valorCorrente: 0 }
       counts[s.dj_id].total++
       if (s.data?.startsWith(mes)) { counts[s.dj_id].mesCorrente++; counts[s.dj_id].valorCorrente += s.valor ?? 0 }
-      if (s.data?.startsWith(mesProx)) { counts[s.dj_id].mesSeguinte++; counts[s.dj_id].valorSeguinte += s.valor ?? 0 }
     })
     return counts
   },
@@ -429,6 +441,14 @@ export const bloqueiosApi = {
     const { error } = await supabase
       .from('bloqueios')
       .update({ activo: false })
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  async reactivar(id) {
+    const { error } = await supabase
+      .from('bloqueios')
+      .update({ activo: true })
       .eq('id', id)
     if (error) throw error
   },
@@ -805,6 +825,44 @@ export const eventosApi = {
 
   async apagar(id) {
     const { error } = await supabase.from('eventos').delete().eq('id', id)
+    if (error) throw error
+  },
+}
+
+// ─── Artistas ────────────────────────────────────────────────────────────────
+
+export const artistasApi = {
+  async listar() {
+    const { data, error } = await supabase.from('artistas').select('*').order('nome')
+    if (error) throw error
+    return data ?? []
+  },
+
+  async buscar(id) {
+    const { data, error } = await supabase.from('artistas').select('*').eq('id', id).single()
+    if (error) throw error
+    return data
+  },
+
+  async criar(artista) {
+    const { id: _id, criado_em, actualizado_em, ...dados } = artista
+    const { data, error } = await supabase.from('artistas').insert(dados).select().single()
+    if (error) throw error
+    return data
+  },
+
+  async actualizar(id, alteracoes) {
+    const { id: _id, criado_em, actualizado_em, ...dados } = alteracoes
+    const { data, error } = await supabase
+      .from('artistas')
+      .update({ ...dados, actualizado_em: new Date().toISOString() })
+      .eq('id', id).select().single()
+    if (error) throw error
+    return data
+  },
+
+  async apagar(id) {
+    const { error } = await supabase.from('artistas').delete().eq('id', id)
     if (error) throw error
   },
 }
