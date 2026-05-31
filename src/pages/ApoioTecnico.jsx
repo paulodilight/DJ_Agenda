@@ -178,140 +178,129 @@ function TecnicoChip({ nome, cor, isDragging, onDragStart, onDragEnd }) {
   )
 }
 
-// ── Utilitário: parse "HH:MM:SS" → horas decimais ────────────────────────────
+// ── Utilitários estatísticas ──────────────────────────────────────────────────
 function horasDecimais(t) {
   if (!t) return null
   const [h, m] = t.split(':').map(Number)
   return h + (m || 0) / 60
-}
-function diffHoras(inicio, fim) {
-  const h1 = horasDecimais(inicio)
-  const h2 = horasDecimais(fim)
-  if (h1 == null || h2 == null) return 0
-  const d = h2 - h1
-  return d >= 0 ? d : d + 24 // passa meia-noite
 }
 function fmtH(h) {
   const hh = Math.floor(h)
   const mm = Math.round((h - hh) * 60)
   return `${hh}h${mm > 0 ? String(mm).padStart(2, '0') : ''}`
 }
+function fmtEuroStat(v) {
+  return v.toLocaleString('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €'
+}
+function calcStats(tecnicos, eventos, agendamentos) {
+  return tecnicos.map(tec => {
+    const evsT  = eventos.filter(e => e.tecnico_id === tec.id)
+    const datas = new Set(evsT.map(e => e.data_evento)).size
+    const folgas = agendamentos.filter(a => a.tecnico_id === tec.id && a.folga).length
+    const horas  = evsT.reduce((acc, e) => {
+      const chegada = e.hora_instalacao || e.hora_inicio
+      if (!chegada) return acc
+      const hC = horasDecimais(chegada)
+      const hF = e.hora_inicio ? horasDecimais(e.hora_inicio) + 2 : hC + 3
+      const d  = hF - hC
+      return acc + (d > 0 ? d : d + 24)
+    }, 0)
+    const valor = evsT.reduce((acc, e) => acc + (e.valor_apoio_tecnico ?? 0), 0)
+    return { tec, datas, folgas, horas, valor }
+  }).filter(s => s.datas > 0 || s.folgas > 0)
+}
+
+const METRICAS = [
+  { id: 'datas',  label: 'Datas',  fmt: v => String(v),       cor: 'text-accent' },
+  { id: 'folgas', label: 'Folgas', fmt: v => String(v),       cor: 'text-orange-400' },
+  { id: 'horas',  label: 'Horas',  fmt: v => fmtH(v),         cor: 'text-accent' },
+  { id: 'valor',  label: 'Valor',  fmt: v => fmtEuroStat(v),  cor: 'text-accent' },
+]
 
 // ── Vista Estatísticas ────────────────────────────────────────────────────────
 function VistaEstatisticas({ tecnicos, eventos, agendamentos, tecCorMap }) {
-  const stats = tecnicos.map(tec => {
-    const evsT   = eventos.filter(e => e.tecnico_id === tec.id)
-    const datas  = new Set(evsT.map(e => e.data_evento)).size
-    const folgas = agendamentos.filter(a => a.tecnico_id === tec.id && a.folga).length
-    const horas  = evsT.reduce((acc, e) => {
-      // hora_instalacao → hora_inicio como mínimo de trabalho
-      // se só há hora_inicio, conta 0 (sem info de chegada)
-      return acc + diffHoras(e.hora_instalacao || e.hora_inicio, e.hora_inicio || e.hora_instalacao)
-    }, 0)
-    // alternativa: usar hora_instalacao a hora_inicio (setup) + estimar 2h de serviço
-    const horasEstimadas = evsT.reduce((acc, e) => {
-      const chegada = e.hora_instalacao || e.hora_inicio
-      if (!chegada) return acc
-      const hChegada = horasDecimais(chegada)
-      // assume termina 2h após hora_inicio (ou 3h se não há hora_inicio)
-      const hFim = e.hora_inicio ? horasDecimais(e.hora_inicio) + 2 : hChegada + 3
-      const total = hFim - hChegada
-      return acc + (total > 0 ? total : total + 24)
-    }, 0)
-    return { tec, datas, folgas, horas: horasEstimadas }
-  }).filter(s => s.datas > 0 || s.folgas > 0)
+  const [metricaActiva, setMetricaActiva] = useState('datas')
+  const stats = calcStats(tecnicos, eventos, agendamentos)
 
-  if (stats.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-20 text-accent-subtle/40 text-sm">
-        Sem dados para este mês.
-      </div>
-    )
-  }
+  if (stats.length === 0)
+    return <div className="flex items-center justify-center py-20 text-accent-subtle/40 text-sm">Sem dados para este mês.</div>
 
-  const maxDatas = Math.max(1, ...stats.map(s => s.datas))
-  const maxHoras = Math.max(1, ...stats.map(s => s.horas))
+  const metrica    = METRICAS.find(m => m.id === metricaActiva)
+  const ordenados  = [...stats].sort((a, b) => b[metricaActiva] - a[metricaActiva])
+  const maxVal     = Math.max(1, ...ordenados.map(s => s[metricaActiva]))
 
   return (
-    <div className="p-6 flex flex-col gap-4 overflow-auto">
-      <p className="text-[10px] font-bold text-accent-subtle uppercase tracking-widest">
-        Resumo por colaborador — carga horária estimada (hora instalação → hora início + 2h de serviço)
-      </p>
+    <div className="p-6 flex flex-col gap-5 overflow-auto">
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {stats.map(({ tec, datas, folgas, horas }) => {
+      {/* ── Card resumo comparativo ── */}
+      <div className="bg-surface-1 border border-border rounded-2xl overflow-hidden">
+        {/* Botões de métrica */}
+        <div className="px-5 py-3.5 border-b border-border/50 flex items-center gap-2">
+          <span className="text-[10px] font-bold text-accent-subtle uppercase tracking-widest mr-2">Comparação</span>
+          {METRICAS.map(m => (
+            <button key={m.id} onClick={() => setMetricaActiva(m.id)}
+              className={clsx(
+                'px-3.5 py-1.5 rounded-lg text-xs font-bold border transition-all',
+                metricaActiva === m.id
+                  ? 'bg-white/10 text-accent border-white/20'
+                  : 'bg-surface-2 text-accent-muted border-border hover:text-accent hover:bg-surface-3'
+              )}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {/* Ranking */}
+        <div className="divide-y divide-border/20">
+          {ordenados.map(({ tec, ...vals }, idx) => {
+            const val = vals[metricaActiva]
+            const cor = tecCorMap[tec.id]
+            return (
+              <div key={tec.id} className="flex items-center gap-4 px-5 py-3">
+                <span className="w-5 text-[11px] text-accent-subtle/50 tabular-nums text-right font-bold">{idx + 1}</span>
+                <span className={clsx('text-xs font-bold w-28 truncate shrink-0', cor?.text ?? 'text-accent')}>{tec.nome}</span>
+                <div className="flex-1 h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                  <div className={clsx('h-full rounded-full transition-all duration-500', cor?.dot ?? 'bg-accent')}
+                    style={{ width: `${(val / maxVal) * 100}%` }} />
+                </div>
+                <span className={clsx('text-base font-black tabular-nums shrink-0 w-20 text-right', cor?.text ?? 'text-accent')}>
+                  {metrica.fmt(val)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Cards individuais em linha ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map(({ tec, datas, folgas, horas, valor }) => {
           const cor = tecCorMap[tec.id]
           return (
-            <div key={tec.id}
-              className="bg-surface-1 border border-border rounded-2xl p-5 flex flex-col gap-4">
-
-              {/* Cabeçalho */}
-              <div className="flex items-center gap-3">
-                <span className={clsx(
-                  'w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black shrink-0',
-                  cor?.avatar ?? 'bg-surface-3 text-accent-muted border border-border'
-                )}>
+            <div key={tec.id} className="bg-surface-1 border border-border rounded-2xl p-4 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <span className={clsx('w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black shrink-0', cor?.avatar ?? 'bg-surface-3 text-accent-muted')}>
                   {tec.nome.charAt(0).toUpperCase()}
                 </span>
-                <p className="font-bold text-accent text-sm">{tec.nome}</p>
+                <p className="font-bold text-accent text-sm truncate">{tec.nome}</p>
               </div>
-
-              {/* Stats números */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="flex flex-col gap-0.5">
-                  <span className={clsx('text-2xl font-black tabular-nums', cor?.text ?? 'text-accent')}>{datas}</span>
-                  <span className="text-[10px] text-accent-subtle uppercase tracking-wider">Datas</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-2xl font-black tabular-nums text-orange-400">{folgas}</span>
-                  <span className="text-[10px] text-accent-subtle uppercase tracking-wider">Folgas</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className={clsx('text-2xl font-black tabular-nums', cor?.text ?? 'text-accent')}>{fmtH(horas)}</span>
-                  <span className="text-[10px] text-accent-subtle uppercase tracking-wider">Horas est.</span>
-                </div>
-              </div>
-
-              {/* Barras visuais */}
-              <div className="flex flex-col gap-2">
-                <div>
-                  <div className="flex justify-between text-[10px] text-accent-subtle mb-1">
-                    <span>Datas de trabalho</span><span>{datas}</span>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                {[
+                  { label: 'Datas',  val: datas,              color: cor?.text ?? 'text-accent', fmt: v => v },
+                  { label: 'Folgas', val: folgas,             color: 'text-orange-400',           fmt: v => v },
+                  { label: 'Horas',  val: horas,              color: cor?.text ?? 'text-accent',  fmt: fmtH },
+                  { label: 'Valor',  val: valor,              color: cor?.text ?? 'text-accent',  fmt: v => v > 0 ? fmtEuroStat(v) : '—' },
+                ].map(({ label, val, color, fmt }) => (
+                  <div key={label} className="flex flex-col gap-0.5">
+                    <span className={clsx('text-lg font-black tabular-nums leading-none', color)}>{fmt(val)}</span>
+                    <span className="text-[9px] text-accent-subtle uppercase tracking-wider">{label}</span>
                   </div>
-                  <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                    <div
-                      className={clsx('h-full rounded-full transition-all', cor?.dot ? cor.dot : 'bg-accent')}
-                      style={{ width: `${(datas / maxDatas) * 100}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[10px] text-accent-subtle mb-1">
-                    <span>Carga horária estimada</span><span>{fmtH(horas)}</span>
-                  </div>
-                  <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                    <div
-                      className={clsx('h-full rounded-full transition-all', cor?.dot ? cor.dot : 'bg-accent')}
-                      style={{ width: `${(horas / maxHoras) * 100}%` }}
-                    />
-                  </div>
-                </div>
-                {folgas > 0 && (
-                  <div>
-                    <div className="flex justify-between text-[10px] text-accent-subtle mb-1">
-                      <span>Folgas</span><span>{folgas}</span>
-                    </div>
-                    <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-orange-400 transition-all"
-                        style={{ width: `${Math.min(100, (folgas / Math.max(1, datas)) * 100)}%` }} />
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
           )
         })}
       </div>
+
     </div>
   )
 }
@@ -374,7 +363,7 @@ export function ApoioTecnico() {
       supabase.from('espacos').select('id, nome').eq('activo', true).order('nome'),
       supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicio).lte('data', dataFim),
       supabase.from('supa_eventos')
-        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_instalacao, status, tecnico_id')
+        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_instalacao, status, tecnico_id, valor_apoio_tecnico')
         .gte('data_evento', dataInicio).lte('data_evento', dataFim).neq('status', 'cancelado'),
       supabase.from('agenda')
         .select('id, espaco_id, data, dj_nome, dj_id, tipo_slot, estado, djs(nome, nome_artistico)')
