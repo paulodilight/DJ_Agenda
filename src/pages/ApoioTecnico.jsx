@@ -887,11 +887,19 @@ export function ApoioTecnico() {
                     {/* Evento */}
                     <td className="px-2 py-2 text-accent-muted max-w-0"><span className="block truncate">{linha?.ev?.evento ?? ''}</span></td>
                     {/* Hora Inst. */}
-                    <td className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium" />
+                    <td className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium">
+                      {linha?.ev?.hora_instalacao
+                        ? <span className={tecCorMap[linha.tecId]?.text ?? 'text-accent-subtle'}>{hhmm(linha.ev.hora_instalacao)}</span>
+                        : linha ? <span className="text-border/20">—</span> : null}
+                    </td>
                     {/* Hora Início */}
-                    <td className="px-2 py-2 text-center text-accent-subtle tabular-nums whitespace-nowrap" />
+                    <td className="px-2 py-2 text-center text-accent-subtle tabular-nums whitespace-nowrap">
+                      {linha?.ev?.hora_inicio ? hhmm(linha.ev.hora_inicio) : linha ? <span className="text-border/20">—</span> : null}
+                    </td>
                     {/* DJ */}
-                    <td className="px-2 py-2 text-accent-muted whitespace-nowrap" />
+                    <td className="px-2 py-2 text-accent-muted whitespace-nowrap">
+                      {linha ? (linha.djs?.length ? linha.djs.join(' · ') : <span className="text-border/20">—</span>) : null}
+                    </td>
                     {/* Folga — rowSpan */}
                     {li === 0 && (
                       <td rowSpan={rowSpan}
