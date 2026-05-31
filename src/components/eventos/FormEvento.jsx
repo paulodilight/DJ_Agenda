@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
-import { X, Database } from 'lucide-react'
+import { X, Database, Star } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
 import { supaEventosApi } from '@/lib/supaEventosApi'
+import { artistasApi } from '@/lib/api'
+import { useUndo } from '@/contexts/UndoContext'
 import { supabase } from '@/lib/supabase'
 import { clsx } from 'clsx'
 
@@ -17,11 +19,12 @@ const VAZIO = {
   evento: '',
   tipo: '',
   espaco_id: '',
-  cliente: '',
   responsavel: '',
   morada: '',
   contacto_pelo_evento: '',
   status: 'proposta',
+  xclusive: false,
+  artista_id: '',
   data_evento: '',
   hora_inicio: '',
   hora_fim: '',
@@ -53,13 +56,14 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   const [form, setForm]       = useState(VAZIO)
   const [loading, setLoading] = useState(false)
   const [erro, setErro]       = useState(null)
+  const { pushUndo } = useUndo()
   const [abaActiva, setAba]   = useState('geral')
   const [tipos, setTipos]       = useState([])
   const [espacos, setEspacos]   = useState([])
   const [tecnicos, setTecnicos] = useState([])
+  const [artistas, setArtistas] = useState([])
 
   useEffect(() => {
-    // Carregar tipos com flag tem_artista
     supabase.from('tipo_eventos').select('id, nome, tem_artista').order('nome')
       .then(({ data }) => setTipos(data ?? []))
       .catch(console.error)
@@ -67,6 +71,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
     supabase.from('tecnicos').select('id, nome').eq('ativo', true).order('nome')
       .then(({ data }) => setTecnicos(data ?? []))
       .catch(console.error)
+    artistasApi.listar().then(setArtistas).catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -80,6 +85,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         valor:               evento.valor               != null ? String(evento.valor)               : '',
         valor_artistico:     evento.valor_artistico     != null ? String(evento.valor_artistico)     : '',
         valor_apoio_tecnico: evento.valor_apoio_tecnico != null ? String(evento.valor_apoio_tecnico) : '',
+        xclusive:    evento.xclusive    ?? false,
+        artista_id:  evento.artista_id  ?? '',
         tecnico_id:      evento.tecnico_id ?? '',
         hora_inicio:     evento.hora_inicio?.slice(0, 5)     ?? '',
         hora_fim:        evento.hora_fim?.slice(0, 5)        ?? '',
@@ -110,6 +117,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         valor:               form.valor               !== '' ? Number(form.valor)               : null,
         valor_artistico:     form.valor_artistico     !== '' ? Number(form.valor_artistico)     : null,
         valor_apoio_tecnico: form.valor_apoio_tecnico !== '' ? Number(form.valor_apoio_tecnico) : null,
+        espaco_id:       form.espaco_id       || null,
+        artista_id:      form.artista_id      || null,
         tecnico_id:      form.tecnico_id      || null,
         hora_inicio:     form.hora_inicio     || null,
         hora_fim:        form.hora_fim        || null,
@@ -132,10 +141,15 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
 
   const apagar = async () => {
     if (!evento?.id) return
-    if (!window.confirm('Apagar este evento? Esta acção não pode ser desfeita.')) return
+    if (!window.confirm('Apagar este evento?')) return
     setLoading(true)
     try {
+      const backup = { ...evento }
       await supaEventosApi.apagar(evento.id)
+      pushUndo({
+        label: `Evento "${evento.evento || evento.id}" apagado`,
+        undo: async () => { await supaEventosApi.criar(backup); onGuardado?.() },
+      })
       onGuardado?.()
       onFechar()
     } catch (e) {
@@ -233,16 +247,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 </select>
               </Field>
 
-              {/* Cliente + Status */}
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Cliente">
-                  <input
-                    className={inputCls}
-                    value={form.cliente}
-                    onChange={(e) => set('cliente', e.target.value)}
-                    placeholder="Nome do cliente…"
-                  />
-                </Field>
+              {/* Status + Xclusive */}
+              <div className="grid grid-cols-2 gap-3 items-end">
                 <Field label="Status">
                   <select
                     className={inputCls}
@@ -254,7 +260,38 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     ))}
                   </select>
                 </Field>
+                <div className="pb-1">
+                  <button
+                    type="button"
+                    onClick={() => set('xclusive', !form.xclusive)}
+                    className={clsx(
+                      'w-full flex items-center justify-center gap-2 px-3 py-2 rounded border text-xs font-semibold transition-colors',
+                      form.xclusive
+                        ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
+                        : 'bg-surface-2 border-border text-accent-muted hover:text-accent hover:border-white/20'
+                    )}
+                  >
+                    <Star size={12} className={form.xclusive ? 'fill-violet-400 text-violet-400' : ''} />
+                    Xclusive
+                  </button>
+                </div>
               </div>
+
+              {/* Artista — só aparece quando Xclusive está activo */}
+              {form.xclusive && (
+                <Field label="Artista">
+                  <select
+                    className={inputCls}
+                    value={form.artista_id}
+                    onChange={(e) => set('artista_id', e.target.value)}
+                  >
+                    <option value="">— Seleccionar artista —</option>
+                    {artistas.map(a => (
+                      <option key={a.id} value={a.id}>{a.nome}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
 
               {/* Valores — apoio técnico sempre visível; artístico só para tipos com artista */}
               {(() => {
