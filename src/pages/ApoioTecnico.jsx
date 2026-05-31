@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { X, Search, Columns2, AlignJustify } from 'lucide-react'
+import { X, Search, Columns2, AlignJustify, BarChart3 } from 'lucide-react'
 import { useMesStore } from '@/store'
 import { supabase } from '@/lib/supabase'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { clsx } from 'clsx'
+import { corTecnico } from '@/utils/tecnicoColor'
 
 const isoData    = (d) => format(d, 'yyyy-MM-dd')
 const hhmm       = (t) => t?.slice(0, 5) ?? null
@@ -157,7 +158,7 @@ function ModalFolga({ aberto, data, tecnicos, folgasHoje, agendamentos, onFechar
 }
 
 // ── Chip de técnico (draggable) ───────────────────────────────────────────────
-function TecnicoChip({ nome, isDragging, onDragStart, onDragEnd }) {
+function TecnicoChip({ nome, cor, isDragging, onDragStart, onDragEnd }) {
   if (!nome) return <span className="text-border/30 text-[10px]">+ atribuir</span>
   return (
     <span
@@ -165,14 +166,152 @@ function TecnicoChip({ nome, isDragging, onDragStart, onDragEnd }) {
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={clsx(
-        'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold select-none',
-        'bg-status-confirmado/15 text-status-confirmado border border-status-confirmado/30',
+        'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold select-none border',
+        cor?.chip ?? 'bg-status-confirmado/15 text-status-confirmado border-status-confirmado/30',
         'cursor-grab active:cursor-grabbing transition-opacity duration-150',
         isDragging ? 'opacity-25 scale-95' : 'opacity-100',
       )}
     >
       {nome}
     </span>
+  )
+}
+
+// ── Utilitário: parse "HH:MM:SS" → horas decimais ────────────────────────────
+function horasDecimais(t) {
+  if (!t) return null
+  const [h, m] = t.split(':').map(Number)
+  return h + (m || 0) / 60
+}
+function diffHoras(inicio, fim) {
+  const h1 = horasDecimais(inicio)
+  const h2 = horasDecimais(fim)
+  if (h1 == null || h2 == null) return 0
+  const d = h2 - h1
+  return d >= 0 ? d : d + 24 // passa meia-noite
+}
+function fmtH(h) {
+  const hh = Math.floor(h)
+  const mm = Math.round((h - hh) * 60)
+  return `${hh}h${mm > 0 ? String(mm).padStart(2, '0') : ''}`
+}
+
+// ── Vista Estatísticas ────────────────────────────────────────────────────────
+function VistaEstatisticas({ tecnicos, eventos, agendamentos, tecCorMap }) {
+  const stats = tecnicos.map(tec => {
+    const evsT   = eventos.filter(e => e.tecnico_id === tec.id)
+    const datas  = new Set(evsT.map(e => e.data_evento)).size
+    const folgas = agendamentos.filter(a => a.tecnico_id === tec.id && a.folga).length
+    const horas  = evsT.reduce((acc, e) => {
+      // hora_instalacao → hora_inicio como mínimo de trabalho
+      // se só há hora_inicio, conta 0 (sem info de chegada)
+      return acc + diffHoras(e.hora_instalacao || e.hora_inicio, e.hora_inicio || e.hora_instalacao)
+    }, 0)
+    // alternativa: usar hora_instalacao a hora_inicio (setup) + estimar 2h de serviço
+    const horasEstimadas = evsT.reduce((acc, e) => {
+      const chegada = e.hora_instalacao || e.hora_inicio
+      if (!chegada) return acc
+      const hChegada = horasDecimais(chegada)
+      // assume termina 2h após hora_inicio (ou 3h se não há hora_inicio)
+      const hFim = e.hora_inicio ? horasDecimais(e.hora_inicio) + 2 : hChegada + 3
+      const total = hFim - hChegada
+      return acc + (total > 0 ? total : total + 24)
+    }, 0)
+    return { tec, datas, folgas, horas: horasEstimadas }
+  }).filter(s => s.datas > 0 || s.folgas > 0)
+
+  if (stats.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-20 text-accent-subtle/40 text-sm">
+        Sem dados para este mês.
+      </div>
+    )
+  }
+
+  const maxDatas = Math.max(1, ...stats.map(s => s.datas))
+  const maxHoras = Math.max(1, ...stats.map(s => s.horas))
+
+  return (
+    <div className="p-6 flex flex-col gap-4 overflow-auto">
+      <p className="text-[10px] font-bold text-accent-subtle uppercase tracking-widest">
+        Resumo por colaborador — carga horária estimada (hora instalação → hora início + 2h de serviço)
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {stats.map(({ tec, datas, folgas, horas }) => {
+          const cor = tecCorMap[tec.id]
+          return (
+            <div key={tec.id}
+              className="bg-surface-1 border border-border rounded-2xl p-5 flex flex-col gap-4">
+
+              {/* Cabeçalho */}
+              <div className="flex items-center gap-3">
+                <span className={clsx(
+                  'w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black shrink-0',
+                  cor?.avatar ?? 'bg-surface-3 text-accent-muted border border-border'
+                )}>
+                  {tec.nome.charAt(0).toUpperCase()}
+                </span>
+                <p className="font-bold text-accent text-sm">{tec.nome}</p>
+              </div>
+
+              {/* Stats números */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className={clsx('text-2xl font-black tabular-nums', cor?.text ?? 'text-accent')}>{datas}</span>
+                  <span className="text-[10px] text-accent-subtle uppercase tracking-wider">Datas</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-2xl font-black tabular-nums text-orange-400">{folgas}</span>
+                  <span className="text-[10px] text-accent-subtle uppercase tracking-wider">Folgas</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className={clsx('text-2xl font-black tabular-nums', cor?.text ?? 'text-accent')}>{fmtH(horas)}</span>
+                  <span className="text-[10px] text-accent-subtle uppercase tracking-wider">Horas est.</span>
+                </div>
+              </div>
+
+              {/* Barras visuais */}
+              <div className="flex flex-col gap-2">
+                <div>
+                  <div className="flex justify-between text-[10px] text-accent-subtle mb-1">
+                    <span>Datas de trabalho</span><span>{datas}</span>
+                  </div>
+                  <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                    <div
+                      className={clsx('h-full rounded-full transition-all', cor?.dot ? cor.dot : 'bg-accent')}
+                      style={{ width: `${(datas / maxDatas) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-[10px] text-accent-subtle mb-1">
+                    <span>Carga horária estimada</span><span>{fmtH(horas)}</span>
+                  </div>
+                  <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                    <div
+                      className={clsx('h-full rounded-full transition-all', cor?.dot ? cor.dot : 'bg-accent')}
+                      style={{ width: `${(horas / maxHoras) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                {folgas > 0 && (
+                  <div>
+                    <div className="flex justify-between text-[10px] text-accent-subtle mb-1">
+                      <span>Folgas</span><span>{folgas}</span>
+                    </div>
+                    <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-orange-400 transition-all"
+                        style={{ width: `${Math.min(100, (folgas / Math.max(1, datas)) * 100)}%` }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -262,6 +401,13 @@ export function ApoioTecnico() {
     return idx
   }, [slots])
 
+  // Mapa tecnico_id → estilos de cor
+  const tecCorMap = useMemo(() => {
+    const m = {}
+    tecnicos.forEach((t, i) => { m[t.id] = corTecnico(t.nome, i) })
+    return m
+  }, [tecnicos])
+
   const espacosActivos = useMemo(() => {
     const ids = new Set([...eventos.map(e => e.espaco_id), ...slots.map(s => s.espaco_id)])
     return espacos.filter(e => ids.has(e.id))
@@ -282,7 +428,6 @@ export function ApoioTecnico() {
         const tecNome = tecId ? tecnicos.find(t => t.id === tecId)?.nome ?? null : null
         linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev, djs: dj ?? [], ag, tecNome, tecId })
       })
-      if (linhas.length === 0) return
       result.push({ dataStr, dia, linhas, folgas: folgasIdx[dataStr] ?? [] })
     })
     return result
@@ -314,7 +459,7 @@ export function ApoioTecnico() {
       )
 
       const temFolgaDoTecnico = tecFiltroId && (grupo.folgas ?? []).includes(tecFiltroId)
-      if (linhas.length === 0 && !temFolgaDoTecnico) return null
+      if (linhas.length === 0 && !temFolgaDoTecnico && (filtroEspaco || tecFiltroId || q)) return null
 
       return { ...grupo, linhas }
     }).filter(Boolean)
@@ -409,6 +554,10 @@ export function ApoioTecnico() {
     const isDst     = dragOver === dropKey && dragSource && dragSource.dropKey !== dropKey
     const isDraggingAny = !!dragSource
 
+    // Cor baseada no nome do técnico
+    const tecIdx = linha.tecNome ? tecnicos.findIndex(t => t.id === linha.tecId) : -1
+    const cor = linha.tecNome ? corTecnico(linha.tecNome, tecIdx) : null
+
     return (
       <td
         key={`tec-${dropKey}`}
@@ -428,11 +577,12 @@ export function ApoioTecnico() {
           extraCls,
           isDst
             ? 'bg-status-confirmado/10 outline outline-1 outline-inset outline-status-confirmado/50'
-            : !isDraggingAny && 'cursor-pointer hover:bg-status-confirmado/5',
+            : !isDraggingAny && 'cursor-pointer hover:bg-surface-2/40',
         )}
       >
         <TecnicoChip
           nome={linha.tecNome}
+          cor={cor}
           isDragging={isSrc}
           onDragStart={(e) => handleDragStart(e, linha)}
           onDragEnd={handleDragEnd}
@@ -481,6 +631,13 @@ export function ApoioTecnico() {
               >
                 <AlignJustify size={13} />
               </button>
+              <button
+                onClick={() => setVista('stats')}
+                title="Estatísticas por colaborador"
+                className={clsx('p-1.5 rounded transition-colors', vista === 'stats' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}
+              >
+                <BarChart3 size={13} />
+              </button>
             </div>
 
             {/* Pesquisa */}
@@ -497,8 +654,8 @@ export function ApoioTecnico() {
           </div>
         </div>
 
-        {/* Linha 2 — colaboradores */}
-        <div className="px-5 py-2 flex items-center gap-1">
+        {/* Linha 2 — colaboradores (oculto na vista stats) */}
+        <div className={clsx('px-5 py-2 flex items-center gap-1', vista === 'stats' && 'hidden')}>
           <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Apoio</span>
           <button onClick={() => setFiltroTecnico('')}
             className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
@@ -558,7 +715,7 @@ export function ApoioTecnico() {
                 <tr><td colSpan={99} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
               )}
               {linhasPorDia.map(({ dataStr, dia, linhas, folgas }) => {
-                const nomesEmFolga = folgas.map(tid => tecnicos.find(t => t.id === tid)?.nome ?? '?').join(' · ')
+                const tecsFolga = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
                 return (
                   <tr key={dataStr} className={clsx(
                     'border-b border-border/30 hover:bg-surface-2/20 transition-colors align-middle',
@@ -580,8 +737,10 @@ export function ApoioTecnico() {
                         renderTecCell(linha, i > 0 ? 'pl-3' : ''),
                         <td key={`esp-${dataStr}-${i}`} className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>,
                         <td key={`ev-${dataStr}-${i}`} className="px-2 py-2 text-accent-muted max-w-0"><span className="block truncate">{linha?.ev?.evento ?? ''}</span></td>,
-                        <td key={`ins-${dataStr}-${i}`} className="px-2 py-2 text-center text-accent-subtle tabular-nums whitespace-nowrap">
-                          {linha?.ev?.hora_instalacao ? hhmm(linha.ev.hora_instalacao) : linha ? <span className="text-border/20">—</span> : null}
+                        <td key={`ins-${dataStr}-${i}`} className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium">
+                          {linha?.ev?.hora_instalacao
+                            ? <span className={tecCorMap[linha.tecId]?.text ?? 'text-accent-subtle'}>{hhmm(linha.ev.hora_instalacao)}</span>
+                            : linha ? <span className="text-border/20">—</span> : null}
                         </td>,
                         <td key={`ini-${dataStr}-${i}`} className="px-2 py-2 text-center text-accent-subtle tabular-nums whitespace-nowrap">
                           {linha?.ev?.hora_inicio ? hhmm(linha.ev.hora_inicio) : linha ? <span className="text-border/20">—</span> : null}
@@ -593,7 +752,16 @@ export function ApoioTecnico() {
                     })}
                     <td onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
                       className="px-2 py-2 border-l border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors whitespace-nowrap">
-                      {nomesEmFolga ? <span className="text-orange-400 font-medium text-[11px]">{nomesEmFolga}</span> : <span className="text-border/20 text-[10px]">—</span>}
+                      {tecsFolga.length > 0
+                        ? <span className="inline-flex flex-wrap gap-x-1.5 gap-y-0.5">
+                            {tecsFolga.map(t => (
+                              <span key={t.id} className={clsx('font-medium text-[11px]', tecCorMap[t.id]?.text ?? 'text-accent-muted')}>
+                                {t.nome}
+                              </span>
+                            ))}
+                          </span>
+                        : <span className="text-border/20 text-[10px]">—</span>
+                      }
                     </td>
                   </tr>
                 )
@@ -634,14 +802,19 @@ export function ApoioTecnico() {
                 <tr><td colSpan={9} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
               )}
               {linhasPorDia.map(({ dataStr, dia, linhas, folgas }) => {
-                const nomesEmFolga = folgas.map(tid => tecnicos.find(t => t.id === tid)?.nome ?? '?').join(' · ')
-                const rowSpan = linhas.length || 1
-                return linhas.map((linha, li) => (
-                  <tr key={`${dataStr}-${linha.espaco_id}`}
+                const tecsFolga = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
+                const rowSpan   = linhas.length || 1
+                // cor de fundo da linha: primeiro técnico com folga, se existir
+                const folgaRowCls = tecsFolga.length > 0
+                  ? (tecCorMap[tecsFolga[0].id]?.row ?? 'bg-orange-400/[0.06]')
+                  : null
+                const rowsToRender = linhas.length > 0 ? linhas : [null]
+                return rowsToRender.map((linha, li) => (
+                  <tr key={linha ? `${dataStr}-${linha.espaco_id}` : `${dataStr}-empty`}
                     className={clsx(
                       'hover:bg-surface-2/20 transition-colors',
-                      li < linhas.length - 1 ? 'border-b border-border/10' : 'border-b border-border/30',
-                      isFds(dataStr) ? 'bg-blue-400/[0.04]' : 'bg-surface-0'
+                      li < rowsToRender.length - 1 ? 'border-b border-border/10' : 'border-b border-border/30',
+                      folgaRowCls ?? (isFds(dataStr) ? 'bg-blue-400/[0.04]' : 'bg-surface-0')
                     )}
                   >
                     {li === 0 && (
@@ -657,28 +830,31 @@ export function ApoioTecnico() {
                       </td>
                     )}
                     {/* Técnico — draggable */}
-                    {renderTecCell(linha)}
+                    {linha ? renderTecCell(linha) : <td className="px-2 py-2" />}
                     {/* Espaço */}
-                    <td className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha.espacoNome}</td>
+                    <td className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>
                     {/* Evento */}
-                    <td className="px-2 py-2 text-accent-muted max-w-0"><span className="block truncate">{linha.ev?.evento ?? <span className="text-border/20">—</span>}</span></td>
+                    <td className="px-2 py-2 text-accent-muted max-w-0"><span className="block truncate">{linha?.ev?.evento ?? ''}</span></td>
                     {/* Hora Inst. */}
-                    <td className="px-2 py-2 text-center text-accent-subtle tabular-nums whitespace-nowrap">
-                      {linha.ev?.hora_instalacao ? hhmm(linha.ev.hora_instalacao) : <span className="text-border/20">—</span>}
-                    </td>
+                    <td className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium" />
                     {/* Hora Início */}
-                    <td className="px-2 py-2 text-center text-accent-subtle tabular-nums whitespace-nowrap">
-                      {linha.ev?.hora_inicio ? hhmm(linha.ev.hora_inicio) : <span className="text-border/20">—</span>}
-                    </td>
+                    <td className="px-2 py-2 text-center text-accent-subtle tabular-nums whitespace-nowrap" />
                     {/* DJ */}
-                    <td className="px-2 py-2 text-accent-muted whitespace-nowrap">
-                      {linha.djs?.length ? linha.djs.join(' · ') : <span className="text-border/20">—</span>}
-                    </td>
+                    <td className="px-2 py-2 text-accent-muted whitespace-nowrap" />
                     {/* Folga — rowSpan */}
                     {li === 0 && (
                       <td rowSpan={rowSpan} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
                         className="px-2 py-2 align-top border-l border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors whitespace-nowrap">
-                        {nomesEmFolga ? <span className="text-orange-400 font-medium text-[11px]">{nomesEmFolga}</span> : <span className="text-border/20 text-[10px]">—</span>}
+                        {tecsFolga.length > 0
+                          ? <span className="inline-flex flex-wrap gap-x-1.5 gap-y-0.5">
+                              {tecsFolga.map(t => (
+                                <span key={t.id} className={clsx('font-medium text-[11px]', tecCorMap[t.id]?.text ?? 'text-accent-muted')}>
+                                  {t.nome}
+                                </span>
+                              ))}
+                            </span>
+                          : <span className="text-border/20 text-[10px]">—</span>
+                        }
                       </td>
                     )}
                   </tr>
@@ -686,6 +862,16 @@ export function ApoioTecnico() {
               })}
             </tbody>
           </table>
+        )}
+
+        {/* ════ VISTA ESTATÍSTICAS ════ */}
+        {vista === 'stats' && (
+          <VistaEstatisticas
+            tecnicos={tecnicos}
+            eventos={eventos}
+            agendamentos={agendamentos}
+            tecCorMap={tecCorMap}
+          />
         )}
 
       </div>
