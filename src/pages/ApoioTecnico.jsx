@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { X, Search, Columns2, AlignJustify, BarChart3 } from 'lucide-react'
+import { X, Search, Columns2, AlignJustify, BarChart3, Pencil } from 'lucide-react'
 import { useMesStore } from '@/store'
 import { supabase } from '@/lib/supabase'
 import { Modal } from '@/components/ui/Modal'
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { clsx } from 'clsx'
 import { corTecnico } from '@/utils/tecnicoColor'
+import { FormEvento } from '@/components/eventos/FormEvento'
 
 const isoData    = (d) => format(d, 'yyyy-MM-dd')
 const hhmm       = (t) => t?.slice(0, 5) ?? null
@@ -342,8 +343,9 @@ export function ApoioTecnico() {
   const [eventos, setEventos]           = useState([])
   const [slots, setSlots]               = useState([])
   const [espacos, setEspacos]           = useState([])
-  const [modalAtrib, setModalAtrib]     = useState(null)
-  const [modalFolga, setModalFolga]     = useState(null)
+  const [modalAtrib, setModalAtrib]       = useState(null)
+  const [modalFolga, setModalFolga]       = useState(null)
+  const [modalEditEvento, setModalEditEvento] = useState(null) // evento obj
   const [filtroEspaco, setFiltroEspaco]   = useState('')
   const [filtroTecnico, setFiltroTecnico] = useState('')
   const [pesquisa, setPesquisa]           = useState('')
@@ -779,7 +781,14 @@ export function ApoioTecnico() {
                         // Técnico — draggable
                         renderTecCell(linha, i > 0 ? 'pl-3' : ''),
                         <td key={`esp-${dataStr}-${i}`} className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>,
-                        <td key={`ev-${dataStr}-${i}`} className="px-2 py-2 text-accent-muted max-w-0"><span className="block truncate">{linha?.ev?.evento ?? ''}</span></td>,
+                        <td key={`ev-${dataStr}-${i}`}
+                          onClick={() => linha?.ev && setModalEditEvento(linha.ev)}
+                          className={clsx('px-2 py-2 text-accent-muted max-w-0 group', linha?.ev && 'cursor-pointer hover:text-accent transition-colors')}>
+                          <span className="flex items-center gap-1">
+                            <span className="block truncate">{linha?.ev?.evento ?? ''}</span>
+                            {linha?.ev && <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />}
+                          </span>
+                        </td>,
                         <td key={`ins-${dataStr}-${i}`} className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium">
                           {linha?.ev?.hora_instalacao
                             ? <span className={tecCorMap[linha.tecId]?.text ?? 'text-accent-subtle'}>{hhmm(linha.ev.hora_instalacao)}</span>
@@ -885,7 +894,14 @@ export function ApoioTecnico() {
                     {/* Espaço */}
                     <td className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>
                     {/* Evento */}
-                    <td className="px-2 py-2 text-accent-muted max-w-0"><span className="block truncate">{linha?.ev?.evento ?? ''}</span></td>
+                    <td
+                      onClick={() => linha?.ev && setModalEditEvento(linha.ev)}
+                      className={clsx('px-2 py-2 text-accent-muted max-w-0 group', linha?.ev && 'cursor-pointer hover:text-accent transition-colors')}>
+                      <span className="flex items-center gap-1">
+                        <span className="block truncate">{linha?.ev?.evento ?? ''}</span>
+                        {linha?.ev && <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />}
+                      </span>
+                    </td>
                     {/* Hora Inst. */}
                     <td className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium">
                       {linha?.ev?.hora_instalacao
@@ -953,6 +969,12 @@ export function ApoioTecnico() {
         folgasHoje={folgasIdx[modalFolga?.data] ?? []} agendamentos={agendamentos}
         onFechar={() => setModalFolga(null)}
         onGuardado={() => { setModalFolga(null); carregar() }}
+      />
+      <FormEvento
+        aberto={!!modalEditEvento}
+        evento={modalEditEvento}
+        onFechar={() => setModalEditEvento(null)}
+        onGuardado={() => { setModalEditEvento(null); carregar() }}
       />
     </div>
   )
