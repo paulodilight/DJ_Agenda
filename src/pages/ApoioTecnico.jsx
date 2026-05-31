@@ -354,30 +354,8 @@ export function ApoioTecnico() {
   const [dragOver, setDragOver]     = useState(null)  // dropKey string
 
   // ── Drag state (folga) ──────────────────────────────────────────────────────
-  const [dragFolga, setDragFolga]   = useState(null)  // { data, tecnicoId }
-  const [dragOverFolga, setDragOverFolga] = useState(null)  // dataStr
-
-  const handleFolgaDragStart = useCallback((e, data, tecnicoId) => {
-    e.stopPropagation()
-    e.dataTransfer.effectAllowed = 'move'
-    setDragFolga({ data, tecnicoId })
-  }, [])
-
-  const handleFolgaDrop = useCallback(async (e, targetData) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!dragFolga || dragFolga.data === targetData) { setDragFolga(null); setDragOverFolga(null); return }
-    try {
-      // Remove folga do dia de origem
-      const folgaOrigem = agendamentos.find(a => a.data === dragFolga.data && a.tecnico_id === dragFolga.tecnicoId && a.folga)
-      if (folgaOrigem) await supabase.from('agendamentos_tecnicos').delete().eq('id', folgaOrigem.id)
-      // Adiciona folga no dia destino (se não existir já)
-      const jaExiste = agendamentos.find(a => a.data === targetData && a.tecnico_id === dragFolga.tecnicoId && a.folga)
-      if (!jaExiste) await supabase.from('agendamentos_tecnicos').insert({ data: targetData, tecnico_id: dragFolga.tecnicoId, folga: true })
-      carregar()
-    } catch (err) { console.error(err) }
-    finally { setDragFolga(null); setDragOverFolga(null) }
-  }, [dragFolga, agendamentos, carregar])
+  const [dragFolga, setDragFolga]         = useState(null)
+  const [dragOverFolga, setDragOverFolga] = useState(null)
 
   const { dataInicio, dataFim, dias } = useMemo(() => {
     const [ano, mes] = anoMes.split('-').map(Number)
@@ -411,6 +389,27 @@ export function ApoioTecnico() {
 
   useEffect(() => { carregar() }, [carregar])
   useEffect(() => { setFiltroEspaco(''); setFiltroTecnico(''); setPesquisa('') }, [anoMes])
+
+  // ── Handlers folga drag ──────────────────────────────────────────────────────
+  const handleFolgaDragStart = useCallback((e, data, tecnicoId) => {
+    e.stopPropagation()
+    e.dataTransfer.effectAllowed = 'move'
+    setDragFolga({ data, tecnicoId })
+  }, [])
+
+  const handleFolgaDrop = useCallback(async (e, targetData) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!dragFolga || dragFolga.data === targetData) { setDragFolga(null); setDragOverFolga(null); return }
+    try {
+      const folgaOrigem = agendamentos.find(a => a.data === dragFolga.data && a.tecnico_id === dragFolga.tecnicoId && a.folga)
+      if (folgaOrigem) await supabase.from('agendamentos_tecnicos').delete().eq('id', folgaOrigem.id)
+      const jaExiste = agendamentos.find(a => a.data === targetData && a.tecnico_id === dragFolga.tecnicoId && a.folga)
+      if (!jaExiste) await supabase.from('agendamentos_tecnicos').insert({ data: targetData, tecnico_id: dragFolga.tecnicoId, folga: true })
+      carregar()
+    } catch (err) { console.error(err) }
+    finally { setDragFolga(null); setDragOverFolga(null) }
+  }, [dragFolga, agendamentos, carregar])
 
   const agIdx = useMemo(() => {
     const idx = {}
