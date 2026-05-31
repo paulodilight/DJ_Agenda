@@ -838,7 +838,7 @@ export function ApoioTecnico() {
               <col style={{ width: 50 }} />
               <col style={{ width: 105 }} />
               <col style={{ width: 140 }} />
-              <col />
+              <col style={{ width: 160 }} />
               <col style={{ width: 78 }} />
               <col style={{ width: 78 }} />
               <col style={{ width: 120 }} />
