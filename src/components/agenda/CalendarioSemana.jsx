@@ -225,12 +225,26 @@ export function CalendarioSemana({
         )}
 
         <tbody>
-          {/* ── Separador de semana com data ── */}
+          {/* ── Separador de semana: número + dias ── */}
           {semanaLabel && (
-            <tr className="border-b border-border/60 bg-surface-2/80">
-              <td colSpan={dias.length + 1} className="px-4 py-1 text-[10px] font-bold text-accent-subtle uppercase tracking-widest">
-                {semanaLabel}
+            <tr className="border-b border-t-2 border-border bg-surface-2/90">
+              <td className="px-4 py-1.5 text-[10px] font-black text-accent-subtle uppercase tracking-widest sticky left-0 bg-surface-2/90 z-10">
+                {semanaLabel}ª SEMANA
               </td>
+              {dias.map(dia => {
+                const hoje   = isToday(dia)
+                const passado = isPast(dia) && !hoje
+                return (
+                  <td key={isoData(dia)} className={clsx(
+                    'px-2 py-1.5 text-[10px] font-semibold text-center border-l border-border/30',
+                    fds(dia) ? 'text-blue-300/70' : hoje ? 'text-accent' : passado ? 'text-accent-subtle/50' : 'text-accent-subtle'
+                  )}>
+                    <span className="whitespace-nowrap">
+                      {nomeDiaCompleto(dia)}, {fmtDiaCurto(dia)}
+                    </span>
+                  </td>
+                )
+              })}
             </tr>
           )}
 

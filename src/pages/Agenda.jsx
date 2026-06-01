@@ -468,7 +468,7 @@ export function Agenda() {
                     bloqueios={bloqueios}
                     onClickSlot={abrirEditarSlot}
                     onClickVazio={abrirNovoSlot}
-                    semanaLabel={format(semana[0], "d 'de' MMMM", { locale: pt })}
+                    semanaLabel={si + 1}
                     ocultarCabecalho={si > 0}
                     nomeEspaco={nomeEspacoFiltro}
                     conflictsIdx={conflictsIdx}
