@@ -967,13 +967,15 @@ export function ApoioTecnico() {
               {linhasPorDia.length === 0 && (
                 <tr><td colSpan={99} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
               )}
-              {linhasPorDia.map(({ dataStr, dia, linhas, folgas }, dayIdx) => {
-                const tecsFolga = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
-                const zebraCls  = dayIdx % 2 === 1 ? 'bg-white/[0.025]' : ''
-                return (
+              {linhasPorDia.flatMap(({ dataStr, dia, linhas, folgas }, dayIdx) => {
+                const tecsFolga  = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
+                const zebraCls   = dayIdx % 2 === 1 ? 'bg-white/[0.04]' : ''
+                const isSab      = new Date(dataStr + 'T00:00:00').getDay() === 6
+
+                const row = (
                   <tr key={dataStr} className={clsx(
-                    'border-b border-border/30 hover:bg-surface-2/20 transition-colors align-middle',
-                    isFds(dataStr) ? 'bg-blue-400/[0.04]' : zebraCls
+                    'border-b border-border/20 hover:bg-surface-2/20 transition-colors align-middle',
+                    zebraCls
                   )}>
                     <td colSpan={2} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
                       className="px-3 py-2 font-medium whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors text-accent-muted">
@@ -982,21 +984,26 @@ export function ApoioTecnico() {
                     {Array.from({ length: maxGrupos }, (_, i) => {
                       const linha = linhas[i] ?? null
                       return [
-                        i > 0 && <td key={`sep-${dataStr}-${i}`} className="p-0 bg-border w-0.5" />,
-                        // Técnico — draggable
+                        i > 0 && <td key={`sep-${dataStr}-${i}`} className="p-0 bg-border/30 w-px" />,
                         renderTecCell(linha, i > 0 ? 'pl-3' : ''),
                         <td key={`esp-${dataStr}-${i}`} className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>,
+                        /* Evento — clique para editar ou criar */
                         <td key={`ev-${dataStr}-${i}`}
-                          onClick={() => linha?.ev && setModalEditEvento(linha.ev)}
-                          className={clsx('px-2 py-2 text-accent-muted max-w-0 group', linha?.ev && 'cursor-pointer hover:text-accent transition-colors')}>
+                          onClick={() => {
+                            if (linha?.ev) setModalEditEvento(linha.ev)
+                            else if (linha) setModalEditEvento({ espaco_id: linha.espaco_id, data_evento: dataStr })
+                          }}
+                          className="px-2 py-2 text-accent-muted max-w-0 group cursor-pointer hover:text-accent transition-colors">
                           <span className="flex items-center gap-1">
                             <span className="block truncate">{linha?.ev?.evento ?? ''}</span>
-                            {linha?.ev && <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />}
+                            {linha?.ev
+                              ? <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
+                              : linha && <span className="opacity-0 group-hover:opacity-30 text-[10px]">+ evento</span>}
                           </span>
                         </td>,
                         <td key={`ins-${dataStr}-${i}`} className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium">
                           {linha?.ev?.hora_instalacao
-                            ? <span className={tecCorMap[linha.tecId]?.text ?? 'text-accent-subtle'}>{hhmm(linha.ev.hora_instalacao)}</span>
+                            ? <span className="text-accent-subtle">{hhmm(linha.ev.hora_instalacao)}</span>
                             : linha ? <span className="text-border/20">—</span> : null}
                         </td>,
                         <td key={`ini-${dataStr}-${i}`} className="px-2 py-2 text-center text-accent-subtle tabular-nums whitespace-nowrap">
@@ -1007,6 +1014,7 @@ export function ApoioTecnico() {
                         </td>,
                       ]
                     })}
+                    {/* Folga */}
                     <td
                       onClick={() => setModalFolga({ data: dataStr })}
                       onDragOver={e => { e.preventDefault(); setDragOverFolga(dataStr) }}
@@ -1015,6 +1023,7 @@ export function ApoioTecnico() {
                       title="Gerir folgas · arrastar para mover folga"
                       className={clsx(
                         'px-2 py-2 border-l border-border/40 cursor-pointer transition-colors whitespace-nowrap',
+                        tecsFolga.length === 1 ? 'align-middle' : 'align-top',
                         dragOverFolga === dataStr ? 'bg-orange-400/10 outline outline-1 outline-orange-400/40' : 'hover:bg-orange-400/5'
                       )}>
                       {tecsFolga.length > 0
@@ -1030,6 +1039,15 @@ export function ApoioTecnico() {
                     </td>
                   </tr>
                 )
+
+                // Separador de fim de semana após Sábado
+                const sep = isSab ? (
+                  <tr key={`sep-week-${dataStr}`}>
+                    <td colSpan={99} className="h-px bg-border/60 p-0" />
+                  </tr>
+                ) : null
+
+                return sep ? [row, sep] : [row]
               })}
             </tbody>
           </table>
@@ -1064,21 +1082,19 @@ export function ApoioTecnico() {
               {linhasPorDia.length === 0 && (
                 <tr><td colSpan={8} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
               )}
-              {linhasPorDia.map(({ dataStr, dia, linhas, folgas }, dayIdx) => {
-                const tecsFolga = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
-                const rowSpan   = linhas.length || 1
-                const zebraCls  = dayIdx % 2 === 1 ? 'bg-white/[0.025]' : ''
-                // cor de fundo da linha: primeiro técnico com folga, se existir
-                const folgaRowCls = tecsFolga.length > 0
-                  ? (tecCorMap[tecsFolga[0].id]?.row ?? 'bg-orange-400/[0.06]')
-                  : null
+              {linhasPorDia.flatMap(({ dataStr, dia, linhas, folgas }, dayIdx) => {
+                const tecsFolga    = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
+                const rowSpan      = linhas.length || 1
+                const zebraCls     = dayIdx % 2 === 1 ? 'bg-white/[0.04]' : ''
+                const isSabLinhas  = new Date(dataStr + 'T00:00:00').getDay() === 6
                 const rowsToRender = linhas.length > 0 ? linhas : [null]
-                return rowsToRender.map((linha, li) => (
+
+                const rows = rowsToRender.map((linha, li) => (
                   <tr key={linha ? `${dataStr}-${linha.espaco_id}` : `${dataStr}-empty`}
                     className={clsx(
                       'hover:bg-surface-2/20 transition-colors',
-                      li < rowsToRender.length - 1 ? 'border-b border-border/10' : 'border-b border-border/30',
-                      folgaRowCls ?? (isFds(dataStr) ? 'bg-blue-400/[0.04]' : zebraCls)
+                      li < rowsToRender.length - 1 ? 'border-b border-border/10' : 'border-b border-border/20',
+                      zebraCls
                     )}
                   >
                     {li === 0 && (
@@ -1091,19 +1107,24 @@ export function ApoioTecnico() {
                     {linha ? renderTecCell(linha) : <td className="px-2 py-2" />}
                     {/* Cliente */}
                     <td className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>
-                    {/* Evento */}
+                    {/* Evento — clique para editar ou criar */}
                     <td
-                      onClick={() => linha?.ev && setModalEditEvento(linha.ev)}
-                      className={clsx('px-2 py-2 text-accent-muted max-w-0 group', linha?.ev && 'cursor-pointer hover:text-accent transition-colors')}>
+                      onClick={() => {
+                        if (linha?.ev) setModalEditEvento(linha.ev)
+                        else if (linha) setModalEditEvento({ espaco_id: linha.espaco_id, data_evento: dataStr })
+                      }}
+                      className="px-2 py-2 text-accent-muted max-w-0 group cursor-pointer hover:text-accent transition-colors">
                       <span className="flex items-center gap-1">
                         <span className="block truncate">{linha?.ev?.evento ?? ''}</span>
-                        {linha?.ev && <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />}
+                        {linha?.ev
+                          ? <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
+                          : linha && <span className="opacity-0 group-hover:opacity-30 text-[10px]">+ evento</span>}
                       </span>
                     </td>
                     {/* Hora Inst. */}
                     <td className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium">
                       {linha?.ev?.hora_instalacao
-                        ? <span className={tecCorMap[linha.tecId]?.text ?? 'text-accent-subtle'}>{hhmm(linha.ev.hora_instalacao)}</span>
+                        ? <span className="text-accent-subtle">{hhmm(linha.ev.hora_instalacao)}</span>
                         : linha ? <span className="text-border/20">—</span> : null}
                     </td>
                     {/* Hora Início */}
@@ -1123,7 +1144,8 @@ export function ApoioTecnico() {
                         onDrop={e => handleFolgaDrop(e, dataStr)}
                         title="Gerir folgas · arrastar para mover folga"
                         className={clsx(
-                          'px-2 py-2 align-top border-l border-border/40 cursor-pointer transition-colors whitespace-nowrap',
+                          'px-2 py-2 border-l border-border/40 cursor-pointer transition-colors whitespace-nowrap',
+                          tecsFolga.length === 1 ? 'align-middle' : 'align-top',
                           dragOverFolga === dataStr ? 'bg-orange-400/10 outline outline-1 outline-orange-400/40' : 'hover:bg-orange-400/5'
                         )}>
                         {tecsFolga.length > 0
@@ -1140,6 +1162,14 @@ export function ApoioTecnico() {
                     )}
                   </tr>
                 ))
+
+                const sepLinhas = isSabLinhas ? (
+                  <tr key={`sep-week-linhas-${dataStr}`}>
+                    <td colSpan={8} className="h-px bg-border/60 p-0" />
+                  </tr>
+                ) : null
+
+                return sepLinhas ? [...rows, sepLinhas] : rows
               })}
             </tbody>
           </table>
