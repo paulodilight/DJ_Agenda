@@ -811,7 +811,7 @@ export function ApoioTecnico() {
 
         {/* Linha 1 — Clientes + pesquisa */}
         <div className="px-5 py-2 flex items-center justify-between gap-3 border-b border-border/30">
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="flex items-center gap-1 flex-nowrap overflow-hidden">
             <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Cliente</span>
             <button onClick={() => setFiltroEspaco('')}
               className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
@@ -1034,7 +1034,7 @@ export function ApoioTecnico() {
                         dragOverFolga === dataStr ? 'bg-orange-400/10 outline outline-1 outline-orange-400/40' : 'hover:bg-orange-400/5'
                       )}>
                       {tecsFolga.length > 0
-                        ? <span className="inline-flex flex-wrap gap-x-1 gap-y-1">
+                        ? <span className="inline-flex flex-nowrap gap-1 overflow-hidden">
                             {tecsFolga.map(t => (
                               <FolgaChip key={t.id} tecnico={t} cor={tecCorMap[t.id]}
                                 dataStr={dataStr} onDragStart={handleFolgaDragStart}
@@ -1156,7 +1156,7 @@ export function ApoioTecnico() {
                           dragOverFolga === dataStr ? 'bg-orange-400/10 outline outline-1 outline-orange-400/40' : 'hover:bg-orange-400/5'
                         )}>
                         {tecsFolga.length > 0
-                          ? <span className="inline-flex flex-wrap gap-x-1 gap-y-1">
+                          ? <span className="inline-flex flex-nowrap gap-1 overflow-hidden">
                               {tecsFolga.map(t => (
                                 <FolgaChip key={t.id} tecnico={t} cor={tecCorMap[t.id]}
                                   dataStr={dataStr} onDragStart={handleFolgaDragStart}
