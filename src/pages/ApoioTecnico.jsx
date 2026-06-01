@@ -994,18 +994,21 @@ export function ApoioTecnico() {
                         i > 0 && <td key={`sep-${dataStr}-${i}`} className="p-0 bg-border/30 w-px" />,
                         renderTecCell(linha, i > 0 ? 'pl-3' : ''),
                         <td key={`esp-${dataStr}-${i}`} className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>,
-                        /* Evento — clique para editar ou criar */
+                        /* Evento — clique para editar, criar com espaço, ou criar só com data */
                         <td key={`ev-${dataStr}-${i}`}
                           onClick={() => {
                             if (linha?.ev) setModalEditEvento(linha.ev)
                             else if (linha) setModalEditEvento({ espaco_id: linha.espaco_id, data_evento: dataStr })
+                            else if (i === 0) setModalEditEvento({ data_evento: dataStr })
                           }}
                           className="px-2 py-2 text-accent-muted max-w-0 group cursor-pointer hover:text-accent transition-colors">
                           <span className="flex items-center gap-1">
                             <span className="block truncate">{linha?.ev?.evento ?? ''}</span>
                             {linha?.ev
                               ? <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
-                              : linha && <span className="opacity-0 group-hover:opacity-30 text-[10px]">+ evento</span>}
+                              : linha
+                                ? <span className="opacity-0 group-hover:opacity-30 text-[10px]">+ evento</span>
+                                : i === 0 && <span className="opacity-0 group-hover:opacity-40 text-[10px] text-status-confirmado/70">+ evento</span>}
                           </span>
                         </td>,
                         <td key={`ins-${dataStr}-${i}`} className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium">
@@ -1114,18 +1117,21 @@ export function ApoioTecnico() {
                     {linha ? renderTecCell(linha) : <td className="px-2 py-2" />}
                     {/* Cliente */}
                     <td className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>
-                    {/* Evento — clique para editar ou criar */}
+                    {/* Evento — clique para editar, criar com espaço, ou criar só com data */}
                     <td
                       onClick={() => {
                         if (linha?.ev) setModalEditEvento(linha.ev)
                         else if (linha) setModalEditEvento({ espaco_id: linha.espaco_id, data_evento: dataStr })
+                        else setModalEditEvento({ data_evento: dataStr })
                       }}
                       className="px-2 py-2 text-accent-muted max-w-0 group cursor-pointer hover:text-accent transition-colors">
                       <span className="flex items-center gap-1">
                         <span className="block truncate">{linha?.ev?.evento ?? ''}</span>
                         {linha?.ev
                           ? <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
-                          : linha && <span className="opacity-0 group-hover:opacity-30 text-[10px]">+ evento</span>}
+                          : linha
+                            ? <span className="opacity-0 group-hover:opacity-30 text-[10px]">+ evento</span>
+                            : <span className="opacity-0 group-hover:opacity-40 text-[10px] text-status-confirmado/70">+ evento</span>}
                       </span>
                     </td>
                     {/* Hora Inst. */}
