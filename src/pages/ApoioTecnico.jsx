@@ -643,8 +643,9 @@ export function ApoioTecnico() {
       })
 
       const temFolgaDoTecnico = tecFiltroId && (grupo.folgas ?? []).includes(tecFiltroId)
-      // Oculta vazios só se: botão activo, ou filtro por técnico, ou pesquisa
-      if (linhas.length === 0 && !temFolgaDoTecnico && (ocultarVazios || tecFiltroId || q)) return null
+      const temEventos = linhas.some(l => l.ev !== null)
+      // Oculta dias sem eventos: botão activo, ou filtro por técnico, ou pesquisa
+      if (!temEventos && !temFolgaDoTecnico && (ocultarVazios || tecFiltroId || q)) return null
 
       return { ...grupo, linhas }
     }).filter(Boolean)
