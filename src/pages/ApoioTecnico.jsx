@@ -446,6 +446,28 @@ export function ApoioTecnico() {
   const [pesquisa, setPesquisa]           = useState('')
   const [vista, setVista]                 = useState('colunas')
 
+  // ── Scroll preservation ─────────────────────────────────────────────────────
+  const scrollRef     = useRef(null)   // ref para o contentor scrollável
+  const savedScroll   = useRef({ top: 0, left: 0 })
+
+  const carregarComScroll = useCallback(() => {
+    if (scrollRef.current) {
+      savedScroll.current = { top: scrollRef.current.scrollTop, left: scrollRef.current.scrollLeft }
+    }
+    return carregar()
+  }, [carregar])
+
+  useEffect(() => {
+    if (!loading && (savedScroll.current.top > 0 || savedScroll.current.left > 0)) {
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop  = savedScroll.current.top
+          scrollRef.current.scrollLeft = savedScroll.current.left
+        }
+      })
+    }
+  }, [loading])
+
   // ── Drag state (técnico) ────────────────────────────────────────────────────
   const [dragSource, setDragSource] = useState(null)  // { dropKey, tecnicoId, eventoId, agId }
   const dragSourceRef               = useRef(null)    // ref para evitar stale closure no handleDrop
@@ -517,10 +539,10 @@ export function ApoioTecnico() {
       if (folgaOrigem) await supabase.from('agendamentos_tecnicos').delete().eq('id', folgaOrigem.id)
       const jaExiste = agendamentos.find(a => a.data === targetData && a.tecnico_id === dragFolga.tecnicoId && a.folga)
       if (!jaExiste) await supabase.from('agendamentos_tecnicos').insert({ data: targetData, tecnico_id: dragFolga.tecnicoId, folga: true })
-      carregar()
+      carregarComScroll()
     } catch (err) { console.error(err) }
     finally { setDragFolga(null); setDragOverFolga(null) }
-  }, [dragFolga, agendamentos, carregar])
+  }, [dragFolga, agendamentos, carregarComScroll])
 
   const agIdx = useMemo(() => {
     const idx = {}
@@ -719,9 +741,9 @@ export function ApoioTecnico() {
       } else if (src.agId && src.dropKey !== null) {
         await supabase.from('agendamentos_tecnicos').delete().eq('id', src.agId)
       }
-      carregar()
+      carregarComScroll()
     } catch (err) { console.error(err) }
-  }, [carregar])
+  }, [carregarComScroll])
 
   const handleDrop = useCallback((e, linha) => {
     e.preventDefault()
@@ -941,7 +963,7 @@ export function ApoioTecnico() {
       </div>
 
       {/* ── Tabela ── */}
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollRef} className="flex-1 overflow-auto">
 
         {/* ════ VISTA COLUNAS ════ */}
         {vista === 'colunas' && (
@@ -1211,19 +1233,19 @@ export function ApoioTecnico() {
         aberto={!!modalAtrib} celula={modalAtrib} tecnicos={tecnicos}
         eventos={eventos} agendamentos={agendamentos}
         onFechar={() => setModalAtrib(null)}
-        onGuardado={() => { setModalAtrib(null); carregar() }}
+        onGuardado={() => { setModalAtrib(null); carregarComScroll() }}
       />
       <ModalFolga
         aberto={!!modalFolga} data={modalFolga?.data ?? null} tecnicos={tecnicos}
         folgasHoje={folgasIdx[modalFolga?.data] ?? []} agendamentos={agendamentos}
         onFechar={() => setModalFolga(null)}
-        onGuardado={() => { setModalFolga(null); carregar() }}
+        onGuardado={() => { setModalFolga(null); carregarComScroll() }}
       />
       <FormEvento
         aberto={!!modalEditEvento}
         evento={modalEditEvento}
         onFechar={() => setModalEditEvento(null)}
-        onGuardado={() => { setModalEditEvento(null); carregar() }}
+        onGuardado={() => { setModalEditEvento(null); carregarComScroll() }}
       />
 
       {/* Modal conflito drag & drop */}
