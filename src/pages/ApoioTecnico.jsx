@@ -800,20 +800,53 @@ export function ApoioTecnico() {
         </div>
 
         {/* Linha 2 — colaboradores (oculto na vista stats) */}
-        <div className={clsx('px-5 py-2 flex items-center gap-1', vista === 'stats' && 'hidden')}>
+        <div className={clsx('px-5 py-2 flex items-center gap-1 flex-wrap', vista === 'stats' && 'hidden')}>
           <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Apoio</span>
           <button onClick={() => setFiltroTecnico('')}
             className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
               filtroTecnico === '' ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
             Todos
           </button>
-          {tecnicos.map(t => (
-            <button key={t.id} onClick={() => setFiltroTecnico(filtroTecnico === t.nome ? '' : t.nome)}
-              className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
-                filtroTecnico === t.nome ? 'bg-status-confirmado/15 text-status-confirmado border-status-confirmado/30 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
-              {t.nome}
-            </button>
-          ))}
+          {tecnicos.map(t => {
+            const cor = tecCorMap[t.id]
+            const isDraggingThis = dragSource?.tecnicoId === t.id && dragSource?.dropKey === null
+            return (
+              <div
+                key={t.id}
+                draggable
+                onDragStart={e => {
+                  e.dataTransfer.effectAllowed = 'copy'
+                  // Ghost image
+                  const ghost = document.createElement('span')
+                  ghost.textContent = t.nome
+                  ghost.style.cssText = `position:fixed;top:-100px;left:-100px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;background:${cor ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.08)'};color:white;border:1px solid rgba(255,255,255,0.2);`
+                  document.body.appendChild(ghost)
+                  e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 12)
+                  setTimeout(() => document.body.removeChild(ghost), 0)
+                  setDragSource({ dropKey: null, tecnicoId: t.id, eventoId: null, agId: null })
+                }}
+                onDragEnd={() => setDragSource(null)}
+                onClick={() => setFiltroTecnico(filtroTecnico === t.nome ? '' : t.nome)}
+                title={`Filtrar: ${t.nome} · Arrastar para atribuir`}
+                className={clsx(
+                  'px-3 py-1.5 rounded text-xs transition-all border select-none',
+                  'cursor-grab active:cursor-grabbing',
+                  isDraggingThis && 'opacity-40 scale-95',
+                  filtroTecnico === t.nome
+                    ? (cor?.chip ?? 'bg-status-confirmado/15 text-status-confirmado border-status-confirmado/30') + ' font-medium'
+                    : 'bg-surface-2 text-accent-muted border-border hover:text-accent hover:border-white/20'
+                )}
+              >
+                {t.nome}
+              </div>
+            )
+          })}
+          {/* Indicador visual quando está a arrastar da paleta */}
+          {dragSource?.dropKey === null && dragSource?.tecnicoId && (
+            <span className="ml-2 text-[10px] text-accent-subtle/60 animate-pulse">
+              ↓ largar num slot para atribuir
+            </span>
+          )}
         </div>
       </div>
 
