@@ -823,7 +823,7 @@ export function ApoioTecnico() {
                 key={t.id}
                 draggable
                 onDragStart={e => {
-                  e.dataTransfer.effectAllowed = 'copy'
+                  e.dataTransfer.effectAllowed = 'move'
                   // Ghost image
                   const ghost = document.createElement('span')
                   ghost.textContent = t.nome
