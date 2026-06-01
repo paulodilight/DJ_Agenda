@@ -625,6 +625,29 @@ export function ApoioTecnico() {
     }).filter(Boolean)
   }, [linhasBrutas, filtroEspaco, filtroTecnico, pesquisa, tecnicos])
 
+  // Estatísticas por técnico no mês actual
+  const tecStats = useMemo(() => {
+    const m = {}
+    tecnicos.forEach(t => { m[t.id] = { datas: 0, folgas: 0, valor: 0 } })
+    // Datas com trabalho (contar eventos únicos por data+técnico)
+    const datasVistas = {}  // tecId → Set<data>
+    evTecnicos.forEach(({ evento_id, tecnico_id }) => {
+      const ev = eventos.find(e => e.id === evento_id)
+      if (!ev) return
+      if (!datasVistas[tecnico_id]) datasVistas[tecnico_id] = new Set()
+      datasVistas[tecnico_id].add(ev.data_evento)
+      if (m[tecnico_id]) m[tecnico_id].valor += (ev.valor_apoio_tecnico ?? 0)
+    })
+    Object.entries(datasVistas).forEach(([tid, set]) => {
+      if (m[tid]) m[tid].datas = set.size
+    })
+    // Folgas
+    agendamentos.filter(a => a.folga).forEach(a => {
+      if (m[a.tecnico_id]) m[a.tecnico_id].folgas++
+    })
+    return m
+  }, [tecnicos, evTecnicos, eventos, agendamentos])
+
   const maxGrupos = useMemo(() =>
     Math.max(1, ...linhasPorDia.map(g => g.linhas.length))
   , [linhasPorDia])
@@ -847,7 +870,8 @@ export function ApoioTecnico() {
             Todos
           </button>
           {tecnicos.map(t => {
-            const cor = tecCorMap[t.id]
+            const cor  = tecCorMap[t.id]
+            const st   = tecStats[t.id] ?? { datas: 0, folgas: 0, valor: 0 }
             const isDraggingThis = dragSource?.tecnicoId === t.id && dragSource?.dropKey === null
             return (
               <div
@@ -855,7 +879,6 @@ export function ApoioTecnico() {
                 draggable
                 onDragStart={e => {
                   e.dataTransfer.effectAllowed = 'move'
-                  // Ghost image
                   const ghost = document.createElement('span')
                   ghost.textContent = t.nome
                   ghost.style.cssText = `position:fixed;top:-100px;left:-100px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;background:${cor ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.08)'};color:white;border:1px solid rgba(255,255,255,0.2);`
@@ -868,7 +891,7 @@ export function ApoioTecnico() {
                 onClick={() => setFiltroTecnico(filtroTecnico === t.nome ? '' : t.nome)}
                 title={`Filtrar: ${t.nome} · Arrastar para atribuir`}
                 className={clsx(
-                  'px-3 py-1.5 rounded text-xs transition-all border select-none',
+                  'flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-all border select-none',
                   'cursor-grab active:cursor-grabbing',
                   isDraggingThis && 'opacity-40 scale-95',
                   filtroTecnico === t.nome
@@ -876,7 +899,12 @@ export function ApoioTecnico() {
                     : 'bg-surface-2 text-accent-muted border-border hover:text-accent hover:border-white/20'
                 )}
               >
-                {t.nome}
+                <span className="font-semibold">{t.nome}</span>
+                <span className="flex items-center gap-1.5 text-[10px] opacity-60 font-normal">
+                  {st.datas > 0   && <span>D {st.datas}</span>}
+                  {st.folgas > 0  && <span>F {st.folgas}</span>}
+                  {st.valor > 0   && <span>V {Math.round(st.valor)}</span>}
+                </span>
               </div>
             )
           })}
