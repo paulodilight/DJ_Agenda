@@ -626,13 +626,19 @@ export function ApoioTecnico() {
     }).filter(Boolean)
   }, [linhasBrutas, filtroEspaco, filtroTecnico, pesquisa, tecnicos])
 
-  // Estatísticas por técnico no mês actual
+  // Estatísticas por técnico — filtradas pelo espaço seleccionado
   const tecStats = useMemo(() => {
     const m = {}
     tecnicos.forEach(t => { m[t.id] = { datas: 0, folgas: 0, valor: 0 } })
-    // Datas com trabalho (contar eventos únicos por data+técnico)
-    const datasVistas = {}  // tecId → Set<data>
+    // Filtrar eventos pelo espaço activo
+    const eventosFiltrados = filtroEspaco
+      ? eventos.filter(e => e.espaco_id === filtroEspaco)
+      : eventos
+    const eventoIdsFiltrados = new Set(eventosFiltrados.map(e => e.id))
+    // Datas com trabalho
+    const datasVistas = {}
     evTecnicos.forEach(({ evento_id, tecnico_id }) => {
+      if (!eventoIdsFiltrados.has(evento_id)) return
       const ev = eventos.find(e => e.id === evento_id)
       if (!ev) return
       if (!datasVistas[tecnico_id]) datasVistas[tecnico_id] = new Set()
@@ -642,12 +648,12 @@ export function ApoioTecnico() {
     Object.entries(datasVistas).forEach(([tid, set]) => {
       if (m[tid]) m[tid].datas = set.size
     })
-    // Folgas
-    agendamentos.filter(a => a.folga).forEach(a => {
+    // Folgas — filtradas pelo espaço se existir
+    agendamentos.filter(a => a.folga && (!filtroEspaco || a.espaco_id === filtroEspaco || !a.espaco_id)).forEach(a => {
       if (m[a.tecnico_id]) m[a.tecnico_id].folgas++
     })
     return m
-  }, [tecnicos, evTecnicos, eventos, agendamentos])
+  }, [tecnicos, evTecnicos, eventos, agendamentos, filtroEspaco])
 
   const maxGrupos = useMemo(() =>
     Math.max(1, ...linhasPorDia.map(g => g.linhas.length))
