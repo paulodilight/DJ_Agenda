@@ -197,7 +197,7 @@ export function CalendarioSemana({
           {semanaLabel === 1 && (
             <tr className="bg-surface-0 border-b border-border/30">
               <td colSpan={dias.length + 1} className="px-4 py-4 text-center align-middle">
-                <span className="text-3xl font-black text-accent uppercase tracking-widest">
+                <span className="text-[40px] font-black text-accent uppercase tracking-widest">
                   {nomeEspaco}
                 </span>
               </td>
