@@ -605,41 +605,49 @@ export function ApoioTecnico() {
   const tecnicosFixos = useMemo(() => tecnicos.filter(t => t.tipo === 'fixo'), [tecnicos])
   const i4djEspacoId  = useMemo(() => espacos.find(e => e.nome?.trim().toLowerCase() === 'lmd')?.id ?? null, [espacos])
 
-  const linhasBrutas = useMemo(() => {
-    const result = []
+  // LMD por dia: data → tecIds (técnicos fixos livres = no LMD)
+  const lmdPorDia = useMemo(() => {
+    const m = {}
     dias.forEach(dia => {
       const dataStr    = isoData(dia)
       const folgasHoje = new Set(folgasIdx[dataStr] ?? [])
-      const linhas     = []
+      // Técnicos já atribuídos a qualquer evento neste dia
+      const atribuidos = new Set(
+        evTecnicos
+          .filter(et => { const ev2 = eventos.find(e => e.id === et.evento_id); return ev2?.data_evento === dataStr })
+          .map(et => et.tecnico_id)
+      )
+      // LMD manual (evento_tecnicos para o espaço LMD)
+      const lmdEv = i4djEspacoId ? evIdx[`${dataStr}|${i4djEspacoId}`] : null
+      const lmdTecs = lmdEv ? (evTecIdx[lmdEv.id] ?? []) : []
+      // Técnicos fixos livres (auto-LMD)
+      const livres = tecnicosFixos
+        .filter(t => !folgasHoje.has(t.id) && !atribuidos.has(t.id))
+        .map(t => t.id)
+      m[dataStr] = [...new Set([...lmdTecs, ...livres])]
+    })
+    return m
+  }, [dias, folgasIdx, evTecnicos, eventos, evTecIdx, evIdx, tecnicosFixos, i4djEspacoId])
 
-      espacos.forEach(espaco => {
+  const linhasBrutas = useMemo(() => {
+    const result = []
+    dias.forEach(dia => {
+      const dataStr = isoData(dia)
+      const linhas  = []
+      // Excluir LMD das linhas principais (é mostrado como coluna)
+      espacos.filter(e => e.id !== i4djEspacoId).forEach(espaco => {
         const k      = `${dataStr}|${espaco.id}`
         const ev     = evIdx[k] ?? null
         const dj     = djIdx[k]
         const ag     = agIdx[k] ?? null
-        let   tecIds = ev ? (evTecIdx[ev.id] ?? (ag?.tecnico_id ? [ag.tecnico_id] : []))
+        const tecIds = ev ? (evTecIdx[ev.id] ?? (ag?.tecnico_id ? [ag.tecnico_id] : []))
                           : (ag?.tecnico_id ? [ag.tecnico_id] : [])
-
-        // Auto-i4DJ: adicionar técnicos fixos que estão livres neste dia
-        if (i4djEspacoId && espaco.id === i4djEspacoId) {
-          // Técnicos já atribuídos a qualquer evento neste dia
-          const atribuidos = new Set(
-            evTecnicos
-              .filter(et => { const ev2 = eventos.find(e => e.id === et.evento_id); return ev2?.data_evento === dataStr })
-              .map(et => et.tecnico_id)
-          )
-          const livres = tecnicosFixos
-            .filter(t => !folgasHoje.has(t.id) && !atribuidos.has(t.id))
-            .map(t => t.id)
-          tecIds = [...new Set([...tecIds, ...livres])]
-        }
-
         linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev, djs: dj ?? [], ag, tecIds })
       })
       result.push({ dataStr, dia, linhas, folgas: folgasIdx[dataStr] ?? [] })
     })
     return result
-  }, [dias, espacos, evIdx, djIdx, agIdx, folgasIdx, evTecIdx, evTecnicos, eventos, tecnicosFixos, i4djEspacoId])
+  }, [dias, espacos, evIdx, djIdx, agIdx, folgasIdx, evTecIdx, i4djEspacoId])
 
   const linhasPorDia = useMemo(() => {
     const q = pesquisa.trim().toLowerCase()
@@ -1058,6 +1066,7 @@ export function ApoioTecnico() {
                   <th key={`sh-dj-${i}`}  className={thCls}>DJ</th>,
                 ])}
                 <th className={clsx(thCls, 'border-l border-border/60')}>Folga</th>
+                {i4djEspacoId && <th className={clsx(thCls, 'border-l border-red-500/30 text-red-400/70')}>LMD</th>}
               </tr>
             </thead>
             <tbody>
@@ -1137,6 +1146,27 @@ export function ApoioTecnico() {
                         : <span className="text-border/20 text-[10px]">—</span>
                       }
                     </td>
+                    {/* Coluna LMD */}
+                    {i4djEspacoId && (
+                      <td className="px-2 py-2 border-l border-red-500/20 whitespace-nowrap align-middle">
+                        <span className="inline-flex flex-nowrap gap-1 overflow-hidden">
+                          {(lmdPorDia[dataStr] ?? []).map(tid => {
+                            const tec = tecnicos.find(t => t.id === tid)
+                            const cor = tecCorMap[tid]
+                            if (!tec) return null
+                            return (
+                              <span key={tid} className={clsx(
+                                'inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0',
+                                cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30'
+                              )}>
+                                {tec.nome}
+                              </span>
+                            )
+                          })}
+                          {(lmdPorDia[dataStr] ?? []).length === 0 && <span className="text-border/20 text-[10px]">—</span>}
+                        </span>
+                      </td>
+                    )}
                   </tr>
                 )
 
@@ -1176,11 +1206,12 @@ export function ApoioTecnico() {
                 <th className={clsx(thCls, 'text-center')}>Hora Início</th>
                 <th className={thCls}>DJ</th>
                 <th className={clsx(thCls, 'border-l border-border/60')}>Folga</th>
+                {i4djEspacoId && <th className={clsx(thCls, 'border-l border-red-500/30 text-red-400/70')}>LMD</th>}
               </tr>
             </thead>
             <tbody>
               {linhasPorDia.length === 0 && (
-                <tr><td colSpan={8} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
+                <tr><td colSpan={9} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
               )}
               {linhasPorDia.flatMap(({ dataStr, dia, linhas, folgas }, dayIdx) => {
                 const tecsFolga    = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
@@ -1261,6 +1292,27 @@ export function ApoioTecnico() {
                             </span>
                           : <span className="text-border/20 text-[10px]">—</span>
                         }
+                      </td>
+                    )}
+                    {/* LMD — rowSpan */}
+                    {li === 0 && i4djEspacoId && (
+                      <td rowSpan={rowSpan} className="px-2 py-2 border-l border-red-500/20 align-middle whitespace-nowrap">
+                        <span className="inline-flex flex-nowrap gap-1 overflow-hidden">
+                          {(lmdPorDia[dataStr] ?? []).map(tid => {
+                            const tec = tecnicos.find(t => t.id === tid)
+                            const cor = tecCorMap[tid]
+                            if (!tec) return null
+                            return (
+                              <span key={tid} className={clsx(
+                                'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0',
+                                cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30'
+                              )}>
+                                {tec.nome}
+                              </span>
+                            )
+                          })}
+                          {(lmdPorDia[dataStr] ?? []).length === 0 && <span className="text-border/20 text-[10px]">—</span>}
+                        </span>
                       </td>
                     )}
                   </tr>
