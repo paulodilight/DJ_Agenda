@@ -908,15 +908,16 @@ export function ApoioTecnico() {
               >
                 <span className={clsx('font-semibold', cor?.text ?? 'text-accent-muted')}>{t.nome}</span>
                 {(st.datas > 0 || st.folgas > 0 || st.valor > 0) && (
-                  <span className="flex items-center gap-1 text-[10px] opacity-55 font-normal">
+                  <span className="flex items-center gap-0.5 text-[10px] opacity-55 font-normal shrink-0">
                     {[
-                      st.datas  > 0 && `D${st.datas}`,
-                      st.folgas > 0 && `F${st.folgas}`,
-                      st.valor  > 0 && `V ${Math.round(st.valor)}`,
-                    ].filter(Boolean).map((s, i, arr) => (
-                      <span key={i} className="flex items-center gap-1">
-                        {s}
-                        {i < arr.length - 1 && <span className="opacity-40">|</span>}
+                      st.datas  > 0 && ['D', st.datas],
+                      st.folgas > 0 && ['F', st.folgas],
+                      st.valor  > 0 && ['V', Math.round(st.valor)],
+                    ].filter(Boolean).map(([letra, val], i, arr) => (
+                      <span key={i} className="flex items-center gap-0.5">
+                        <span className="opacity-70">{letra}</span>
+                        <span>{val}</span>
+                        {i < arr.length - 1 && <span className="opacity-30 mx-0.5">|</span>}
                       </span>
                     ))}
                   </span>
