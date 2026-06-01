@@ -1083,7 +1083,7 @@ export function ApoioTecnico() {
                       return [
                         i > 0 && <td key={`sep-${dataStr}-${i}`} className="p-0 bg-border/30 w-px" />,
                         renderTecCell(linha, i > 0 ? 'pl-3' : ''),
-                        <td key={`esp-${dataStr}-${i}`} className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>,
+                        <td key={`esp-${dataStr}-${i}`} className={clsx('px-2 py-2 font-medium whitespace-nowrap', linha?.espacoNome?.toLowerCase() === 'lmd' ? 'text-red-400' : 'text-accent-muted')}>{linha?.espacoNome ?? ''}</td>,
                         /* Evento — clique para editar, criar com espaço, ou criar só com data */
                         <td key={`ev-${dataStr}-${i}`}
                           onClick={() => {
@@ -1206,7 +1206,7 @@ export function ApoioTecnico() {
                     {/* Técnico — draggable */}
                     {linha ? renderTecCell(linha) : <td className="px-2 py-2" />}
                     {/* Cliente */}
-                    <td className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>
+                    <td className={clsx('px-2 py-2 font-medium whitespace-nowrap', linha?.espacoNome?.toLowerCase() === 'lmd' ? 'text-red-400' : 'text-accent-muted')}>{linha?.espacoNome ?? ''}</td>
                     {/* Evento — clique para editar, criar com espaço, ou criar só com data */}
                     <td
                       onClick={() => {
