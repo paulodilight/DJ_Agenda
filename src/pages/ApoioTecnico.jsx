@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useCallback } from 'react'
+﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle } from 'lucide-react'
@@ -448,6 +448,7 @@ export function ApoioTecnico() {
 
   // ── Drag state (técnico) ────────────────────────────────────────────────────
   const [dragSource, setDragSource] = useState(null)  // { dropKey, tecnicoId, eventoId, agId }
+  const dragSourceRef               = useRef(null)    // ref para evitar stale closure no handleDrop
   const [dragOver, setDragOver]     = useState(null)  // dropKey string
 
   // ── Drag state (folga) ──────────────────────────────────────────────────────
@@ -662,15 +663,18 @@ export function ApoioTecnico() {
     document.body.appendChild(ghost)
     e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 12)
     setTimeout(() => document.body.removeChild(ghost), 0)
-    setDragSource({
+    const src = {
       dropKey:   `${linha.dataStr}|${linha.espaco_id}`,
       tecnicoId,
       eventoId:  linha.ev?.id ?? null,
       agId:      linha.ag?.id ?? null,
-    })
+    }
+    dragSourceRef.current = src
+    setDragSource(src)
   }, [tecnicos])
 
   const handleDragEnd = useCallback(() => {
+    dragSourceRef.current = null
     setDragSource(null)
     setDragOver(null)
   }, [])
@@ -716,7 +720,8 @@ export function ApoioTecnico() {
   const handleDrop = useCallback((e, linha) => {
     e.preventDefault()
     setDragOver(null)
-    const src = dragSource
+    const src = dragSourceRef.current   // ← sempre o valor mais recente
+    dragSourceRef.current = null
     setDragSource(null)
     if (!src?.tecnicoId) return
     const dstKey = `${linha.dataStr}|${linha.espaco_id}`
@@ -885,9 +890,11 @@ export function ApoioTecnico() {
                   document.body.appendChild(ghost)
                   e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 12)
                   setTimeout(() => document.body.removeChild(ghost), 0)
-                  setDragSource({ dropKey: null, tecnicoId: t.id, eventoId: null, agId: null })
+                  const paletteSrc = { dropKey: null, tecnicoId: t.id, eventoId: null, agId: null }
+                  dragSourceRef.current = paletteSrc
+                  setDragSource(paletteSrc)
                 }}
-                onDragEnd={() => setDragSource(null)}
+                onDragEnd={() => { dragSourceRef.current = null; setDragSource(null) }}
                 onClick={() => setFiltroTecnico(filtroTecnico === t.nome ? '' : t.nome)}
                 title={`Filtrar: ${t.nome} · Arrastar para atribuir`}
                 className={clsx(
@@ -899,7 +906,7 @@ export function ApoioTecnico() {
                     : 'bg-surface-2 text-accent-muted border-border hover:text-accent hover:border-white/20'
                 )}
               >
-                <span className="font-semibold">{t.nome}</span>
+                <span className={clsx('font-semibold', cor?.text ?? 'text-accent-muted')}>{t.nome}</span>
                 {(st.datas > 0 || st.folgas > 0 || st.valor > 0) && (
                   <span className="flex items-center gap-1 text-[10px] opacity-55 font-normal">
                     {[
