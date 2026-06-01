@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+﻿import { useState, useMemo, useCallback, useEffect } from 'react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { Users, Euro, CalendarDays, TrendingUp, Check, AlertTriangle, ChevronUp, SlidersHorizontal, Search, ArrowUpDown } from 'lucide-react'
@@ -169,7 +169,7 @@ function InputMeta({ value, onChange, placeholder, prefixo }) {
   )
 }
 
-// ── Modal DJ: metas + meta por espaço + preferências ─────────────────────────
+// ── Modal DJ: metas + meta por Cliente + preferências ─────────────────────────
 function ModalDJ({ dj, meta, metaEspaco, isSaving, onSaveMeta, onSaveMetaEspaco, espacosComTurnos, turnosPorEspaco, adminPrefs, onSetPeso, togglingPref, onFechar }) {
   if (!dj) return null
 
@@ -212,12 +212,12 @@ function ModalDJ({ dj, meta, metaEspaco, isSaving, onSaveMeta, onSaveMetaEspaco,
           </div>
         </div>
 
-        {/* ── Limite por espaço ── */}
+        {/* ── Limite por Cliente ── */}
         {espacosComTurnos.length > 0 && (
           <div>
-            <p className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mb-1">Limite por Espaço</p>
+            <p className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mb-1">Limite por Cliente</p>
             <p className="text-[10px] text-accent-subtle/60 mb-2.5">
-              Max. atuações neste espaço/mês · vazio = usa meta global · 0 = nunca distribuir aqui
+              Max. atuações neste Cliente/mês · vazio = usa meta global · 0 = nunca distribuir aqui
             </p>
             <div className="border border-border/60 rounded-lg overflow-hidden">
               {espacosComTurnos.map((espaco, idx) => {
@@ -266,7 +266,7 @@ function ModalDJ({ dj, meta, metaEspaco, isSaving, onSaveMeta, onSaveMetaEspaco,
           </p>
 
           {espacosComTurnos.length === 0 ? (
-            <p className="text-xs text-accent-subtle/60 text-center py-3">Nenhum espaço com turnos configurados.</p>
+            <p className="text-xs text-accent-subtle/60 text-center py-3">Nenhum Cliente com turnos configurados.</p>
           ) : (
             <div className="border border-border/60 rounded-lg overflow-hidden">
               {espacosComTurnos.map((espaco, idx) => {
@@ -283,7 +283,7 @@ function ModalDJ({ dj, meta, metaEspaco, isSaving, onSaveMeta, onSaveMetaEspaco,
                       nActivos > 0 ? 'bg-accent/5' : 'bg-surface-2'
                     )}
                   >
-                    {/* Nome do espaço */}
+                    {/* Nome do Cliente */}
                     <span className={clsx(
                       'text-[11px] font-medium w-24 shrink-0 truncate pt-1',
                       nActivos > 0 ? 'text-accent' : 'text-accent-muted'
@@ -416,7 +416,7 @@ export function Equilibrio() {
           }
         })
         setMetas(metasInit)
-        // Inicializar metas por espaço: { [dj_id]: { [espaco_id]: max_datas_mes } }
+        // Inicializar metas por Cliente: { [dj_id]: { [espaco_id]: max_datas_mes } }
         const metasEspacoInit = {}
         ;(metaEspacoRes.data ?? []).forEach(({ dj_id, espaco_id, max_datas_mes }) => {
           if (!metasEspacoInit[dj_id]) metasEspacoInit[dj_id] = {}
@@ -438,7 +438,7 @@ export function Equilibrio() {
     return () => { cancelled = true }
   }, [dataInicio, dataFim])
 
-  // ── Turnos agrupados por espaço — query direta, sempre fresco ────────────
+  // ── Turnos agrupados por Cliente — query direta, sempre fresco ────────────
   const turnosPorEspaco = useMemo(() => {
     const map = {}
     turnos.forEach(t => {
@@ -448,7 +448,7 @@ export function Equilibrio() {
     return map
   }, [turnos])
 
-  // ── Espaços com pelo menos um turno (elegíveis para preferências) ─────────
+  // ── Clientes com pelo menos um turno (elegíveis para preferências) ─────────
   const espacosComTurnos = useMemo(() =>
     espacos.filter(e => (turnosPorEspaco[e.id]?.length ?? 0) > 0)
   , [espacos, turnosPorEspaco])
@@ -502,7 +502,7 @@ export function Equilibrio() {
     }
   }, [metas])
 
-  // ── Guardar meta por espaço (auto-save no blur) ───────────────────────────
+  // ── Guardar meta por Cliente (auto-save no blur) ───────────────────────────
   const guardarMetaEspaco = useCallback(async (djId, espacoId, valor) => {
     // Actualização optimista
     setMetasEspaco((prev) => ({
@@ -512,11 +512,11 @@ export function Equilibrio() {
     try {
       await djMetaEspacoApi.guardarUm(djId, espacoId, valor)
     } catch (e) {
-      console.error('Erro ao guardar meta por espaço:', e)
+      console.error('Erro ao guardar meta por Cliente:', e)
     }
   }, [])
 
-  // ── Slots filtrados por espaço (para gráfico e tabela) ───────────────────
+  // ── Slots filtrados por Cliente (para gráfico e tabela) ───────────────────
   const slotsFiltrados = useMemo(() =>
     filtroEspaco ? slots.filter((s) => s.espaco_id === filtroEspaco) : slots
   , [slots, filtroEspaco])
@@ -724,13 +724,13 @@ export function Equilibrio() {
                   Valor
                 </button>
               </div>
-              {/* Filtro espaço */}
+              {/* Filtro Cliente */}
               <select
                 value={filtroEspaco}
                 onChange={(e) => setFiltroEspaco(e.target.value)}
                 className="bg-surface-2 border border-border rounded px-2 py-1 text-[11px] text-accent-muted focus:outline-none"
               >
-                <option value="">Todos os espaços</option>
+                <option value="">Todos os Clientes</option>
                 {espacos.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
               </select>
             </div>

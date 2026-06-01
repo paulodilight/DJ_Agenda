@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Save, ChevronLeft, ChevronRight, ImageIcon, X } from 'lucide-react'
 import { espacosApi, turnosApi, djsFixosApi, espacoDjPreferenciasApi, turnoValoresDiaApi, categoriasDjApi, turnoCategoriaApi } from '@/lib/api'
@@ -129,7 +129,7 @@ export function EspacoPerfil() {
         setConfigDia(novaConfig)
       } catch { /* silencioso */ }
 
-      // Carregar preferências de DJs para este espaço
+      // Carregar preferências de DJs para este Cliente
       const prefsData = await espacoDjPreferenciasApi.listar(id)
       const prefsMap = {}
       prefsData
@@ -296,9 +296,9 @@ export function EspacoPerfil() {
             className="flex items-center gap-1.5 text-xs text-accent-muted hover:text-accent mb-2 transition-colors"
           >
             <ArrowLeft size={13} />
-            Voltar aos espaços
+            Voltar aos Clientes
           </button>
-          <h1 className="text-base font-semibold text-accent">{form.nome || 'Espaço'}</h1>
+          <h1 className="text-base font-semibold text-accent">{form.nome || 'Cliente'}</h1>
         </div>
         <Button type="submit" variante="primary" tamanho="sm" loading={saving}>
           <Save size={14} />
@@ -377,7 +377,7 @@ export function EspacoPerfil() {
                 <p className="text-[10px] text-accent-subtle mt-1">1 = primeiro · vazio = automático</p>
               </div>
             </div>
-            <Textarea label="Notas / regras do espaço" value={form.notas} onChange={setField('notas')} placeholder="Regras específicas, preferências..." />
+            <Textarea label="Notas / regras do Cliente" value={form.notas} onChange={setField('notas')} placeholder="Regras específicas, preferências..." />
           </CardBody>
         </Card>
 
@@ -675,7 +675,7 @@ export function EspacoPerfil() {
           <CardHeader>
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
-                <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Preferências de DJs para este espaço</p>
+                <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Preferências de DJs para este Cliente</p>
                 <p className="text-xs text-accent-subtle mt-1">
                   Preferido = o motor favorece este DJ · Excluído = nunca atribui · Neutro = sem preferência
                 </p>

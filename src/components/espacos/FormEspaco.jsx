@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -62,13 +62,13 @@ export function FormEspaco({ aberto, espaco, onFechar, onGuardado }) {
   }
 
   return (
-    <Modal aberto={aberto} onFechar={onFechar} titulo={editar ? 'Editar espaço' : 'Novo espaço'} largura="max-w-xl">
+    <Modal aberto={aberto} onFechar={onFechar} titulo={editar ? 'Editar Cliente' : 'Novo Cliente'} largura="max-w-xl">
       <form onSubmit={guardar}>
         <div className="px-6 py-5 flex flex-col gap-4">
           {erro && <Alerta tipo="erro" mensagem={erro} />}
 
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Nome" value={form.nome} onChange={set('nome')} placeholder="Nome do espaço" required />
+            <Input label="Nome" value={form.nome} onChange={set('nome')} placeholder="Nome do Cliente" required />
             <Select label="Tipo" value={form.tipo} onChange={set('tipo')}>
               {TIPO_OPCOES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </Select>
@@ -94,13 +94,13 @@ export function FormEspaco({ aberto, espaco, onFechar, onGuardado }) {
             />
           </div>
 
-          <Textarea label="Notas / Regras do espaço" value={form.notas} onChange={set('notas')} placeholder="Regras específicas, preferências, notas internas..." />
+          <Textarea label="Notas / Regras do Cliente" value={form.notas} onChange={set('notas')} placeholder="Regras específicas, preferências, notas internas..." />
         </div>
 
         <div className="px-6 py-4 border-t border-border flex justify-end gap-2">
           <Button type="button" variante="ghost" tamanho="sm" onClick={onFechar}>Cancelar</Button>
           <Button type="submit" variante="primary" tamanho="sm" loading={loading}>
-            {editar ? 'Guardar alterações' : 'Criar espaço'}
+            {editar ? 'Guardar alterações' : 'Criar Cliente'}
           </Button>
         </div>
       </form>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Select, Textarea } from '@/components/ui/Input'
 import { Input } from '@/components/ui/Input'
@@ -9,9 +9,9 @@ import { useDJs } from '@/hooks/useDJs'
 import { useEspacos } from '@/hooks/useEspacos'
 
 const TIPO_OPCOES = [
-  { value: 'BAN', label: 'BAN — Bloquear DJ num espaço' },
-  { value: 'LOCK', label: 'LOCK — Fixar DJ num espaço numa data' },
-  { value: 'SWAP', label: 'SWAP — Trocar dois DJs entre espaços' },
+  { value: 'BAN', label: 'BAN — Bloquear DJ num Cliente' },
+  { value: 'LOCK', label: 'LOCK — Fixar DJ num Cliente numa data' },
+  { value: 'SWAP', label: 'SWAP — Trocar dois DJs entre Clientes' },
 ]
 
 const vazio = { tipo: 'BAN', dj_id: '', dj_swap_id: '', espaco_id: '', data: '', motivo: '' }
@@ -70,9 +70,9 @@ export function FormBloqueio({ aberto, onFechar, onGuardado }) {
 
           {/* Descrição do tipo */}
           <div className="text-xs text-accent-muted bg-surface-2 rounded px-3 py-2 border border-border">
-            {form.tipo === 'BAN' && 'O DJ nunca será distribuído para este espaço (permanente).'}
-            {form.tipo === 'LOCK' && 'O DJ fica fixo neste espaço nesta data — o motor não pode alterar.'}
-            {form.tipo === 'SWAP' && 'Dois DJs trocam de espaço automaticamente na data indicada.'}
+            {form.tipo === 'BAN' && 'O DJ nunca será distribuído para este Cliente (permanente).'}
+            {form.tipo === 'LOCK' && 'O DJ fica fixo neste Cliente nesta data — o motor não pode alterar.'}
+            {form.tipo === 'SWAP' && 'Dois DJs trocam de Cliente automaticamente na data indicada.'}
           </div>
 
           <Select label={form.tipo === 'SWAP' ? 'DJ A' : 'DJ'} value={form.dj_id} onChange={set('dj_id')} required>
@@ -91,8 +91,8 @@ export function FormBloqueio({ aberto, onFechar, onGuardado }) {
             </Select>
           )}
 
-          <Select label="Espaço" value={form.espaco_id} onChange={set('espaco_id')} required>
-            <option value="">Seleccionar espaço...</option>
+          <Select label="Cliente" value={form.espaco_id} onChange={set('espaco_id')} required>
+            <option value="">Seleccionar Cliente...</option>
             {espacos.map((e) => (
               <option key={e.id} value={e.id}>{e.nome}</option>
             ))}

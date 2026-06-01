@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { agendaApi } from '@/lib/api'
 import { Modal } from '@/components/ui/Modal'
@@ -60,7 +60,7 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
           .select('dj_id, disponivel')
           .eq('data', slot.data),
 
-        // Agenda deste dia (todos os espaços) — para cross-espaço
+        // Agenda deste dia (todos os Clientes) — para cross-Cliente
         supabase.from('agenda')
           .select('dj_id, espaco_id')
           .eq('data', slot.data)
@@ -68,12 +68,12 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
           .neq('estado', 'sem_efeito')
           .neq('id', slot.id),
 
-        // Preferências do espaço sobre DJs
+        // Preferências do Cliente sobre DJs
         supabase.from('espaco_dj_preferencias')
           .select('dj_id, tipo')
           .eq('espaco_id', slot.espaco_id),
 
-        // Preferências dos DJs sobre este espaço
+        // Preferências dos DJs sobre este Cliente
         supabase.from('dj_preferencias_espaco')
           .select('dj_id, preferencia')
           .eq('espaco_id', slot.espaco_id),
@@ -86,13 +86,13 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
         // Categorias de todos os DJs
         supabase.from('dj_categorias').select('dj_id, categoria_id'),
 
-        // Bloqueios activos para este espaço
+        // Bloqueios activos para este Cliente
         supabase.from('bloqueios')
           .select('dj_id, tipo')
           .eq('espaco_id', slot.espaco_id)
           .eq('activo', true),
 
-        // Peso admin por DJ neste espaço+turno
+        // Peso admin por DJ neste Cliente+turno
         turno?.id
           ? supabase.from('admin_dj_espaco_pref')
               .select('dj_id, peso')
@@ -100,7 +100,7 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
               .eq('turno_id', turno.id)
           : Promise.resolve({ data: [] }),
 
-        // Contagem de slots do mês para cada DJ neste espaço (espaçamento/score)
+        // Contagem de slots do mês para cada DJ neste Cliente (espaçamento/score)
         supabase.from('agenda')
           .select('dj_id')
           .eq('espaco_id', slot.espaco_id)
@@ -141,17 +141,17 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
 
         // Verificações de exclusão
         if (bans.has(dj.id))
-          razoes.push('BAN neste espaço')
+          razoes.push('BAN neste Cliente')
         if (espacoPrefs[dj.id] === 'excluido')
-          razoes.push('Excluído pelo espaço')
+          razoes.push('Excluído pelo Cliente')
         if (djPrefs[dj.id] === 'recusa')
-          razoes.push('Recusa este espaço')
+          razoes.push('Recusa este Cliente')
         if (dispMapa[dj.id] === false)
           razoes.push('Indisponível nesta data')
         if (jaNesteEspaco.has(dj.id))
-          razoes.push('Já atribuído neste espaço neste dia')
+          razoes.push('Já atribuído neste Cliente neste dia')
         if (jaNoutroEspaco.has(dj.id))
-          razoes.push('Já atribuído noutro espaço neste dia')
+          razoes.push('Já atribuído noutro Cliente neste dia')
         if (espaco?.budget_max && (dj.valor_sessao ?? 0) > espaco.budget_max)
           razoes.push(`Valor ${formatarEuro(dj.valor_sessao)} acima do budget`)
         if (turnoCats.size > 0) {
@@ -174,8 +174,8 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
 
         // Destaques positivos para mostrar
         const destaques = []
-        if (espacoPrefs[dj.id] === 'preferido') destaques.push('Preferido pelo espaço')
-        if (djPrefs[dj.id]    === 'prefere')    destaques.push('Prefere este espaço')
+        if (espacoPrefs[dj.id] === 'preferido') destaques.push('Preferido pelo Cliente')
+        if (djPrefs[dj.id]    === 'prefere')    destaques.push('Prefere este Cliente')
         if (dispMapa[dj.id]   === true)          destaques.push('Disponibilidade confirmada')
 
         disponiveis.push({ dj, score, destaques })
@@ -189,17 +189,17 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
       if (slot.dj_id) {
         const razoesActual = []
         if (bans.has(slot.dj_id))
-          razoesActual.push('BAN neste espaço')
+          razoesActual.push('BAN neste Cliente')
         if (espacoPrefs[slot.dj_id] === 'excluido')
-          razoesActual.push('Excluído pelo espaço')
+          razoesActual.push('Excluído pelo Cliente')
         if (djPrefs[slot.dj_id] === 'recusa')
-          razoesActual.push('Recusa este espaço')
+          razoesActual.push('Recusa este Cliente')
         if (dispMapa[slot.dj_id] === false)
           razoesActual.push('Indisponível nesta data')
         if (jaNesteEspaco.has(slot.dj_id))
-          razoesActual.push('Já atribuído neste espaço neste dia')
+          razoesActual.push('Já atribuído neste Cliente neste dia')
         if (jaNoutroEspaco.has(slot.dj_id))
-          razoesActual.push('Já atribuído noutro espaço neste dia')
+          razoesActual.push('Já atribuído noutro Cliente neste dia')
         if (razoesActual.length > 0)
           setConflitoDJActual({ djNome: slot.dj_nome, razoes: razoesActual })
       }
@@ -363,7 +363,7 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
                   {excluidos.map(({ dj, razoes }) => {
                     const bloqueioAbsoluto =
                       razoes.includes('Indisponível nesta data') ||
-                      razoes.includes('Já atribuído noutro espaço neste dia')
+                      razoes.includes('Já atribuído noutro Cliente neste dia')
                     return (
                       <div key={dj.id} className="flex items-center gap-2 px-3 py-2 rounded border border-border/40 bg-surface-1/50">
                         <UserX size={12} className="text-accent-subtle/50 shrink-0" />

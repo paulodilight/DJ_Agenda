@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useMesStore } from '@/store'
@@ -7,6 +7,7 @@ import { formatarEuro } from '@/utils/formatacao'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { clsx } from 'clsx'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { corTecnico } from '@/utils/tecnicoColor'
 
 const cap  = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
 const fmtD = (d) => format(new Date(d + 'T00:00:00'), "EEE d/MM", { locale: pt })
@@ -219,20 +220,24 @@ export function ContasColaboradores() {
         >
           Dashboard
         </button>
-        {cards.map(c => (
-          <button
-            key={c.tec.id}
-            onClick={() => setFiltroTec(filtroTec === c.tec.id ? 'dashboard' : c.tec.id)}
-            className={clsx(
-              'px-3 py-1.5 rounded text-xs transition-colors border',
-              filtroTec === c.tec.id
-                ? 'bg-surface-3 text-accent border-white/20 font-semibold'
-                : 'bg-surface-2 text-accent-muted border-border hover:text-accent'
-            )}
-          >
-            {c.tec.nome}
-          </button>
-        ))}
+        {cards.map((c, i) => {
+          const cor = corTecnico(c.tec.nome, i)
+          const activo = filtroTec === c.tec.id
+          return (
+            <button
+              key={c.tec.id}
+              onClick={() => setFiltroTec(activo ? 'dashboard' : c.tec.id)}
+              className={clsx(
+                'px-3 py-1.5 rounded text-xs transition-colors border font-medium',
+                activo
+                  ? cor.btn
+                  : 'bg-surface-2 text-accent-muted border-border hover:text-accent'
+              )}
+            >
+              {c.tec.nome}
+            </button>
+          )
+        })}
       </div>
 
       {/* ── Conteúdo scrollável ── */}
@@ -273,6 +278,7 @@ export function ContasColaboradores() {
           const isDia  = tipo === 'dia'
           const isHora = tipo === 'hora'
           const isMensal = tipo === 'mensal'
+          const cor    = corTecnico(tec.nome, cardsFiltrados.findIndex(c => c.tec.id === tec.id))
 
           // Label do valor base
           const labelValor = isDia ? 'Valor / dia' : isHora ? 'Valor / hora' : isMensal ? 'Valor / mês' : 'Valor / evento'
@@ -283,7 +289,7 @@ export function ContasColaboradores() {
               {/* ── Cabeçalho ── */}
               <div className="px-5 py-4 flex items-center justify-between gap-4 border-b border-border/40">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-surface-3 border border-border flex items-center justify-center text-sm font-bold text-accent shrink-0">
+                  <div className={clsx('w-10 h-10 rounded-full border flex items-center justify-center text-sm font-bold shrink-0', cor.avatar)}>
                     {tec.nome.charAt(0)}
                   </div>
                   <div>
@@ -404,7 +410,7 @@ export function ContasColaboradores() {
                         <thead>
                           <tr className="bg-surface-2/60 border-b border-border/30">
                             <th className="text-left px-5 py-2 font-medium text-accent-subtle">Data</th>
-                            <th className="text-left px-3 py-2 font-medium text-accent-subtle">Espaço</th>
+                            <th className="text-left px-3 py-2 font-medium text-accent-subtle">Cliente</th>
                             <th className="text-left px-3 py-2 font-medium text-accent-subtle">Evento</th>
                             <th className="text-center px-3 py-2 font-medium text-accent-subtle">Duração</th>
                             <th className="text-right px-5 py-2 font-medium text-accent-subtle">Valor</th>

@@ -38,6 +38,20 @@ export default {
       borderRadius: {
         DEFAULT: '6px',
       },
+      keyframes: {
+        slideUp: {
+          from: { opacity: '0', transform: 'translate(-50%, 12px)' },
+          to:   { opacity: '1', transform: 'translate(-50%, 0)' },
+        },
+        drain: {
+          from: { width: '100%' },
+          to:   { width: '0%' },
+        },
+      },
+      animation: {
+        'slide-up': 'slideUp 0.18s ease-out forwards',
+        'drain':    'drain linear forwards',
+      },
     },
   },
   plugins: [],

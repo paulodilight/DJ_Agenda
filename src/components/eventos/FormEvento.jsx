@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { X, Database, Star } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -233,8 +233,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 </Field>
               </div>
 
-              {/* Espaço */}
-              <Field label="Espaço">
+              {/* Cliente */}
+              <Field label="Cliente">
                 <select
                   className={inputCls}
                   value={form.espaco_id}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, Plus, Pencil, Trash2, Eye, Search, ArrowDownUp } from 'lucide-react'
+import { Users, Plus, Trash2, Pencil, Search, ArrowDownUp } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
@@ -10,7 +10,22 @@ import { FormDJ } from '@/components/djs/FormDJ'
 import { useDJs } from '@/hooks/useDJs'
 import { djsApi, agendaApi, categoriasDjApi, djCategoriasApi } from '@/lib/api'
 import { formatarEuro, labelEstadoDJ } from '@/utils/formatacao'
+import { useUndo } from '@/contexts/UndoContext'
 import { clsx } from 'clsx'
+import { format, addMonths, startOfMonth } from 'date-fns'
+import { pt } from 'date-fns/locale'
+
+// Gerar lista de meses: 12 atrás + 6 à frente
+function gerarMeses() {
+  const lista = []
+  const agora = new Date()
+  for (let i = -12; i <= 6; i++) {
+    const d = addMonths(startOfMonth(agora), i)
+    lista.push({ value: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: pt }) })
+  }
+  return lista
+}
+const MESES_OPCOES = gerarMeses()
 
 const ORDENACAO_OPCOES = [
   { value: 'nome',       label: 'Nome' },
@@ -21,6 +36,7 @@ const ORDENACAO_OPCOES = [
 export function DJs() {
   const navigate = useNavigate()
   const { djs, loading, erro, recarregar } = useDJs()
+  const { pushUndo } = useUndo()
   const [modalAberto, setModalAberto]       = useState(false)
   const [djSeleccionado, setDJSeleccionado] = useState(null)
   const [apagando, setApagando]             = useState(null)
@@ -32,12 +48,16 @@ export function DJs() {
   const [filtroEstado, setFiltroEstado]   = useState('activo')   // default: só activo
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [ordenacao, setOrdenacao]         = useState('nome')
+  const [filtroMes, setFiltroMes]         = useState(format(new Date(), 'yyyy-MM'))
 
   // djCatsMap: { dj_id: [categoria_id, ...] }
   const [djCatsMap, setDjCatsMap] = useState({})
 
   useEffect(() => {
-    agendaApi.contarPorDJ().then(setCounts).catch(() => {})
+    agendaApi.contarPorDJ(filtroMes).then(setCounts).catch(() => {})
+  }, [filtroMes])
+
+  useEffect(() => {
     categoriasDjApi.listar().then(setCategorias).catch(() => {})
   }, [])
 
@@ -54,15 +74,23 @@ export function DJs() {
   }, [djs])
 
   const abrirCriar  = () => { setDJSeleccionado(null); setModalAberto(true) }
-  const abrirEditar = (dj) => { setDJSeleccionado(dj); setModalAberto(true) }
   const fecharModal = () => { setModalAberto(false); setDJSeleccionado(null) }
 
   const apagar = async (dj) => {
-    if (!confirm(`Apagar "${dj.nome_artistico || dj.nome}"? Esta acção não pode ser revertida.`)) return
+    if (!confirm(`Apagar "${dj.nome_artistico || dj.nome}"?`)) return
     setApagando(dj.id)
     try {
+      const backup = { ...dj }
       await djsApi.apagar(dj.id)
       recarregar()
+      pushUndo({
+        label: `DJ "${dj.nome_artistico || dj.nome}" apagado`,
+        undo: async () => {
+          const { id: _id, created_at, ...payload } = backup
+          await djsApi.criar(payload)
+          recarregar()
+        },
+      })
     } catch (e) {
       alert(e.message)
     } finally {
@@ -111,7 +139,8 @@ export function DJs() {
     return lista
   }, [djs, filtroEstado, filtroCategoria, pesquisa, ordenacao, counts, djCatsMap])
 
-  const temFiltroActivo = filtroEstado !== 'activo' || filtroCategoria || pesquisa
+  const mesCorrente = format(new Date(), 'yyyy-MM')
+  const temFiltroActivo = filtroEstado !== 'activo' || filtroCategoria || pesquisa || filtroMes !== mesCorrente
 
   return (
     <div className="p-6">
@@ -171,6 +200,17 @@ export function DJs() {
           ))}
         </select>
 
+        {/* Mês */}
+        <select
+          value={filtroMes}
+          onChange={(e) => setFiltroMes(e.target.value)}
+          className="bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-accent-muted focus:outline-none focus:border-white/20"
+        >
+          {MESES_OPCOES.map(m => (
+            <option key={m.value} value={m.value}>{m.label}</option>
+          ))}
+        </select>
+
         {/* Ordenação */}
         <div className="flex items-center gap-1 ml-auto">
           <ArrowDownUp size={11} className="text-accent-subtle" />
@@ -188,7 +228,7 @@ export function DJs() {
         {/* Limpar filtros */}
         {temFiltroActivo && (
           <button
-            onClick={() => { setPesquisa(''); setFiltroEstado('activo'); setFiltroCategoria('') }}
+            onClick={() => { setPesquisa(''); setFiltroEstado('activo'); setFiltroCategoria(''); setFiltroMes(mesCorrente) }}
             className="text-[11px] text-accent-subtle hover:text-accent transition-colors underline underline-offset-2"
           >
             Limpar filtros
@@ -223,10 +263,14 @@ export function DJs() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-accent-muted">Categoria</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-accent-muted">Estado</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">Dist.</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-accent-muted">Valor/sessão</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">Total datas</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">Mês actual</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">Mês seguinte</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">
+                  Datas <span className="text-accent-subtle/60 font-normal capitalize">{format(new Date(filtroMes + '-01'), 'MMM', { locale: pt })}</span>
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-accent-muted">
+                  Valor <span className="text-accent-subtle/60 font-normal capitalize">{format(new Date(filtroMes + '-01'), 'MMM', { locale: pt })}</span>
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-accent-muted">Valor/sessão</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -271,18 +315,27 @@ export function DJs() {
                         : <span className="text-[11px] text-accent-subtle tabular-nums">{dj.prioridade_admin ?? 5}</span>
                       }
                     </td>
+                    <td className="px-4 py-3 text-center tabular-nums text-accent text-xs">
+                      {c.total > 0 ? c.total : <span className="text-accent-subtle/40">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center tabular-nums text-xs">
+                      {c.mesCorrente > 0
+                        ? <span className="text-accent font-medium">{c.mesCorrente}</span>
+                        : <span className="text-accent-subtle/40">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-xs">
+                      {c.mesCorrente > 0 && dj.valor_sessao
+                        ? <span className="text-status-confirmado font-medium">{formatarEuro(c.mesCorrente * dj.valor_sessao)}</span>
+                        : <span className="text-accent-subtle/40">—</span>
+                      }
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums text-accent-muted text-xs">
                       {dj.valor_sessao ? formatarEuro(dj.valor_sessao) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-center tabular-nums text-accent">{c.total}</td>
-                    <td className="px-4 py-3 text-center tabular-nums text-accent-muted">{c.mesCorrente}</td>
-                    <td className="px-4 py-3 text-center tabular-nums text-accent-muted">{c.mesSeguinte}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variante="ghost" tamanho="sm" onClick={() => navigate(`/djs/${dj.id}`)}>
-                          <Eye size={13} />
-                        </Button>
-                        <Button variante="ghost" tamanho="sm" onClick={() => abrirEditar(dj)}>
+                        <Button variante="ghost" tamanho="sm" onClick={() => navigate(`/djs/${dj.id}`)} title="Editar perfil">
                           <Pencil size={13} />
                         </Button>
                         <Button

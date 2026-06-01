@@ -29,7 +29,7 @@ export function useDJ(id) {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState(null)
 
-  useEffect(() => {
+  const carregar = useCallback(async () => {
     if (!id) return
     setLoading(true)
     djsApi.buscar(id)
@@ -38,5 +38,7 @@ export function useDJ(id) {
       .finally(() => setLoading(false))
   }, [id])
 
-  return { dj, loading, erro }
+  useEffect(() => { carregar() }, [carregar])
+
+  return { dj, loading, erro, recarregar: carregar }
 }

@@ -1,11 +1,12 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, MapPin, CalendarDays, Zap, Ban,
   Settings, LogOut, Mic2, Bell, Music2, Scale, Send, Wallet,
-  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones,
+  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar,
 } from 'lucide-react'
 import { useAuthStore, useMesStore } from '@/store'
+import { UndoToast } from '@/components/ui/UndoToast'
 import { clsx } from 'clsx'
 import { format, addMonths } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -20,7 +21,8 @@ const ROTAS = [
   { path: '/comunicacao',   label: 'Comunicação' },
   { path: '/contas',        label: 'Contas' },
   { path: '/djs',           label: 'DJs' },
-  { path: '/espacos',       label: 'Espaços' },
+  { path: '/artistas',      label: 'Artistas' },
+  { path: '/espacos',       label: 'Clientes' },
   { path: '/bloqueios',     label: 'Bloqueios' },
   { path: '/apoio-tecnico', label: 'Apoio T.' },
   { path: '/configuracoes', label: 'Configurações' },
@@ -57,10 +59,11 @@ const navPrincipal = [
 ]
 
 const navGestao = [
-  { para: '/atuacoes',      icone: Mic2,  label: 'Atuações' },
-  { para: '/djs',           icone: Users, label: 'DJs' },
-  { para: '/espacos',       icone: MapPin, label: 'Espaços' },
-  { para: '/bloqueios',     icone: Ban,   label: 'Bloqueios' },
+  { para: '/atuacoes',      icone: Mic2,    label: 'Atuações' },
+  { para: '/djs',           icone: Users,   label: 'DJs' },
+  { para: '/artistas',      icone: Guitar,  label: 'Artistas' },
+  { para: '/espacos',       icone: MapPin,  label: 'Clientes' },
+  { para: '/bloqueios',     icone: Ban,     label: 'Bloqueios' },
 ]
 
 function NavItem({ para, icone: Icone, label, collapsed }) {
@@ -283,6 +286,9 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Undo global — visível em todas as páginas e modais */}
+      <UndoToast />
     </div>
   )
 }

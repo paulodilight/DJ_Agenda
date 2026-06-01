@@ -1,8 +1,8 @@
-import { supabase } from './supabase'
+﻿import { supabase } from './supabase'
 import { eachDayOfInterval, startOfMonth, endOfMonth, getDay, format, addDays } from 'date-fns'
 
 /**
- * Distribuição automática para um espaço e mês.
+ * Distribuição automática para um Cliente e mês.
  *
  * Regras aplicadas (por ordem de prioridade):
  *  0. Slots confirmados → nunca tocados
@@ -12,29 +12,29 @@ import { eachDayOfInterval, startOfMonth, endOfMonth, getDay, format, addDays } 
  *
  * Exclusões absolutas (elegibilidade base):
  *  • excluido_admin = true
- *  • BAN bloqueio para este espaço
- *  • Espaço marcou DJ como 'excluido'
- *  • DJ marcou espaço como 'recusa'
- *  • valor_sessao do DJ > budget_max do espaço (se definido)
+ *  • BAN bloqueio para este Cliente
+ *  • Cliente marcou DJ como 'excluido'
+ *  • DJ marcou Cliente como 'recusa'
+ *  • valor_sessao do DJ > budget_max do Cliente (se definido)
  *
  * Exclusões por slot (contexto do dia):
  *  • DJ marcou o dia como indisponível
- *  • DJ já atribuído noutro espaço nesse dia (conflito cross-espaço)
- *  • DJ já atribuído neste espaço hoje (segundo turno no mesmo dia)
- *  • DJ apareceu neste espaço nos últimos dias_sem_repeticao dias
- *  • DJ apareceu neste espaço nos últimos dias_sem_repeticao dias (cross-espaço: sem restrição)
+ *  • DJ já atribuído noutro Cliente nesse dia (conflito cross-Cliente)
+ *  • DJ já atribuído neste Cliente hoje (segundo turno no mesmo dia)
+ *  • DJ apareceu neste Cliente nos últimos dias_sem_repeticao dias
+ *  • DJ apareceu neste Cliente nos últimos dias_sem_repeticao dias (cross-Cliente: sem restrição)
  *  • Turno com categorias definidas: DJ sem categoria coincidente
  *
  * Score:
- *  prioridade_admin×2 + (preferido espaço: +15) + (prefere espaço: +10)
- *  − contagem_neste_espaço×3 − contagem_noutros_espaços×1
+ *  prioridade_admin×2 + (preferido Cliente: +15) + (prefere Cliente: +10)
+ *  − contagem_neste_Cliente×3 − contagem_noutros_Clientes×1
  *  − floor(valor_sessao/20)
  *
  * @param {{ anoMes: string, espacoId: string }} opts
  * @returns {{ inseridos: number, apagados: number }}
  */
 /**
- * Pré-calcula quantos slots cada DJ deve ir a cada espaço neste mês,
+ * Pré-calcula quantos slots cada DJ deve ir a cada Cliente neste mês,
  * distribuindo a sua meta_datas_mes proporcionalmente aos pesos definidos
  * em admin_dj_espaco_pref (método de Hamilton / maior resto).
  *
@@ -64,7 +64,7 @@ export async function calcularPreAlocacoes(anoMes) {
       .select('espaco_id, dias_semana'),
   ])
 
-  // Espaços com pelo menos um turno activo (dias_semana não vazio → geram slots)
+  // Clientes com pelo menos um turno activo (dias_semana não vazio → geram slots)
   const espacosActivos = new Set(
     (turnosRes.data ?? [])
       .filter(t => t.dias_semana?.length > 0)
@@ -78,11 +78,11 @@ export async function calcularPreAlocacoes(anoMes) {
   // DJs com registos este mês (opt-in obrigatório)
   const djsComRegistos = new Set((dispRes.data ?? []).map(r => r.dj_id))
 
-  // Soma de peso por DJ × espaço — ignora espaços fechados (sem dias_semana)
+  // Soma de peso por DJ × Cliente — ignora Clientes fechados (sem dias_semana)
   // { djId: { espacoId: totalPeso } }
   const djEspacoPeso = {}
   ;(prefsRes.data ?? []).forEach(({ dj_id, espaco_id, peso }) => {
-    if (!espacosActivos.has(espaco_id)) return  // espaço fechado → não conta
+    if (!espacosActivos.has(espaco_id)) return  // Cliente fechado → não conta
     const p = peso ?? 0
     if (p <= 0) return
     if (!djEspacoPeso[dj_id]) djEspacoPeso[dj_id] = {}
@@ -111,7 +111,7 @@ export async function calcularPreAlocacoes(anoMes) {
     const sumFloors = shares.reduce((s, x) => s + x.floor, 0)
     const extras    = meta - sumFloors   // quantos "+1" ainda temos para distribuir
 
-    // Distribui os extras pelos espaços com maior parte fraccional
+    // Distribui os extras pelos Clientes com maior parte fraccional
     shares.sort((a, b) => (b.exact - b.floor) - (a.exact - a.floor))
     shares.forEach((s, i) => { s.final = s.floor + (i < extras ? 1 : 0) })
 
@@ -131,7 +131,7 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
   const dataInicio = format(mesInicio, 'yyyy-MM-dd')
   const dataFim    = format(mesFim,    'yyyy-MM-dd')
 
-  // ── 0. IDs dos turnos do espaço (necessário para subconsultas) ──────────
+  // ── 0. IDs dos turnos do Cliente (necessário para subconsultas) ──────────
   const turnoIdsRes = await supabase
     .from('turnos_espaco')
     .select('id')
@@ -156,7 +156,7 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
     adminPrefsRes,
     metaEspacoRes,
   ] = await Promise.all([
-    // Configurações do espaço
+    // Configurações do Cliente
     supabase
       .from('espacos')
       .select('budget_max, dias_sem_repeticao, dias_espacamento')
@@ -169,7 +169,7 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
       .select('id, nome_artistico, nome, valor_sessao, prioridade_admin, excluido_admin, meta_datas_mes, orcamento_max')
       .in('estado', ['activo', 'activo_ext']),
 
-    // Turnos do espaço
+    // Turnos do Cliente
     supabase
       .from('turnos_espaco')
       .select('id, nome, valor, hora_inicio, hora_fim, dias_semana')
@@ -189,19 +189,19 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
       .gte('data', dataInicio)
       .lte('data', dataFim),
 
-    // Preferências do espaço sobre cada DJ
+    // Preferências do Cliente sobre cada DJ
     supabase
       .from('espaco_dj_preferencias')
       .select('dj_id, tipo')
       .eq('espaco_id', espacoId),
 
-    // Preferências de cada DJ sobre este espaço
+    // Preferências de cada DJ sobre este Cliente
     supabase
       .from('dj_preferencias_espaco')
       .select('dj_id, preferencia')
       .eq('espaco_id', espacoId),
 
-    // Agenda deste espaço no mês
+    // Agenda deste Cliente no mês
     supabase
       .from('agenda')
       .select('id, dj_id, data, turno_id, estado, hora_inicio, origem')
@@ -209,7 +209,7 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
       .gte('data', dataInicio)
       .lte('data', dataFim),
 
-    // Agenda GLOBAL no mês (todos os outros espaços) — conflitos + contagem
+    // Agenda GLOBAL no mês (todos os outros Clientes) — conflitos + contagem
     supabase
       .from('agenda')
       .select('dj_id, data')
@@ -231,7 +231,7 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
       ? supabase.from('turno_valores_dia').select('turno_id, dia_semana, valor, hora_inicio, hora_fim').in('turno_id', turnoIds)
       : Promise.resolve({ data: [], error: null }),
 
-    // Bloqueios activos para este espaço (BAN + LOCK)
+    // Bloqueios activos para este Cliente (BAN + LOCK)
     supabase
       .from('bloqueios')
       .select('tipo, dj_id, data')
@@ -245,7 +245,7 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
       .select('dj_id, turno_id, peso')
       .eq('espaco_id', espacoId),
 
-    // Meta por DJ por espaço (sobrepõe meta global para este espaço)
+    // Meta por DJ por Cliente (sobrepõe meta global para este Cliente)
     supabase
       .from('dj_meta_espaco')
       .select('dj_id, max_datas_mes')
@@ -256,12 +256,12 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
     if (r.error) throw r.error
   }
 
-  // ── Configurações do espaço ────────────────────────────────────────────
+  // ── Configurações do Cliente ────────────────────────────────────────────
   const espaco       = espacoRes.data
   const budgetMax    = espaco.budget_max         ?? null
   const diasSemRepet = espaco.dias_sem_repeticao ?? 0
-  // Nota: dias_espacamento cross-espaço não se aplica —
-  // um DJ pode tocar em espaços diferentes em dias consecutivos.
+  // Nota: dias_espacamento cross-Cliente não se aplica —
+  // um DJ pode tocar em Clientes diferentes em dias consecutivos.
 
   // ── Categorias por turno: turno_id → Set<categoria_id> ─────────────────
   const turnoCatsMap = {}
@@ -321,30 +321,30 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
     adminPesoMap[`${p.dj_id}|${p.turno_id}`] = p.peso ?? 10
   })
 
-  // ── Meta por DJ neste espaço: dj_id → max_datas_mes ──────────────────────
-  //    Quando definida, sobrepõe a meta global e limita aparições NESTE espaço
+  // ── Meta por DJ neste Cliente: dj_id → max_datas_mes ──────────────────────
+  //    Quando definida, sobrepõe a meta global e limita aparições NESTE Cliente
   const metaEspacoMap = {}
   ;(metaEspacoRes.data ?? []).forEach(({ dj_id, max_datas_mes }) => {
     metaEspacoMap[dj_id] = max_datas_mes
   })
 
   // ── Bloqueios ─────────────────────────────────────────────────────────
-  const banSet  = new Set()          // dj_ids com BAN permanente neste espaço
+  const banSet  = new Set()          // dj_ids com BAN permanente neste Cliente
   const lockMap = {}                 // data → dj_id (LOCK numa data específica)
   ;(bloqueiosRes.data ?? []).forEach(b => {
     if (b.tipo === 'BAN'  && b.dj_id)          banSet.add(b.dj_id)
     if (b.tipo === 'LOCK' && b.dj_id && b.data) lockMap[b.data] = b.dj_id
   })
 
-  // ── Agenda global (outros espaços): conflitos e contagem ──────────────
-  const globalConflictSet = new Set()  // "dj_id|data" já atribuídos noutros espaços
-  const globalCount       = {}         // dj_id → nº de slots em outros espaços no mês
+  // ── Agenda global (outros Clientes): conflitos e contagem ──────────────
+  const globalConflictSet = new Set()  // "dj_id|data" já atribuídos noutros Clientes
+  const globalCount       = {}         // dj_id → nº de slots em outros Clientes no mês
   ;(agendaGlobalRes.data ?? []).forEach(({ dj_id, data }) => {
     globalConflictSet.add(`${dj_id}|${data}`)
     globalCount[dj_id] = (globalCount[dj_id] ?? 0) + 1
   })
 
-  // ── Agenda deste espaço ────────────────────────────────────────────────
+  // ── Agenda deste Cliente ────────────────────────────────────────────────
   const agendaExistente = agendaRes.data ?? []
 
   // ── 2. Apagar slots automáticos e proteger os manuais ─────────────────
@@ -381,19 +381,19 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
   const djsElegiveis = djs.filter(dj => {
     if (!djsComRegistos.has(dj.id))       return false  // sem confirmação de disponibilidade este mês
     if (dj.excluido_admin)                return false  // banido pelo admin
-    if (banSet.has(dj.id))                return false  // BAN bloqueio neste espaço
-    if (espPrefs[dj.id] === 'excluido')   return false  // espaço excluiu DJ
-    if (djPrefs[dj.id]  === 'recusa')     return false  // DJ recusa espaço
+    if (banSet.has(dj.id))                return false  // BAN bloqueio neste Cliente
+    if (espPrefs[dj.id] === 'excluido')   return false  // Cliente excluiu DJ
+    if (djPrefs[dj.id]  === 'recusa')     return false  // DJ recusa Cliente
     // meta_datas_mes = 0 → não distribuir automaticamente
     if (dj.meta_datas_mes != null && dj.meta_datas_mes === 0) return false
-    // Budget máximo do espaço (valor por sessão do DJ não pode exceder o limite do espaço)
+    // Budget máximo do Cliente (valor por sessão do DJ não pode exceder o limite do Cliente)
     if (budgetMax != null && (dj.valor_sessao ?? 0) > budgetMax) return false
     return true
   })
 
   // ── 4. Gerar propostas ─────────────────────────────────────────────────
   const novas         = []
-  const contagemNovas = {}  // dj_id → nº de slots atribuídos nesta distribuição (neste espaço)
+  const contagemNovas = {}  // dj_id → nº de slots atribuídos nesta distribuição (neste Cliente)
 
   // Sets dinâmicos — inicializados com slots manuais com DJ
   const manuaisComDJ = slotsManuais.filter(s => s.dj_id)
@@ -404,7 +404,7 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
   const getContagem = (djId) =>
     (contagemConf[djId] ?? 0) + (contagemNovas[djId] ?? 0)
 
-  // Se o espaço não tem turnos configurados → não distribuir (ignorar espaço)
+  // Se o Cliente não tem turnos configurados → não distribuir (ignorar Cliente)
   if (turnos.length === 0) {
     return { inseridos: 0, apagados: 0 }
   }
@@ -450,39 +450,39 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
         const catsPermitidas = turnoCatsMap[turno.id]
 
         const candidatos = djsElegiveis.filter(dj => {
-          // ── Meta por espaço (limita aparições NESTE espaço) ──────────────
-          //    0 = nunca distribuir neste espaço; N = máximo de N aparições
+          // ── Meta por Cliente (limita aparições NESTE Cliente) ──────────────
+          //    0 = nunca distribuir neste Cliente; N = máximo de N aparições
           const maxNEsteEspaco = metaEspacoMap[dj.id]
           if (maxNEsteEspaco != null) {
             if (maxNEsteEspaco === 0) return false
             if (getContagem(dj.id) >= maxNEsteEspaco) return false
           }
 
-          // ── Pré-alocação: reserva quota para espaços prioritários ─────────
+          // ── Pré-alocação: reserva quota para Clientes prioritários ─────────
           //
           //   Cada DJ tem uma quota calculada proporcionalmente aos seus pesos
           //   (admin_dj_espaco_pref) usando o método de Hamilton.
           //
           //   Dois casos:
-          //   A) Este espaço TEM quota definida → cap: bloqueia quando a quota
-          //      local está esgotada (garante espaço para outros espaços preferidos)
-          //   B) Este espaço NÃO TEM quota → bloqueia enquanto a quota total
+          //   A) Este Cliente TEM quota definida → cap: bloqueia quando a quota
+          //      local está esgotada (garante Cliente para outros Clientes preferidos)
+          //   B) Este Cliente NÃO TEM quota → bloqueia enquanto a quota total
           //      preferida ainda não foi preenchida; liberta depois disso
-          //      (overflow vai para espaços sem preferência explícita)
+          //      (overflow vai para Clientes sem preferência explícita)
           const djPreAlloc = preAlocacoes[dj.id]
           if (djPreAlloc) {
             const quotaNesteEspaco = djPreAlloc.quotas[espacoId]
             if (quotaNesteEspaco !== undefined) {
-              // Espaço com quota explícita: bloqueia quando esgotada
+              // Cliente com quota explícita: bloqueia quando esgotada
               if (getContagem(dj.id) >= quotaNesteEspaco) return false
             } else {
-              // Espaço sem quota: bloqueia se ainda há quota preferida por preencher
+              // Cliente sem quota: bloqueia se ainda há quota preferida por preencher
               const totalUsado = (globalCount[dj.id] ?? 0) + getContagem(dj.id)
               if (totalUsado < djPreAlloc.total) return false
             }
           }
 
-          // ── Meta global: DJ atingiu o máximo total em todos os espaços ───
+          // ── Meta global: DJ atingiu o máximo total em todos os Clientes ───
           if (dj.meta_datas_mes != null && dj.meta_datas_mes > 0) {
             const totalGlobal = (globalCount[dj.id] ?? 0) + getContagem(dj.id)
             if (totalGlobal >= dj.meta_datas_mes) return false
@@ -502,13 +502,13 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
           // Opt-in: DJ registou disponibilidades para este mês → só pode actuar nos dias marcados
           if (optInDias[dj.id]?.size > 0 && !optInDias[dj.id].has(iso)) return false
 
-          // Conflito cross-espaço: já está noutro espaço hoje
+          // Conflito cross-Cliente: já está noutro Cliente hoje
           if (globalConflictSet.has(`${dj.id}|${iso}`)) return false
 
-          // Já está neste espaço hoje (outro turno)
+          // Já está neste Cliente hoje (outro turno)
           if (assignedThisSpace.has(`${dj.id}|${iso}`)) return false
 
-          // dias_sem_repeticao: DJ não pode repetir neste espaço nos últimos N dias
+          // dias_sem_repeticao: DJ não pode repetir neste Cliente nos últimos N dias
           if (diasSemRepet > 0) {
             for (let d = 1; d <= diasSemRepet; d++) {
               const dataAnterior = format(addDays(dia, -d), 'yyyy-MM-dd')
@@ -538,11 +538,11 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
           dj,
           score:
             (dj.prioridade_admin ?? 5) * 2 +
-            (espPrefs[dj.id] === 'preferido'                      ? 15 : 0) +  // espaço prefere DJ
-            (djPrefs[dj.id]  === 'prefere'                        ? 10 : 0) +  // DJ prefere espaço
+            (espPrefs[dj.id] === 'preferido'                      ? 15 : 0) +  // Cliente prefere DJ
+            (djPrefs[dj.id]  === 'prefere'                        ? 10 : 0) +  // DJ prefere Cliente
             (adminPesoMap[`${dj.id}|${turno.id}`]              ?? 0) +  // peso admin neste turno
-            - getContagem(dj.id) * 3 -           // penaliza quem já tem datas neste espaço
-            (globalCount[dj.id] ?? 0) * 1 -    // penaliza ligeiramente quem já tem datas noutros espaços
+            - getContagem(dj.id) * 3 -           // penaliza quem já tem datas neste Cliente
+            (globalCount[dj.id] ?? 0) * 1 -    // penaliza ligeiramente quem já tem datas noutros Clientes
             Math.floor((dj.valor_sessao ?? 0) / 20),
         }))
 

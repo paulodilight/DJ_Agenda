@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Settings, AlertTriangle, Ban } from 'lucide-react'
 import { configuracoesApi } from '@/lib/api'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
@@ -97,37 +97,37 @@ export function Configuracoes() {
             type="number" min={1} max={90}
             value={config.dias_espacamento_global ?? ''}
             onChange={set('dias_espacamento_global')}
-            descricao="Número mínimo de dias entre atuações do mesmo DJ em qualquer espaço."
+            descricao="Número mínimo de dias entre atuações do mesmo DJ em qualquer Cliente."
           />
           <Input
-            label="Dias sem repetir DJ no mesmo espaço (default)"
+            label="Dias sem repetir DJ no mesmo Cliente (default)"
             type="number" min={1} max={180}
             value={config.dias_sem_repeticao_global ?? ''}
             onChange={set('dias_sem_repeticao_global')}
-            descricao="Cada espaço pode sobrepor este valor nas suas configurações."
+            descricao="Cada Cliente pode sobrepor este valor nas suas configurações."
           />
         </CardBody>
       </Card>
 
-      {/* ── Regra 1: Sem repetição entre espaços ── */}
+      {/* ── Regra 1: Sem repetição entre Clientes ── */}
       <Card className="mb-4">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Ban size={13} className="text-accent-muted" />
-            <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Regra 1 — Sem repetição entre espaços</p>
+            <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Regra 1 — Sem repetição entre Clientes</p>
           </div>
         </CardHeader>
         <CardBody className="flex flex-col gap-4">
           <Toggle
             checked={config.regra_sem_repeticao_espacos === 'true'}
             onChange={setToggle('regra_sem_repeticao_espacos')}
-            label="Activar regra de não repetição entre espaços no mesmo dia"
-            descricao="Um DJ não pode estar agendado em mais do que um espaço no mesmo dia e turno. A Distribuição assinala o conflito automaticamente."
+            label="Activar regra de não repetição entre Clientes no mesmo dia"
+            descricao="Um DJ não pode estar agendado em mais do que um Cliente no mesmo dia e turno. A Distribuição assinala o conflito automaticamente."
           />
           {config.regra_sem_repeticao_espacos === 'true' && (
             <div className="bg-surface-2 border border-border/50 rounded-lg px-4 py-3 text-xs text-accent-subtle leading-relaxed">
               <p className="font-semibold text-accent-muted mb-1">Como funciona</p>
-              <p>Ao atribuir um DJ a um slot, o motor verifica se esse DJ já tem uma atuação confirmada ou proposta noutro espaço no mesmo dia. Se existir conflito, o slot é assinalado com aviso e o DJ não é sugerido na distribuição automática.</p>
+              <p>Ao atribuir um DJ a um slot, o motor verifica se esse DJ já tem uma atuação confirmada ou proposta noutro Cliente no mesmo dia. Se existir conflito, o slot é assinalado com aviso e o DJ não é sugerido na distribuição automática.</p>
             </div>
           )}
         </CardBody>

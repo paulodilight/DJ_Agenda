@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+﻿import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapPin, Plus, Pencil, Settings2, Search } from 'lucide-react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
@@ -49,9 +49,9 @@ export function Espacos() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-base font-semibold text-accent">Espaços</h1>
+          <h1 className="text-base font-semibold text-accent">Clientes</h1>
           <p className="text-xs text-accent-muted mt-0.5">
-            {pesquisa ? `${espacosFiltrados.length} de ${espacos.length}` : espacos.length} espaço{espacos.length !== 1 ? 's' : ''} activos
+            {pesquisa ? `${espacosFiltrados.length} de ${espacos.length}` : espacos.length} Cliente{espacos.length !== 1 ? 's' : ''} activos
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -61,13 +61,13 @@ export function Espacos() {
               type="text"
               value={pesquisa}
               onChange={(e) => setPesquisa(e.target.value)}
-              placeholder="Pesquisar espaço…"
+              placeholder="Pesquisar Cliente…"
               className="bg-surface-2 border border-border rounded pl-8 pr-3 py-1.5 text-xs text-accent placeholder:text-accent-subtle/60 focus:outline-none focus:border-white/20 transition-colors w-48"
             />
           </div>
           <Button variante="primary" tamanho="sm" onClick={abrirCriar}>
             <Plus size={14} />
-            Novo Espaço
+            Novo Cliente
           </Button>
         </div>
       </div>
@@ -78,9 +78,9 @@ export function Espacos() {
       {!loading && !erro && espacos.length === 0 && (
         <EmptyState
           icone={MapPin}
-          titulo="Nenhum espaço registado"
-          descricao="Adiciona o primeiro espaço para começar."
-          accao={<Button variante="primary" tamanho="sm" onClick={abrirCriar}><Plus size={14} />Novo Espaço</Button>}
+          titulo="Nenhum Cliente registado"
+          descricao="Adiciona o primeiro Cliente para começar."
+          accao={<Button variante="primary" tamanho="sm" onClick={abrirCriar}><Plus size={14} />Novo Cliente</Button>}
         />
       )}
 
@@ -88,7 +88,7 @@ export function Espacos() {
         <EmptyState
           icone={Search}
           titulo="Sem resultados"
-          descricao={`Nenhum espaço encontrado para "${pesquisa}".`}
+          descricao={`Nenhum Cliente encontrado para "${pesquisa}".`}
         />
       )}
 

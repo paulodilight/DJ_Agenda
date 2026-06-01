@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { clsx } from 'clsx'
 import { useDroppable } from '@dnd-kit/core'
 import { Plus } from 'lucide-react'
@@ -236,7 +236,7 @@ export function CalendarioSemana({
             </tr>
           )}
 
-          {/* ── Por espaço → cabeçalho + linhas de turnos ── */}
+          {/* ── Por Cliente → cabeçalho + linhas de turnos ── */}
           {espacos.map((espaco) => {
             const turnos = [...(espaco.turnos_espaco ?? [])]
               .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
@@ -247,7 +247,7 @@ export function CalendarioSemana({
               : [{ id: null, nome: '—' }]
 
             return [
-              /* ── Cabeçalho do espaço ── */
+              /* ── Cabeçalho do Cliente ── */
               <tr key={`hdr-${espaco.id}`} className="border-t-2 border-border bg-surface-2">
                 <td
                   colSpan={dias.length + 1}
@@ -367,7 +367,7 @@ export function CalendarioSemana({
           {espacos.length === 0 && (
             <tr>
               <td colSpan={dias.length + 1} className="text-center py-8 text-accent-subtle">
-                Nenhum espaço activo.
+                Nenhum Cliente activo.
               </td>
             </tr>
           )}

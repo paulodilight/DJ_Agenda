@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+﻿import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   startOfWeek, endOfWeek, eachDayOfInterval,
@@ -238,7 +238,7 @@ export function Dashboard() {
             icone={Users}
             valor={stats.djsActivos}
             label="DJs activos"
-            sub={`${espacos.length} espaço${espacos.length !== 1 ? 's' : ''}`}
+            sub={`${espacos.length} Cliente${espacos.length !== 1 ? 's' : ''}`}
             cor="text-status-lock"
             bgCor="bg-status-lock/10"
           />

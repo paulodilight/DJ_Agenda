@@ -23,8 +23,11 @@ import { ContasColaboradores } from '@/pages/contas/ContasColaboradores'
 import { ContasMargens } from '@/pages/contas/ContasMargens'
 import { Eventos } from '@/pages/Eventos'
 import { ApoioTecnico } from '@/pages/ApoioTecnico'
+import { Artistas } from '@/pages/Artistas'
+import { ArtistaPerfil } from '@/pages/ArtistaPerfil'
 import { ResetPassword } from '@/pages/ResetPassword'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
+import { UndoProvider } from '@/contexts/UndoContext'
 
 function RotaProtegida({ children }) {
   const { session, loading } = useAuthStore()
@@ -39,6 +42,7 @@ export default function App() {
   useEffect(() => { init() }, [init])
 
   return (
+    <UndoProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -63,6 +67,8 @@ export default function App() {
           <Route path="equilibrio" element={<Equilibrio />} />
           <Route path="eventos" element={<Eventos />} />
           <Route path="apoio-tecnico" element={<ApoioTecnico />} />
+          <Route path="artistas" element={<Artistas />} />
+          <Route path="artistas/:id" element={<ArtistaPerfil />} />
           <Route path="comunicacao" element={<Comunicacao />} />
           <Route path="contas" element={<Contas />}>
             <Route index element={<ContasDashboard />} />
@@ -76,5 +82,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+    </UndoProvider>
   )
 }

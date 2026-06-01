@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
@@ -32,7 +32,7 @@ const novaLinhaManual = (referencia) => ({
 })
 
 export function FormAtuacao({ aberto, dataInicial, espacoIdInicial, onFechar, onGuardado }) {
-  // Se vem da grelha, o espaço está fixo e não se mostra o selector
+  // Se vem da grelha, o Cliente está fixo e não se mostra o selector
   const doCelula = !!espacoIdInicial
 
   const [espacoId, setEspacoId] = useState('')
@@ -66,7 +66,7 @@ export function FormAtuacao({ aberto, dataInicial, espacoIdInicial, onFechar, on
     }
   }, [aberto, dataInicial, espacoIdInicial])
 
-  // Carregar turnos + djs fixos quando o espaço muda
+  // Carregar turnos + djs fixos quando o Cliente muda
   useEffect(() => {
     if (!espacoId) { setTurnosEspaco([]); setDjsFixosEspaco({}); return }
     setLoadingTurnos(true)
@@ -81,7 +81,7 @@ export function FormAtuacao({ aberto, dataInicial, espacoIdInicial, onFechar, on
       .finally(() => setLoadingTurnos(false))
   }, [espacoId])
 
-  // Reconstruir linhas a partir dos turnos quando mudam espaço/data/turnos/fixos
+  // Reconstruir linhas a partir dos turnos quando mudam Cliente/data/turnos/fixos
   useEffect(() => {
     const dia = diaSemana(data)
     const aplicaveis = turnosEspaco.filter((t) =>
@@ -153,16 +153,16 @@ export function FormAtuacao({ aberto, dataInicial, espacoIdInicial, onFechar, on
         <div className="px-6 py-5 flex flex-col gap-4">
           {erro && <Alerta tipo="erro" mensagem={erro} />}
 
-          {/* Espaço + Data */}
+          {/* Cliente + Data */}
           {doCelula ? (
-            // Vem da grelha — espaço fixo, só mostra a data
+            // Vem da grelha — Cliente fixo, só mostra a data
             <div className="flex items-center gap-4">
               <div className="flex-1">
                 <Input label="Data" value={data} onChange={(e) => setData(e.target.value)} type="date" required />
               </div>
               {espacoNome && (
                 <div className="flex-1">
-                  <p className="text-xs font-medium text-accent-muted mb-1.5">Espaço</p>
+                  <p className="text-xs font-medium text-accent-muted mb-1.5">Cliente</p>
                   <p className="text-sm font-medium text-accent border border-border rounded px-3 py-2 bg-surface-2">
                     {espacoNome}
                   </p>
@@ -171,8 +171,8 @@ export function FormAtuacao({ aberto, dataInicial, espacoIdInicial, onFechar, on
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
-              <Select label="Espaço" value={espacoId} onChange={(e) => setEspacoId(e.target.value)} required>
-                <option value="">Seleccionar espaço</option>
+              <Select label="Cliente" value={espacoId} onChange={(e) => setEspacoId(e.target.value)} required>
+                <option value="">Seleccionar Cliente</option>
                 {espacos.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
               </Select>
               <Input label="Data" value={data} onChange={(e) => setData(e.target.value)} type="date" required />
@@ -280,7 +280,7 @@ export function FormAtuacao({ aberto, dataInicial, espacoIdInicial, onFechar, on
 
           {!espacoId && !doCelula && (
             <p className="text-xs text-accent-subtle text-center py-3 border border-dashed border-border rounded-md">
-              Selecciona um espaço para ver os turnos e DJs disponíveis.
+              Selecciona um Cliente para ver os turnos e DJs disponíveis.
             </p>
           )}
 

@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { espacosApi } from '@/lib/api'
 
-// todos: true  → todos os espaços incluindo inactivos (páginas de gestão)
-// todos: false → espaços com calendário configurado OU com actividade no mês
+// todos: true  → todos os Clientes incluindo inactivos (páginas de gestão)
+// todos: false → Clientes com calendário configurado OU com actividade no mês
 // anoMes: 'yyyy-MM' → considera actividade nesse mês (slots DJ + eventos)
 export function useEspacos({ todos = false, anoMes = null } = {}) {
   const [espacos, setEspacos] = useState([])
@@ -21,7 +21,7 @@ export function useEspacos({ todos = false, anoMes = null } = {}) {
         return
       }
 
-      // Espaços com calendário semanal configurado
+      // Clientes com calendário semanal configurado
       const comCalendario = data.filter(e =>
         (e.turnos_espaco ?? []).some(t => t.dias_semana?.length > 0)
       )
@@ -31,7 +31,7 @@ export function useEspacos({ todos = false, anoMes = null } = {}) {
         return
       }
 
-      // Também inclui espaços sem calendário mas com actividade no mês
+      // Também inclui Clientes sem calendário mas com actividade no mês
       const [ano, mes] = anoMes.split('-').map(Number)
       const ref    = new Date(ano, mes - 1, 1)
       const inicio = format(startOfMonth(ref), 'yyyy-MM-dd')

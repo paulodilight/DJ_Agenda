@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Trash2 } from 'lucide-react'
+﻿import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Trash2, CalendarCheck, CalendarX, Plus } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
 import { djsApi, djPreferenciasEspacoApi, disponibilidadesApi, categoriasDjApi, djCategoriasApi } from '@/lib/api'
+import { useUndo } from '@/contexts/UndoContext'
 import { useEspacos } from '@/hooks/useEspacos'
-import { format, parse, isValid } from 'date-fns'
+import { format, parse, isValid, addMonths, startOfMonth, getDaysInMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { clsx } from 'clsx'
 
@@ -45,7 +46,7 @@ const RATINGS = [
   { campo: 'qualidade_artistica', label: 'Qualidade Artística' },
   { campo: 'assiduidade',         label: 'Assiduidade' },
   { campo: 'profissionalismo',    label: 'Profissionalismo' },
-  { campo: 'adaptacao_espaco',    label: 'Adaptação ao Espaço' },
+  { campo: 'adaptacao_espaco',    label: 'Adaptação ao Cliente' },
 ]
 
 const PREFS_OPCOES = [
@@ -130,10 +131,26 @@ export function FormDJ({ aberto, dj, onFechar, onGuardado }) {
   const [prefsEspaco, setPrefsEspaco] = useState({})
   const [disps, setDisps] = useState([])
   const [apagarDisp, setApagarDisp] = useState(null)
+  const { pushUndo } = useUndo()
+  const [addMes, setAddMes] = useState('')
+  const [addDisponivel, setAddDisponivel] = useState(true)
+  const [addDiasInput, setAddDiasInput] = useState('')
+  const [addNotas, setAddNotas] = useState('')
+  const [addCarrinho, setAddCarrinho] = useState([])
+  const [addGuardando, setAddGuardando] = useState(false)
+  const [addErro, setAddErro] = useState(null)
   const [categorias, setCategorias] = useState([])
   const [catsSel, setCatsSel] = useState(['', '', ''])  // 3 slots de categoria
   const { espacos } = useEspacos()
   const editar = !!dj
+
+  const MESES_ADD = useMemo(() => {
+    const hoje = startOfMonth(new Date())
+    return Array.from({ length: 14 }, (_, i) => {
+      const d = addMonths(hoje, i - 1)
+      return { value: format(d, 'yyyy-MM'), label: cap(format(d, 'MMMM yyyy', { locale: pt })) }
+    })
+  }, [])
 
   useEffect(() => {
     categoriasDjApi.listar().then(setCategorias).catch(() => {})
@@ -163,6 +180,12 @@ export function FormDJ({ aberto, dj, onFechar, onGuardado }) {
       setPrefsEspaco({})
       setDisps([])
       setCatsSel(['', '', ''])
+      setAddMes(format(new Date(), 'yyyy-MM'))
+      setAddDisponivel(true)
+      setAddDiasInput('')
+      setAddNotas('')
+      setAddCarrinho([])
+      setAddErro(null)
       if (dj?.id) {
         djPreferenciasEspacoApi.listar(dj.id)
           .then((rows) => {
@@ -186,10 +209,69 @@ export function FormDJ({ aberto, dj, onFechar, onGuardado }) {
   const removerDisp = async (iso) => {
     setApagarDisp(iso)
     try {
+      const backup = disps.find(d => d.data === iso)
       await disponibilidadesApi.apagar(dj.id, iso)
       setDisps((prev) => prev.filter((d) => d.data !== iso))
+      pushUndo({
+        label: `Data ${iso} removida`,
+        undo: async () => {
+          await disponibilidadesApi.registar(dj.id, iso, backup?.disponivel ?? true, backup?.notas ?? '')
+          carregarDisps()
+        },
+      })
     } catch { /* silencioso */ }
     finally { setApagarDisp(null) }
+  }
+
+  const adicionarAoCarrinho = () => {
+    setAddErro(null)
+    if (!addMes) return setAddErro('Seleciona um mês')
+    if (!addDiasInput.trim()) return setAddErro('Indica os dias')
+    const [ano, mes] = addMes.split('-').map(Number)
+    const maxDias = getDaysInMonth(new Date(ano, mes - 1, 1))
+    const dias = []
+    for (const parte of addDiasInput.split(/[,\s]+/).filter(Boolean)) {
+      if (parte.includes('-')) {
+        const [de, ate] = parte.split('-').map(Number)
+        if (isNaN(de) || isNaN(ate) || de > ate) return setAddErro(`Intervalo inválido: ${parte}`)
+        for (let d = de; d <= ate; d++) dias.push(d)
+      } else {
+        const n = Number(parte)
+        if (isNaN(n)) return setAddErro(`Dia inválido: ${parte}`)
+        dias.push(n)
+      }
+    }
+    const invalidos = dias.filter(d => d < 1 || d > maxDias)
+    if (invalidos.length) return setAddErro(`Dias inválidos para este mês: ${invalidos.join(', ')}`)
+    const novas = [...new Set(dias)].sort((a, b) => a - b).map(d => ({
+      data: `${addMes}-${String(d).padStart(2, '0')}`,
+      disponivel: addDisponivel,
+      notas: addNotas.trim() || null,
+    }))
+    setAddCarrinho(prev => {
+      const jaExistem = new Set(prev.map(x => x.data))
+      return [...prev, ...novas.filter(n => !jaExistem.has(n.data))]
+    })
+    setAddDiasInput('')
+  }
+
+  const guardarDatasDisp = async () => {
+    if (!addCarrinho.length) return
+    setAddGuardando(true)
+    setAddErro(null)
+    try {
+      for (const item of addCarrinho) {
+        await disponibilidadesApi.registar(dj.id, item.data, item.disponivel, item.notas ?? '')
+      }
+      setAddCarrinho([])
+      setAddDiasInput('')
+      setAddNotas('')
+      carregarDisps()
+    } catch (e) {
+      setAddErro(e.message)
+    } finally {
+      setAddGuardando(false)
+    }
   }
 
   const set = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }))
@@ -214,7 +296,7 @@ export function FormDJ({ aberto, dj, onFechar, onGuardado }) {
         const novo = await djsApi.criar(payload)
         djId = novo.id
       }
-      // guardar preferências de espaço
+      // guardar preferências de Cliente
       if (djId) {
         const prefs = Object.entries(prefsEspaco)
           .filter(([, v]) => v && v !== 'neutro')
@@ -319,7 +401,7 @@ export function FormDJ({ aberto, dj, onFechar, onGuardado }) {
             <div className="flex items-center justify-between py-2 px-3 rounded border border-border bg-surface-2/50">
               <div>
                 <p className="text-xs font-medium text-accent">Excluir da distribuição automática</p>
-                <p className="text-[11px] text-accent-subtle mt-0.5">O WF2 nunca atribui este DJ a nenhum espaço</p>
+                <p className="text-[11px] text-accent-subtle mt-0.5">O WF2 nunca atribui este DJ a nenhum Cliente</p>
               </div>
               <button
                 type="button"
@@ -346,10 +428,10 @@ export function FormDJ({ aberto, dj, onFechar, onGuardado }) {
             placeholder="Ex: prefere noites de fim-de-semana, não aceita restauração, disponível só depois das 22h..."
           />
 
-          {/* Preferências de espaços (só ao editar) */}
+          {/* Preferências de Clientes (só ao editar) */}
           {editar && espacos.length > 0 && (
             <div className="border-t border-border pt-4 flex flex-col gap-3">
-              <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Preferências por espaço</p>
+              <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Preferências por Cliente</p>
               {espacos.map((esp) => {
                 const pref = prefsEspaco[esp.id] ?? 'neutro'
                 return (
@@ -398,6 +480,113 @@ export function FormDJ({ aberto, dj, onFechar, onGuardado }) {
                     </span>
                   )
                 })()}
+              </div>
+
+              {/* Formulário inline para adicionar datas */}
+              <div className="bg-surface-2/40 rounded-lg border border-border/60 p-3 flex flex-col gap-2.5">
+                {/* Linha 1: mês + disponível/indisponível */}
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="text-[11px] text-accent-muted mb-1 block">Mês</label>
+                    <select
+                      value={addMes}
+                      onChange={e => setAddMes(e.target.value)}
+                      className="w-full bg-surface-1 border border-border rounded px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-white/30"
+                    >
+                      {MESES_ADD.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <button type="button" onClick={() => setAddDisponivel(true)}
+                      className={clsx('flex items-center gap-1 px-2.5 py-1.5 rounded border text-[11px] font-medium transition-colors',
+                        addDisponivel
+                          ? 'bg-status-confirmado/20 text-status-confirmado border-status-confirmado/40'
+                          : 'bg-surface-2 text-accent-subtle border-border hover:text-accent-muted'
+                      )}>
+                      <CalendarCheck size={11} />Disp.
+                    </button>
+                    <button type="button" onClick={() => setAddDisponivel(false)}
+                      className={clsx('flex items-center gap-1 px-2.5 py-1.5 rounded border text-[11px] font-medium transition-colors',
+                        !addDisponivel
+                          ? 'bg-status-cancelado/20 text-status-cancelado border-status-cancelado/40'
+                          : 'bg-surface-2 text-accent-subtle border-border hover:text-accent-muted'
+                      )}>
+                      <CalendarX size={11} />Indisp.
+                    </button>
+                  </div>
+                </div>
+
+                {/* Linha 2: dias + nota + botão */}
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="text-[11px] text-accent-muted mb-1 block">
+                      Dias <span className="text-accent-subtle/70 font-normal">ex: 1,5,10-15</span>
+                    </label>
+                    <input
+                      value={addDiasInput}
+                      onChange={e => setAddDiasInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); adicionarAoCarrinho() } }}
+                      placeholder="1, 5, 10-15, 20"
+                      className="w-full bg-surface-1 border border-border rounded px-2 py-1.5 text-xs text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[11px] text-accent-muted mb-1 block">
+                      Nota <span className="text-accent-subtle/70 font-normal">(opcional)</span>
+                    </label>
+                    <input
+                      value={addNotas}
+                      onChange={e => setAddNotas(e.target.value)}
+                      placeholder="Férias, compromisso…"
+                      className="w-full bg-surface-1 border border-border rounded px-2 py-1.5 text-xs text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={adicionarAoCarrinho}
+                    className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded border bg-white/8 border-white/15 text-accent text-[11px] font-medium hover:bg-white/12 transition-colors"
+                  >
+                    <Plus size={12} />Adicionar
+                  </button>
+                </div>
+
+                {addErro && <p className="text-[11px] text-status-cancelado">{addErro}</p>}
+
+                {/* Carrinho */}
+                {addCarrinho.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-accent-subtle">
+                        {addCarrinho.length} data{addCarrinho.length !== 1 ? 's' : ''} para guardar
+                      </p>
+                      <button
+                        type="button"
+                        onClick={guardarDatasDisp}
+                        disabled={addGuardando}
+                        className="px-3 py-1 rounded bg-accent text-black text-[11px] font-semibold hover:bg-accent/80 transition-colors disabled:opacity-50"
+                      >
+                        {addGuardando ? 'A guardar…' : 'Guardar datas'}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {addCarrinho.map(item => (
+                        <span key={item.data} className={clsx(
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border',
+                          item.disponivel
+                            ? 'bg-status-confirmado/15 text-status-confirmado border-status-confirmado/30'
+                            : 'bg-status-cancelado/15 text-status-cancelado border-status-cancelado/30'
+                        )}>
+                          {formatarDataCurta(item.data)}
+                          <button
+                            type="button"
+                            onClick={() => setAddCarrinho(prev => prev.filter(x => x.data !== item.data))}
+                            className="opacity-60 hover:opacity-100 leading-none"
+                          >×</button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {disps.length === 0 ? (

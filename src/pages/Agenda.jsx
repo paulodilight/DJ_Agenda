@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+﻿import { useState, useMemo, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Printer, Trophy } from 'lucide-react'
 import { startOfWeek, addDays, addWeeks, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, format } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -83,7 +83,7 @@ export function Agenda() {
   const mesFim = isoData(endOfMonth(referencia))
   const { agenda: agendaMes, recarregar: recarregarMes } = useAgenda({ dataInicio: mesInicio, dataFim: mesFim })
 
-  // ── Ranking de DJs do mês (mês completo, espaço seleccionado) ────────────
+  // ── Ranking de DJs do mês (mês completo, Cliente seleccionado) ────────────
   const rankingDJs = useMemo(() => {
     const fonte = (filtroEspaco
       ? agendaMes.filter(s => s.espaco_id === filtroEspaco)
@@ -114,14 +114,14 @@ export function Agenda() {
 
   const { espacos } = useEspacos({ anoMes })
   const { bloqueios } = useBloqueios()
-  // Usa agendaMes (sem filtro de espaço) para detectar choques cross-espaço
+  // Usa agendaMes (sem filtro de Cliente) para detectar choques cross-Cliente
   const { conflictsIdx } = useConflitos({ agenda: agendaMes, dataInicio: mesInicio, dataFim: mesFim })
 
   const espacosFiltrados = filtroEspaco
     ? espacos.filter((e) => e.id === filtroEspaco)
     : espacos
 
-  // Indicador de preenchimento — só quando um espaço está seleccionado
+  // Indicador de preenchimento — só quando um Cliente está seleccionado
   const totalAgenda  = filtroEspaco ? agenda.length : 0
   const comDJAgenda  = filtroEspaco ? agenda.filter(s => s.dj_id || s.dj_nome).length : 0
   const semDJAgenda  = totalAgenda - comDJAgenda
@@ -378,7 +378,7 @@ export function Agenda() {
         </div>
       </div>
 
-      {/* Tabs de espaço */}
+      {/* Tabs de Cliente */}
       <div className="flex items-center gap-1 px-5 py-2 border-b border-border/50 bg-surface-0/40 shrink-0 flex-wrap">
         <button
           onClick={() => setFiltroEspaco('')}
@@ -508,8 +508,8 @@ export function Agenda() {
             <p className="text-sm font-semibold text-accent">Top DJs — {tituloMesImpressao}</p>
             <p className="text-[11px] text-accent-subtle mt-0.5">
               {filtroEspaco
-                ? espacos.find(e => e.id === filtroEspaco)?.nome?.trim() ?? 'Espaço seleccionado'
-                : 'Todos os espaços'
+                ? espacos.find(e => e.id === filtroEspaco)?.nome?.trim() ?? 'Cliente seleccionado'
+                : 'Todos os Clientes'
               }
               {' · '}{rankingDJs.filter(d => d.dj_id || d.nome).length} DJs
             </p>

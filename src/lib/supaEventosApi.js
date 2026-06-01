@@ -1,4 +1,4 @@
-/**
+﻿/**
  * API dedicada à tabela supa_eventos — agora no projecto DJ Schedule.
  * Usa exclusivamente o cliente `supabase` principal.
  */
@@ -12,7 +12,7 @@ export const supaEventosApi = {
   async listar({ dataInicio, dataFim } = {}) {
     let query = supabase
       .from(TABLE)
-      .select('*, espacos(id, nome)')
+      .select('*, espacos(id, nome), artistas(id, nome, foto_url, bio, instagram_url, rede_social_url, presskit_url)')
       .order('data_evento', { ascending: true })
       .order('hora_inicio', { ascending: true })
 
@@ -59,7 +59,7 @@ export const supaEventosApi = {
     if (error) throw error
   },
 
-  // ── Espaços ───────────────────────────────────────────────────────────────
+  // ── Clientes ───────────────────────────────────────────────────────────────
   async listarEspacos() {
     const { data, error } = await supabase
       .from('espacos')

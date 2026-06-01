@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+﻿import { useState, useMemo, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -127,7 +127,7 @@ export function Atuacoes() {
     espacoId: filtroEspaco || undefined,
   })
 
-  // Agenda sem filtros para detectar duplicados cross-espaço/DJ
+  // Agenda sem filtros para detectar duplicados cross-Cliente/DJ
   const { agenda: agendaGeral } = useAgenda({ dataInicio, dataFim })
   const { conflictsIdx } = useConflitos({ agenda: agendaGeral, dataInicio, dataFim })
 
@@ -222,13 +222,13 @@ export function Atuacoes() {
           ))}
         </select>
 
-        {/* Filtro Espaço */}
+        {/* Filtro Cliente */}
         <select
           value={filtroEspaco}
           onChange={(e) => setFiltroEspaco(e.target.value)}
           className="bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-accent-muted focus:outline-none"
         >
-          <option value="">Todos os espaços</option>
+          <option value="">Todos os Clientes</option>
           {espacos.map((e) => (
             <option key={e.id} value={e.id}>{e.nome}</option>
           ))}
@@ -278,7 +278,7 @@ export function Atuacoes() {
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted whitespace-nowrap">Data</th>
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">DJ</th>
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted whitespace-nowrap">Horário</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">Espaço</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">Cliente</th>
                   <th className="text-right px-4 py-2.5 text-xs font-medium text-accent-muted">Valor</th>
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">Assiduidade</th>
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">Evento</th>

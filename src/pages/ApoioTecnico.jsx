@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+﻿import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle } from 'lucide-react'
@@ -742,10 +742,10 @@ export function ApoioTecnico() {
       {/* ── Filtros ── */}
       <div className="shrink-0 border-b border-border/50 bg-surface-0/40">
 
-        {/* Linha 1 — espaços + pesquisa */}
+        {/* Linha 1 — Clientes + pesquisa */}
         <div className="px-5 py-2 flex items-center justify-between gap-3 border-b border-border/30">
           <div className="flex items-center gap-1 flex-wrap">
-            <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Espaço</span>
+            <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Cliente</span>
             <button onClick={() => setFiltroEspaco('')}
               className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
                 filtroEspaco === '' ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
@@ -846,7 +846,7 @@ export function ApoioTecnico() {
                 {Array.from({ length: maxGrupos }, (_, i) => [
                   i > 0 && <th key={`sh-sep-${i}`} className={sepThCls} />,
                   <th key={`sh-tec-${i}`} className={clsx(thCls, i > 0 && 'pl-3')}>Técnico</th>,
-                  <th key={`sh-esp-${i}`} className={thCls}>Espaço</th>,
+                  <th key={`sh-esp-${i}`} className={thCls}>Cliente</th>,
                   <th key={`sh-ev-${i}`}  className={thCls}>Evento</th>,
                   <th key={`sh-ins-${i}`} className={clsx(thCls, 'text-center')}>Hora Inst.</th>,
                   <th key={`sh-ini-${i}`} className={clsx(thCls, 'text-center')}>Hora Início</th>,
@@ -950,7 +950,7 @@ export function ApoioTecnico() {
                 <th className={thCls}>Dia</th>
                 <th className={thCls}>Data</th>
                 <th className={thCls}>Técnico</th>
-                <th className={thCls}>Espaço</th>
+                <th className={thCls}>Cliente</th>
                 <th className={thCls}>Evento</th>
                 <th className={clsx(thCls, 'text-center')}>Hora Inst.</th>
                 <th className={clsx(thCls, 'text-center')}>Hora Início</th>
@@ -993,7 +993,7 @@ export function ApoioTecnico() {
                     )}
                     {/* Técnico — draggable */}
                     {linha ? renderTecCell(linha) : <td className="px-2 py-2" />}
-                    {/* Espaço */}
+                    {/* Cliente */}
                     <td className="px-2 py-2 text-accent-muted font-medium whitespace-nowrap">{linha?.espacoNome ?? ''}</td>
                     {/* Evento */}
                     <td

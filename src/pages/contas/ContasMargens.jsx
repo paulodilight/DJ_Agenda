@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useMesStore } from '@/store'
@@ -44,7 +44,7 @@ export function ContasMargens() {
     return () => { cancelled = true }
   }, [dataInicio, dataFim])
 
-  // ── Por espaço ────────────────────────────────────────────────────────────
+  // ── Por Cliente ────────────────────────────────────────────────────────────
   const porEspaco = useMemo(() => {
     return espacos.map(esp => {
       const sl = slots.filter(s => s.espaco_id === esp.id)
@@ -124,12 +124,12 @@ export function ContasMargens() {
         </div>
       </div>
 
-      {/* Tabela por espaço */}
+      {/* Tabela por Cliente */}
       <div className="bg-surface-1 border border-border rounded-lg overflow-hidden">
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="border-b border-border bg-surface-2">
-              <th className="text-left px-4 py-3 font-medium text-accent-muted">Espaço</th>
+              <th className="text-left px-4 py-3 font-medium text-accent-muted">Cliente</th>
               <th className="text-center px-3 py-3 font-medium text-accent-muted">Residentes</th>
               <th className="text-center px-3 py-3 font-medium text-accent-muted">Convidados</th>
               <th className="text-right px-3 py-3 font-medium text-accent-muted">Receita</th>

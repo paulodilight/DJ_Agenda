@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+﻿import { useState, useEffect, useMemo, useCallback } from 'react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { Save, Pencil, X, Search } from 'lucide-react'
@@ -212,7 +212,7 @@ function Dashboard({ espacos, slots, eventos, agendTec, cards }) {
   )
 }
 
-// ── Card por espaço ───────────────────────────────────────────────────────────
+// ── Card por Cliente ───────────────────────────────────────────────────────────
 function SpaceCard({ espaco, slots, eventos, agendTec, cardState, onCardChange, onSave, saving }) {
   const [editApoio, setEditApoio] = useState(false)
   const [mostrarDetalheRes,  setMostrarDetalheRes]   = useState(false)
@@ -325,7 +325,7 @@ function SpaceCard({ espaco, slots, eventos, agendTec, cardState, onCardChange, 
             <td className="py-2 pl-2 pr-4 text-right text-sm font-semibold tabular-nums">
               {avenca > 0
                 ? <span className="text-accent">{formatarEuro(avenca)}</span>
-                : <span className="text-accent-subtle/40 text-xs italic">definir no espaço</span>}
+                : <span className="text-accent-subtle/40 text-xs italic">definir no Cliente</span>}
             </td>
           </tr>
 
@@ -570,7 +570,7 @@ export function ContasClientes() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
-      {/* Chips: Dashboard + espaços + pesquisa */}
+      {/* Chips: Dashboard + Clientes + pesquisa */}
       <div className="shrink-0 px-5 py-2 border-b border-border/50 bg-surface-0/40 flex items-center gap-2 flex-wrap">
         <button
           onClick={() => { setEspacoAtivo(null); setPesquisa('') }}
@@ -628,7 +628,7 @@ export function ContasClientes() {
           />
         )}
 
-        {/* Detalhe espaço — card centrado */}
+        {/* Detalhe Cliente — card centrado */}
         {espacoAtivo !== null && espacoDetalhe && (
           <div className="p-5 flex justify-center">
             <div className="w-full max-w-4xl">

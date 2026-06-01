@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
@@ -136,7 +136,7 @@ export function ContasDashboard() {
             <p className="text-[10px] font-bold text-accent-subtle uppercase tracking-widest">Receita Clientes</p>
           </div>
           <p className="text-2xl font-bold tabular-nums text-status-confirmado">{formatarEuro(totalClientes)}</p>
-          <p className="text-[11px] text-accent-subtle">{topClientes.length} espaços · {titulo}</p>
+          <p className="text-[11px] text-accent-subtle">{topClientes.length} Clientes · {titulo}</p>
         </div>
 
         {/* Custo DJs */}

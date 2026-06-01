@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+﻿import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
 /**
@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
  *  1. DJ duplicado — mesmo DJ em 2+ slots activos na mesma data
  *     (detectado por dj_id quando disponível, ou dj_nome como fallback)
  *  2. Indisponível — DJ marcou a data como indisponível
- *  3. Recusa/Exclusão — DJ recusa o espaço OU espaço excluiu o DJ
+ *  3. Recusa/Exclusão — DJ recusa o Cliente OU Cliente excluiu o DJ
  *
  * Nota: slots com estado 'cancelado' ou 'sem_efeito' são excluídos
  * da deteção de duplicados (não contam como booking activo).
@@ -31,12 +31,12 @@ export function useConflitos({ agenda, dataInicio, dataFim }) {
           .eq('disponivel', false)
           .gte('data', dataInicio)
           .lte('data', dataFim),
-        // DJs que recusam espaços
+        // DJs que recusam Clientes
         supabase
           .from('dj_preferencias_espaco')
           .select('dj_id, espaco_id')
           .eq('preferencia', 'recusa'),
-        // Espaços que excluíram DJs
+        // Clientes que excluíram DJs
         supabase
           .from('espaco_dj_preferencias')
           .select('dj_id, espaco_id')
@@ -85,7 +85,7 @@ export function useConflitos({ agenda, dataInicio, dataFim }) {
       if (s.dj_id && indisponibilidades.has(`${s.dj_id}|${s.data}`)) bad.add(s.id)
     })
 
-    // 3. DJ recusa espaço / espaço excluiu DJ
+    // 3. DJ recusa Cliente / Cliente excluiu DJ
     activos.forEach(s => {
       if (s.dj_id && s.espaco_id && recusas.has(`${s.dj_id}|${s.espaco_id}`)) bad.add(s.id)
     })

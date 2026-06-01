@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+﻿import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   startOfWeek,
@@ -333,8 +333,8 @@ export function Distribuicao() {
     if (espacos.length === 0) return
     setDistribuindo(true)
     try {
-      // Ordenar espaços para distribuição justa:
-      //   1º critério: nº de dias de operação (ASC) — espaços mais restritos correm antes dos mais flexíveis
+      // Ordenar Clientes para distribuição justa:
+      //   1º critério: nº de dias de operação (ASC) — Clientes mais restritos correm antes dos mais flexíveis
       //   2º critério: nº de DJs "preferidos" COM registos este mês (DESC) — desempate por preferências
       //   Exemplo: Delibar (Sex/Sáb=2 dias) → Frou Frou (Ter-Sáb=5 dias) → Avenida (todos=7 dias)
       //   Isto garante que Frou Frou não fica bloqueado pela Avenida (que opera todos os dias)
@@ -360,7 +360,7 @@ export function Distribuicao() {
         }
       })
 
-      // Dias de operação únicos por espaço
+      // Dias de operação únicos por Cliente
       const opDias = {}
       ;(turnosRes.data ?? []).forEach(t => {
         if (!opDias[t.espaco_id]) opDias[t.espaco_id] = new Set()
@@ -369,7 +369,7 @@ export function Distribuicao() {
 
       const espacosOrdenados = [...espacos].sort((a, b) => {
         // 1º: ordem_distribuicao manual (valores definidos primeiro, em ASC)
-        //     Espaços sem valor ficam no fim e usam os critérios automáticos
+        //     Clientes sem valor ficam no fim e usam os critérios automáticos
         const aOrdem = a.ordem_distribuicao ?? Infinity
         const bOrdem = b.ordem_distribuicao ?? Infinity
         if (aOrdem !== bOrdem) return aOrdem - bOrdem
@@ -381,8 +381,8 @@ export function Distribuicao() {
       })
 
       let totalInseridos = 0
-      // Corre para cada espaço em sequência — assim cada espaço vê
-      // os slots já inseridos nos espaços anteriores (conflitos cross-espaço corretos)
+      // Corre para cada Cliente em sequência — assim cada Cliente vê
+      // os slots já inseridos nos Clientes anteriores (conflitos cross-Cliente corretos)
       for (const espaco of espacosOrdenados) {
         const { inseridos } = await correrDistribuicao({
           anoMes,
@@ -392,7 +392,7 @@ export function Distribuicao() {
         totalInseridos += inseridos
       }
       await recarregar()
-      console.info(`Distribuição concluída: ${totalInseridos} slots inseridos em ${espacos.length} espaços.`)
+      console.info(`Distribuição concluída: ${totalInseridos} slots inseridos em ${espacos.length} Clientes.`)
     } catch (e) {
       alert('Erro na distribuição: ' + e.message)
     } finally {
@@ -404,7 +404,7 @@ export function Distribuicao() {
   const espacoSeleccionado = espacoId ?? espacos[0]?.id ?? null
   const espacoNome = espacos.find((e) => e.id === espacoSeleccionado)?.nome?.trim() ?? ''
 
-  // Carregar turnos do espaço seleccionado; reset ao turno 0
+  // Carregar turnos do Cliente seleccionado; reset ao turno 0
   useEffect(() => {
     if (!espacoSeleccionado) return
     setTurnoActivoIdx(0)
@@ -457,13 +457,13 @@ export function Distribuicao() {
     espacoId: espacoSeleccionado,
   })
 
-  // Agenda sem filtro de espaço — necessária para detectar duplicados cross-espaço
+  // Agenda sem filtro de Cliente — necessária para detectar duplicados cross-Cliente
   const { agenda: agendaGeral, recarregar: recarregarGeral } = useAgenda({ dataInicio, dataFim })
   const { conflictsIdx } = useConflitos({ agenda: agendaGeral, dataInicio, dataFim })
 
   const { eventos, recarregar: recarregarEventos } = useSupaEventos({ dataInicio, dataFim })
 
-  // eventosMap[iso] = [evento, ...] — filtrado pelo espaço seleccionado (ou sem espaço)
+  // eventosMap[iso] = [evento, ...] — filtrado pelo Cliente seleccionado (ou sem Cliente)
   const eventosMap = useMemo(() => {
     const map = {}
     eventos
@@ -551,7 +551,7 @@ export function Distribuicao() {
 
   // Larguras fixas — adapta conforme mostrarEvDetalhes
   // Expandido: 5 colunas de evento (Nome | Horário | Instalação | Técnico | Notas)
-  // Colapsado: 1 coluna (só Nome) — esquerda ganha espaço
+  // Colapsado: 1 coluna (só Nome) — esquerda ganha Cliente
   const colW = mostrarEvDetalhes
     ? { dia: '7%', data: '6%', dj: '12%', hr: '8%', val: '7%', evNome: '18%', evHr: '10%', evInst: '12%', evTec: '12%', evNotas: '8%' }
     : { dia: '10%', data: '8%', dj: '24%', hr: '15%', val: '13%', evNome: '30%' }
@@ -619,7 +619,7 @@ export function Distribuicao() {
           </div>
         </div>
 
-        {/* Tabs espaços */}
+        {/* Tabs Clientes */}
         {!loadingEspacos && (
           <div className="flex gap-1 mt-3 flex-wrap">
             {espacos.map((e) => (

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import { parseISO, format, getDate, startOfMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { formatarHora } from '@/utils/datas'
@@ -77,7 +77,7 @@ export function DocumentoAgendaMes({ agenda, espacos, tituloMes, filtroEspaco })
           style={ei > 0 ? { breakBefore: 'page', pageBreakBefore: 'always' } : {}}
           className="p-12"
         >
-          {/* Cabeçalho do espaço */}
+          {/* Cabeçalho do Cliente */}
           <div className="flex items-center gap-4 mb-1 pb-4 border-b-2 border-gray-900">
             {espaco.logo_url && (
               <img

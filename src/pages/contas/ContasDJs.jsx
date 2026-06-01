@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useMesStore } from '@/store'
@@ -151,7 +151,7 @@ export function ContasDJs() {
                         <thead>
                           <tr className="text-accent-subtle border-b border-border/40">
                             <th className="text-left pb-1.5 font-medium">Data</th>
-                            <th className="text-left pb-1.5 font-medium">Espaço</th>
+                            <th className="text-left pb-1.5 font-medium">Cliente</th>
                             <th className="text-left pb-1.5 font-medium">Horário</th>
                             <th className="text-center pb-1.5 font-medium">Estado</th>
                             <th className="text-right pb-1.5 font-medium">Valor</th>

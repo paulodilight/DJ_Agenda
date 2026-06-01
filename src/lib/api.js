@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+﻿import { supabase } from './supabase'
 
 // ─── DJs ────────────────────────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ export const djsApi = {
   },
 }
 
-// ─── Espaços ─────────────────────────────────────────────────────────────────
+// ─── Clientes ─────────────────────────────────────────────────────────────────
 
 export const espacosApi = {
   async listar({ incluirInactivos = false } = {}) {
@@ -68,7 +68,7 @@ export const espacosApi = {
     return data ?? []
   },
 
-  // Conta slots de agenda e eventos por espaço num intervalo de datas
+  // Conta slots de agenda e eventos por Cliente num intervalo de datas
   async atividadeMes(dataInicio, dataFim) {
     const [agendaRes, eventosRes] = await Promise.all([
       supabase.from('agenda')
@@ -148,7 +148,7 @@ export const espacosApi = {
   },
 }
 
-// ─── Turnos por espaço ────────────────────────────────────────────────────────
+// ─── Turnos por Cliente ────────────────────────────────────────────────────────
 
 export const turnosApi = {
   async guardar(espacoId, turnos) {
@@ -457,7 +457,7 @@ export const bloqueiosApi = {
 // ─── Categorias permitidas por turno ─────────────────────────────────────────
 
 export const turnoCategoriaApi = {
-  // Retorna { turno_id: [categoria_id, ...] } para todos os turnos do espaço
+  // Retorna { turno_id: [categoria_id, ...] } para todos os turnos do Cliente
   async listarPorEspaco(espacoId) {
     const turnosIds = (
       await supabase.from('turnos_espaco').select('id').eq('espaco_id', espacoId)
@@ -495,7 +495,7 @@ export const turnoCategoriaApi = {
 
 export const turnoValoresDiaApi = {
   async listarPorEspaco(espacoId) {
-    // Busca todos os valores de todos os turnos do espaço de uma vez
+    // Busca todos os valores de todos os turnos do Cliente de uma vez
     const { data, error } = await supabase
       .from('turno_valores_dia')
       .select('turno_id, dia_semana, valor, hora_inicio, hora_fim')
@@ -614,7 +614,7 @@ export const configuracoesApi = {
   },
 }
 
-// ─── Preferências DJ por Espaço ──────────────────────────────────────────────
+// ─── Preferências DJ por Cliente ──────────────────────────────────────────────
 
 export const djPreferenciasEspacoApi = {
   async listar(djId) {
@@ -644,7 +644,7 @@ export const djPreferenciasEspacoApi = {
   },
 }
 
-// ─── Preferências do Espaço por DJ ───────────────────────────────────────────
+// ─── Preferências do Cliente por DJ ───────────────────────────────────────────
 
 export const espacoDjPreferenciasApi = {
   async listar(espacoId) {
@@ -674,7 +674,7 @@ export const espacoDjPreferenciasApi = {
   },
 }
 
-// ─── Meta por DJ por Espaço ──────────────────────────────────────────────────
+// ─── Meta por DJ por Cliente ──────────────────────────────────────────────────
 
 export const djMetaEspacoApi = {
   // Retorna { [espaco_id]: max_datas_mes } para um DJ
@@ -689,7 +689,7 @@ export const djMetaEspacoApi = {
     return map
   },
 
-  // Guarda todas as metas por espaço para um DJ (substitui as anteriores)
+  // Guarda todas as metas por Cliente para um DJ (substitui as anteriores)
   async guardar(djId, metas) {
     // metas = { [espaco_id]: max_datas_mes | null }
     const { error: delErr } = await supabase
@@ -709,7 +709,7 @@ export const djMetaEspacoApi = {
     return data
   },
 
-  // Guarda um único valor para um DJ num espaço (upsert)
+  // Guarda um único valor para um DJ num Cliente (upsert)
   async guardarUm(djId, espacoId, maxDatasMes) {
     if (maxDatasMes == null) {
       const { error } = await supabase

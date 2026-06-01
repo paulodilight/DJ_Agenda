@@ -7,6 +7,7 @@ import { Alerta } from '@/components/ui/Alerta'
 import { Badge } from '@/components/ui/Badge'
 import { FormBloqueio } from '@/components/bloqueios/FormBloqueio'
 import { bloqueiosApi } from '@/lib/api'
+import { useUndo } from '@/contexts/UndoContext'
 import { formatarData } from '@/utils/datas'
 import { clsx } from 'clsx'
 
@@ -21,6 +22,7 @@ export function Bloqueios() {
   const [tab, setTab] = useState('Todos')
   const [modalAberto, setModalAberto] = useState(false)
   const [desactivando, setDesactivando] = useState(null)
+  const { pushUndo } = useUndo()
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro(null)
@@ -34,7 +36,14 @@ export function Bloqueios() {
   const desactivar = async (b) => {
     if (!confirm(`Remover este bloqueio (${b.tipo})?`)) return
     setDesactivando(b.id)
-    try { await bloqueiosApi.desactivar(b.id); carregar() }
+    try {
+      await bloqueiosApi.desactivar(b.id)
+      carregar()
+      pushUndo({
+        label: `Bloqueio ${b.tipo} removido`,
+        undo: async () => { await bloqueiosApi.reactivar(b.id); carregar() },
+      })
+    }
     catch (e) { alert(e.message) }
     finally { setDesactivando(null) }
   }

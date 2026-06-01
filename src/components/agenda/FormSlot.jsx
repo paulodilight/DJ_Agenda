@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
 import { Badge } from '@/components/ui/Badge'
 import { agendaApi } from '@/lib/api'
+import { useUndo } from '@/contexts/UndoContext'
 import { supabase } from '@/lib/supabase'
 import { useDJs } from '@/hooks/useDJs'
 import { useEspacos } from '@/hooks/useEspacos'
@@ -39,6 +40,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const [erro, setErro] = useState(null)
   const [conflitos, setConflitos] = useState([])
   const [eventoFormAberto, setEventoFormAberto] = useState(false)
+  const { pushUndo } = useUndo()
   const [conflitoCrossEspaco, setConflitoCrossEspaco] = useState(null) // bloqueia guardar
   const [avisoMeta, setAvisoMeta] = useState(null)                      // avisa mas permite
   const [bloqueioIndisponivel, setBloqueioIndisponivel] = useState(null) // bloqueia guardar
@@ -93,12 +95,12 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     const c = validarSlot({
       djId: form.dj_id, espacoId: form.espaco_id, data: form.data,
       valorDJ: dj.valor_sessao,
-      bloqueios, agenda: agendaSemActual, espaco, config,
+      bloqueios, agenda: agendaSemActual, espaco, config, espacos,
     })
     setConflitos(c)
   }, [form.dj_id, form.espaco_id, form.data, djs, espacos, bloqueios, agenda, config, slot?.id, simplificado])
 
-  // Validações live: conflito cross-espaço (bloqueia) + meta mensal (avisa)
+  // Validações live: conflito cross-Cliente (bloqueia) + meta mensal (avisa)
   useEffect(() => {
     if (!form.dj_id || !form.data) {
       setConflitoCrossEspaco(null)
@@ -111,8 +113,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     const espacoIdActual = form.espaco_id || slot?.espaco_id || ''
 
     const verificar = async () => {
-      // ── 1. Conflito cross-espaço ─────────────────────────────────────────
-      // Bloqueia se o DJ já tiver slot noutro espaço nesta data
+      // ── 1. Conflito cross-Cliente ─────────────────────────────────────────
+      // Bloqueia se o DJ já tiver slot noutro Cliente nesta data
       let qCross = supabase
         .from('agenda')
         .select('id, espaco_id, espacos!agenda_espaco_id_fkey(nome)')
@@ -125,7 +127,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       const conflito = (slotsNaData ?? []).find(s => s.espaco_id !== espacoIdActual)
       setConflitoCrossEspaco(
         conflito
-          ? `DJ já está atribuído em "${conflito.espacos?.nome ?? 'outro espaço'}" nesta data — não é possível guardar`
+          ? `🔴 DJ no mesmo dia noutro Cliente · já está em "${conflito.espacos?.nome ?? 'outro Cliente'}" — não é possível guardar`
           : null
       )
 
@@ -181,14 +183,14 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       if (indisponivel) {
         const dj = djs.find(d => d.id === form.dj_id)
         const nomeDJ = dj?.nome_artistico || dj?.nome || 'DJ'
-        setBloqueioIndisponivel(`${nomeDJ} marcou ${form.data} como indisponível — não é possível agendar`)
+        setBloqueioIndisponivel(`🚫 Indisponível · ${nomeDJ} marcou esta data como indisponível — não é possível agendar`)
         setAvisoOptIn(null)
       } else {
         setBloqueioIndisponivel(null)
         if (optIns.length > 0 && !optIns.find(r => r.data === form.data)) {
           const dj = djs.find(d => d.id === form.dj_id)
           const nomeDJ = dj?.nome_artistico || dj?.nome || 'DJ'
-          setAvisoOptIn(`${nomeDJ} não indicou disponibilidade para esta data (tem opt-in noutros dias do mês)`)
+          setAvisoOptIn(`📅 Sem disponibilidade · ${nomeDJ} não indicou esta data (tem opt-in noutros dias do mês)`)
         } else {
           setAvisoOptIn(null)
         }
@@ -233,10 +235,15 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   }
 
   const apagar = async () => {
-    if (!confirm('Apagar esta atuação? Esta acção não pode ser revertida.')) return
+    if (!confirm('Apagar esta atuação?')) return
     setLoading(true)
     try {
+      const backup = { ...slot }
       await agendaApi.apagar(slot.id)
+      pushUndo({
+        label: `Atuação apagada (${backup.data ?? ''})`,
+        undo: async () => { await agendaApi.criar(backup); onGuardado() },
+      })
       onGuardado()
       onFechar()
     } catch (e) {
@@ -293,8 +300,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           {avisoMeta && (
             <Alerta tipo="aviso" mensagem={`⚠️ ${avisoMeta}`} />
           )}
-          {conflito && verificacaoFeita && !bloqueioIndisponivel && !conflitoCrossEspaco && !avisoOptIn && (
-            <Alerta tipo="aviso" mensagem="⚠️ Conflito detectado — DJ duplicado ou com choque nesta data" />
+          {conflito && verificacaoFeita && !bloqueioIndisponivel && !conflitoCrossEspaco && !avisoOptIn && conflitos.length === 0 && (
+            <Alerta tipo="aviso" mensagem="⚠️ Conflito detectado nesta data" />
           )}
           {conflitos.length > 0 && (
             <div className="flex flex-col gap-1">
@@ -427,7 +434,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                     placeholder="Nome livre..."
                   />
                 </div>
-                <Select label="Espaço" value={form.espaco_id} onChange={set('espaco_id')}>
+                <Select label="Cliente" value={form.espaco_id} onChange={set('espaco_id')}>
                   <option value="">—</option>
                   {espacos.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
                 </Select>
@@ -538,7 +545,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
               loading={loading}
               disabled={!!conflitoCrossEspaco || !!bloqueioIndisponivel}
               title={
-                conflitoCrossEspaco ? 'Resolve o conflito de espaço antes de guardar'
+                conflitoCrossEspaco ? 'Resolve o conflito de Cliente antes de guardar'
                 : bloqueioIndisponivel ? 'DJ indisponível nesta data'
                 : undefined
               }
