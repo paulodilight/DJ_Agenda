@@ -86,55 +86,50 @@ function ModalConflito({ conflitos, nomeTecnico, onConfirmar, onCancelar }) {
   )
 }
 
-// ── Modal atribuição de técnico ───────────────────────────────────────────────
+// ── Modal atribuição de técnico (multi-select) ────────────────────────────────
 function ModalAtribuicao({ aberto, celula, tecnicos, eventos, agendamentos, onFechar, onGuardado }) {
-  const [tecnicoId, setTecnicoId]     = useState('')
-  const [loading, setLoading]         = useState(false)
-  const [conflitos, setConflitos]     = useState([])
-  const [confirmar, setConfirmar]     = useState(false)
+  const [seleccionados, setSeleccionados] = useState([])
+  const [loading, setLoading]             = useState(false)
+  const [conflitos, setConflitos]         = useState([])
+  const [confirmar, setConfirmar]         = useState(false)
+  const [tecConflito, setTecConflito]     = useState('')
 
   useEffect(() => {
     if (!aberto) return
-    setTecnicoId(celula?.evento?.tecnico_id ?? celula?.agendamento?.tecnico_id ?? '')
+    setSeleccionados(celula?.tecIds ?? [])
     setConflitos([])
     setConfirmar(false)
   }, [aberto, celula])
 
-  const handleTecnicoChange = (id) => {
-    setTecnicoId(id)
-    setConflitos([])
-    setConfirmar(false)
-    if (id) {
+  const toggle = (id) => {
+    const next = seleccionados.includes(id)
+      ? seleccionados.filter(x => x !== id)
+      : [...seleccionados, id]
+    setSeleccionados(next)
+    // Verificar conflitos para técnicos recém adicionados
+    if (!seleccionados.includes(id)) {
       const cs = detectarConflitos(id, celula?.data, celula?.evento?.id, eventos, agendamentos, tecnicos)
-      setConflitos(cs)
-      if (cs.length > 0) setConfirmar(true)
+      if (cs.length > 0) { setConflitos(cs); setTecConflito(id); setConfirmar(true) }
     }
   }
 
-  const executarGuardar = async () => {
-    if (!celula) return
+  const executarGuardar = async (ids) => {
+    if (!celula?.evento?.id) return
     setLoading(true)
     try {
-      if (celula.evento?.id) {
-        await supabase.from('supa_eventos')
-          .update({ tecnico_id: tecnicoId || null })
-          .eq('id', celula.evento.id)
-      } else {
-        const ag = celula.agendamento
-        if (ag?.id) {
-          if (tecnicoId) {
-            await supabase.from('agendamentos_tecnicos')
-              .update({ tecnico_id: tecnicoId, folga: false })
-              .eq('id', ag.id)
-          } else {
-            await supabase.from('agendamentos_tecnicos').delete().eq('id', ag.id)
-          }
-        } else if (tecnicoId) {
-          await supabase.from('agendamentos_tecnicos').insert({
-            data: celula.data, espaco_id: celula.espaco_id, tecnico_id: tecnicoId, folga: false,
-          })
-        }
-      }
+      const eventoId = celula.evento.id
+      const actuais  = celula.tecIds ?? []
+      const adicionar = ids.filter(id => !actuais.includes(id))
+      const remover   = actuais.filter(id => !ids.includes(id))
+      if (adicionar.length)
+        await supabase.from('evento_tecnicos').upsert(
+          adicionar.map(tid => ({ evento_id: eventoId, tecnico_id: tid })),
+          { onConflict: 'evento_id,tecnico_id' }
+        )
+      if (remover.length)
+        await Promise.all(remover.map(tid =>
+          supabase.from('evento_tecnicos').delete().eq('evento_id', eventoId).eq('tecnico_id', tid)
+        ))
       onGuardado()
       onFechar()
     } catch (e) { console.error(e) }
@@ -142,13 +137,14 @@ function ModalAtribuicao({ aberto, celula, tecnicos, eventos, agendamentos, onFe
   }
 
   const guardar = () => {
-    if (!celula) return
-    const cs = detectarConflitos(tecnicoId, celula?.data, celula?.evento?.id, eventos, agendamentos, tecnicos)
-    if (cs.length > 0) { setConflitos(cs); setConfirmar(true); return }
-    executarGuardar()
+    // Verificar conflitos para novos seleccionados
+    const novos = seleccionados.filter(id => !(celula?.tecIds ?? []).includes(id))
+    for (const id of novos) {
+      const cs = detectarConflitos(id, celula?.data, celula?.evento?.id, eventos, agendamentos, tecnicos)
+      if (cs.length > 0) { setConflitos(cs); setTecConflito(id); setConfirmar(true); return }
+    }
+    executarGuardar(seleccionados)
   }
-
-  const nomeTecnico = tecnicos.find(t => t.id === tecnicoId)?.nome ?? ''
 
   return (
     <>
@@ -156,46 +152,39 @@ function ModalAtribuicao({ aberto, celula, tecnicos, eventos, agendamentos, onFe
         <div className="flex flex-col">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div>
-              <p className="text-sm font-semibold text-accent">Atribuir Técnico</p>
+              <p className="text-sm font-semibold text-accent">Técnicos do evento</p>
               {celula && <p className="text-[11px] text-accent-subtle mt-0.5">{celula.espaco} · {celula.data}</p>}
             </div>
             <button onClick={onFechar} className="text-accent-subtle hover:text-accent"><X size={15} /></button>
           </div>
           <div className="px-5 py-4 flex flex-col gap-3">
-            {(celula?.evento || celula?.dj) && (
+            {celula?.evento && (
               <div className="p-3 rounded-lg bg-surface-2 border border-border/50 text-[11px] flex flex-col gap-1">
-                {celula.evento && <span className="text-accent-muted"><span className="text-accent-subtle">Evento:</span> {celula.evento.evento}</span>}
+                <span className="text-accent-muted"><span className="text-accent-subtle">Evento:</span> {celula.evento.evento}</span>
                 {celula.evento?.hora_instalacao && <span className="text-accent-muted"><span className="text-accent-subtle">Inst.:</span> {hhmm(celula.evento.hora_instalacao)}</span>}
                 {celula.evento?.hora_inicio && <span className="text-accent-muted"><span className="text-accent-subtle">Início:</span> {hhmm(celula.evento.hora_inicio)}</span>}
-                {celula.dj && <span className="text-accent-muted"><span className="text-accent-subtle">DJ:</span> {celula.dj}</span>}
               </div>
             )}
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-medium text-accent-subtle uppercase tracking-wider">Técnico</label>
-              <select
-                value={tecnicoId}
-                onChange={e => handleTecnicoChange(e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded px-3 py-2 text-xs text-accent focus:outline-none focus:border-white/30"
-              >
-                <option value="">— Nenhum —</option>
-                {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-              </select>
-            </div>
-            {/* Avisos inline */}
-            {conflitos.length > 0 && (
-              <div className="flex flex-col gap-1.5">
-                {conflitos.map((c, i) => (
-                  <div key={i} className={clsx(
-                    'flex items-start gap-2 px-3 py-2 rounded-lg text-[11px] border',
-                    c.tipo === 'folga'
-                      ? 'bg-orange-500/10 border-orange-500/20 text-orange-300'
-                      : 'bg-red-500/10 border-red-500/20 text-red-300'
-                  )}>
-                    <AlertTriangle size={11} className="shrink-0 mt-0.5" />{c.msg}
-                  </div>
+              <label className="text-[11px] font-medium text-accent-subtle uppercase tracking-wider">Seleccionar técnicos</label>
+              <div className="flex flex-col gap-1 max-h-52 overflow-y-auto">
+                {tecnicos.map(t => (
+                  <label key={t.id}
+                    className={clsx(
+                      'flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-all',
+                      seleccionados.includes(t.id)
+                        ? 'bg-status-confirmado/10 border-status-confirmado/30'
+                        : 'bg-surface-2 border-border hover:border-white/20'
+                    )}>
+                    <input type="checkbox" checked={seleccionados.includes(t.id)}
+                      onChange={() => toggle(t.id)} className="accent-green-400 w-3.5 h-3.5" />
+                    <span className={clsx('text-xs font-medium', seleccionados.includes(t.id) ? 'text-status-confirmado' : 'text-accent-muted')}>
+                      {t.nome}
+                    </span>
+                  </label>
                 ))}
               </div>
-            )}
+            </div>
           </div>
           <div className="px-5 py-3 border-t border-border flex justify-end gap-2">
             <Button variante="secundario" onClick={onFechar} disabled={loading}>Cancelar</Button>
@@ -204,13 +193,12 @@ function ModalAtribuicao({ aberto, celula, tecnicos, eventos, agendamentos, onFe
         </div>
       </Modal>
 
-      {/* Modal de conflito automático */}
       {confirmar && (
         <ModalConflito
           conflitos={conflitos}
-          nomeTecnico={nomeTecnico}
-          onConfirmar={() => { setConfirmar(false); executarGuardar() }}
-          onCancelar={() => { setConfirmar(false); setTecnicoId(''); setConflitos([]) }}
+          nomeTecnico={tecnicos.find(t => t.id === tecConflito)?.nome ?? ''}
+          onConfirmar={() => { setConfirmar(false); executarGuardar(seleccionados) }}
+          onCancelar={() => { setConfirmar(false); setSeleccionados(seleccionados.filter(id => id !== tecConflito)) }}
         />
       )}
     </>
@@ -447,6 +435,7 @@ export function ApoioTecnico() {
   const [tecnicos, setTecnicos]         = useState([])
   const [agendamentos, setAgendamentos] = useState([])
   const [eventos, setEventos]           = useState([])
+  const [evTecnicos, setEvTecnicos]     = useState([])  // evento_tecnicos
   const [slots, setSlots]               = useState([])
   const [espacos, setEspacos]           = useState([])
   const [modalAtrib, setModalAtrib]       = useState(null)
@@ -490,7 +479,20 @@ export function ApoioTecnico() {
     if (!tRes.error) setTecnicos(tRes.data ?? [])
     if (!eRes.error) setEspacos(eRes.data ?? [])
     if (!agRes.error) setAgendamentos(agRes.data ?? [])
-    if (!evRes.error) setEventos(evRes.data ?? [])
+    if (!evRes.error) {
+      const evs = evRes.data ?? []
+      setEventos(evs)
+      // Fetch tecnicos para os eventos deste mês
+      if (evs.length > 0) {
+        const { data: etData } = await supabase
+          .from('evento_tecnicos')
+          .select('evento_id, tecnico_id')
+          .in('evento_id', evs.map(e => e.id))
+        setEvTecnicos(etData ?? [])
+      } else {
+        setEvTecnicos([])
+      }
+    }
     if (!slRes.error) setSlots(slRes.data ?? [])
     setLoading(false)
   }, [dataInicio, dataFim])
@@ -540,6 +542,16 @@ export function ApoioTecnico() {
     return idx
   }, [eventos])
 
+  // evento_id → tecnico_id[]
+  const evTecIdx = useMemo(() => {
+    const idx = {}
+    evTecnicos.forEach(({ evento_id, tecnico_id }) => {
+      if (!idx[evento_id]) idx[evento_id] = []
+      if (!idx[evento_id].includes(tecnico_id)) idx[evento_id].push(tecnico_id)
+    })
+    return idx
+  }, [evTecnicos])
+
   const djIdx = useMemo(() => {
     const idx = {}
     slots.forEach(s => {
@@ -570,19 +582,18 @@ export function ApoioTecnico() {
       const dataStr = isoData(dia)
       const linhas  = []
       espacos.forEach(espaco => {
-        const k     = `${dataStr}|${espaco.id}`
-        const ev    = evIdx[k]
-        const dj    = djIdx[k]
+        const k  = `${dataStr}|${espaco.id}`
+        const ev = evIdx[k]
+        const dj = djIdx[k]
         if (!ev) return
-        const ag      = agIdx[k] ?? null
-        const tecId   = ev?.tecnico_id ?? ag?.tecnico_id ?? null
-        const tecNome = tecId ? tecnicos.find(t => t.id === tecId)?.nome ?? null : null
-        linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev, djs: dj ?? [], ag, tecNome, tecId })
+        const ag     = agIdx[k] ?? null
+        const tecIds = evTecIdx[ev.id] ?? (ag?.tecnico_id ? [ag.tecnico_id] : [])
+        linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev, djs: dj ?? [], ag, tecIds })
       })
       result.push({ dataStr, dia, linhas, folgas: folgasIdx[dataStr] ?? [] })
     })
     return result
-  }, [dias, espacos, evIdx, djIdx, agIdx, folgasIdx, tecnicos])
+  }, [dias, espacos, evIdx, djIdx, agIdx, folgasIdx, evTecIdx])
 
   const linhasPorDia = useMemo(() => {
     const q = pesquisa.trim().toLowerCase()
@@ -596,18 +607,16 @@ export function ApoioTecnico() {
       if (filtroEspaco) linhas = linhas.filter(l => l.espaco_id === filtroEspaco)
 
       if (tecFiltroId) {
-        linhas = linhas.filter(l => {
-          const tecId = l.ev?.tecnico_id ?? l.ag?.tecnico_id ?? null
-          return tecId === tecFiltroId
-        })
+        linhas = linhas.filter(l => (l.tecIds ?? []).includes(tecFiltroId))
       }
 
-      if (q) linhas = linhas.filter(l =>
-        l.espacoNome.toLowerCase().includes(q) ||
-        (l.ev?.evento ?? '').toLowerCase().includes(q) ||
-        (l.djs?.join(' ') ?? '').toLowerCase().includes(q) ||
-        (l.tecNome ?? '').toLowerCase().includes(q)
-      )
+      if (q) linhas = linhas.filter(l => {
+        const tecNomes = (l.tecIds ?? []).map(id => tecnicos.find(t => t.id === id)?.nome ?? '').join(' ')
+        return l.espacoNome.toLowerCase().includes(q) ||
+          (l.ev?.evento ?? '').toLowerCase().includes(q) ||
+          (l.djs?.join(' ') ?? '').toLowerCase().includes(q) ||
+          tecNomes.toLowerCase().includes(q)
+      })
 
       const temFolgaDoTecnico = tecFiltroId && (grupo.folgas ?? []).includes(tecFiltroId)
       if (linhas.length === 0 && !temFolgaDoTecnico && (filtroEspaco || tecFiltroId || q)) return null
@@ -621,23 +630,22 @@ export function ApoioTecnico() {
   , [linhasPorDia])
 
   // ── Handlers de drag & drop ──────────────────────────────────────────────────
-  const handleDragStart = useCallback((e, linha) => {
+  const handleDragStart = useCallback((e, linha, tecnicoId) => {
     e.dataTransfer.effectAllowed = 'move'
-    // Ghost image minimalista
+    const tec = tecnicos.find(t => t.id === tecnicoId)
     const ghost = document.createElement('span')
-    ghost.textContent = linha.tecNome
+    ghost.textContent = tec?.nome ?? '?'
     ghost.style.cssText = 'position:fixed;top:-100px;left:-100px;padding:2px 10px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:999px;font-size:11px;font-weight:600;'
     document.body.appendChild(ghost)
     e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 12)
     setTimeout(() => document.body.removeChild(ghost), 0)
-
     setDragSource({
       dropKey:   `${linha.dataStr}|${linha.espaco_id}`,
-      tecnicoId: linha.tecId,
+      tecnicoId,
       eventoId:  linha.ev?.id ?? null,
       agId:      linha.ag?.id ?? null,
     })
-  }, [])
+  }, [tecnicos])
 
   const handleDragEnd = useCallback(() => {
     setDragSource(null)
@@ -660,16 +668,22 @@ export function ApoioTecnico() {
 
   const executarDrop = useCallback(async (src, linha) => {
     try {
+      // Adicionar técnico ao evento destino
       if (linha.ev?.id) {
-        await supabase.from('supa_eventos').update({ tecnico_id: src.tecnicoId }).eq('id', linha.ev.id)
+        await supabase.from('evento_tecnicos')
+          .upsert({ evento_id: linha.ev.id, tecnico_id: src.tecnicoId }, { onConflict: 'evento_id,tecnico_id' })
       } else if (linha.ag?.id) {
         await supabase.from('agendamentos_tecnicos').update({ tecnico_id: src.tecnicoId }).eq('id', linha.ag.id)
       } else {
         await supabase.from('agendamentos_tecnicos').insert({ data: linha.dataStr, espaco_id: linha.espaco_id, tecnico_id: src.tecnicoId, folga: false })
       }
-      if (src.eventoId) {
-        await supabase.from('supa_eventos').update({ tecnico_id: null }).eq('id', src.eventoId)
-      } else if (src.agId) {
+      // Se veio de um evento (não da paleta), remove da origem
+      if (src.eventoId && src.dropKey !== null) {
+        await supabase.from('evento_tecnicos')
+          .delete()
+          .eq('evento_id', src.eventoId)
+          .eq('tecnico_id', src.tecnicoId)
+      } else if (src.agId && src.dropKey !== null) {
         await supabase.from('agendamentos_tecnicos').delete().eq('id', src.agId)
       }
       carregar()
@@ -699,17 +713,13 @@ export function ApoioTecnico() {
   const thCls    = 'px-2 py-2 text-left text-[10px] font-bold text-accent-subtle uppercase tracking-widest whitespace-nowrap'
   const sepThCls = 'w-0.5 p-0 bg-border'
 
-  // Helper: renderiza a célula de técnico (draggable + drop zone)
+  // Helper: renderiza a célula de técnico (multi-tech, chips fixed-width, drop zone)
   const renderTecCell = (linha, extraCls = '') => {
-    if (!linha) return <td className={clsx('px-2 py-2', extraCls)} />
-    const dropKey   = `${linha.dataStr}|${linha.espaco_id}`
-    const isSrc     = dragSource?.dropKey === dropKey
-    const isDst     = dragOver === dropKey && dragSource && dragSource.dropKey !== dropKey
+    if (!linha) return <td className={clsx('px-2 py-1.5', extraCls)} />
+    const dropKey       = `${linha.dataStr}|${linha.espaco_id}`
+    const isDst         = dragOver === dropKey && dragSource && dragSource.dropKey !== dropKey
     const isDraggingAny = !!dragSource
-
-    // Cor baseada no nome do técnico
-    const tecIdx = linha.tecNome ? tecnicos.findIndex(t => t.id === linha.tecId) : -1
-    const cor = linha.tecNome ? corTecnico(linha.tecNome, tecIdx) : null
+    const tecIds        = linha.tecIds ?? []
 
     return (
       <td
@@ -722,24 +732,45 @@ export function ApoioTecnico() {
               data: linha.dataStr, espaco_id: linha.espaco_id,
               espaco: linha.espacoNome, agendamento: linha.ag,
               evento: linha.ev, dj: linha.djs?.join(', '),
+              tecIds,
             })
           : undefined
         }
         className={clsx(
-          'px-2 py-1.5 whitespace-nowrap transition-all duration-100',
+          'px-2 py-1 transition-all duration-100',
           extraCls,
           isDst
             ? 'bg-status-confirmado/10 outline outline-1 outline-inset outline-status-confirmado/50'
             : !isDraggingAny && 'cursor-pointer hover:bg-surface-2/40',
         )}
       >
-        <TecnicoChip
-          nome={linha.tecNome}
-          cor={cor}
-          isDragging={isSrc}
-          onDragStart={(e) => handleDragStart(e, linha)}
-          onDragEnd={handleDragEnd}
-        />
+        <div className="flex items-center gap-1 flex-nowrap overflow-hidden">
+          {tecIds.length === 0 ? (
+            <span className="text-border/30 text-[10px]">+ atribuir</span>
+          ) : tecIds.map(tid => {
+            const tec    = tecnicos.find(t => t.id === tid)
+            const tidx   = tecnicos.findIndex(t => t.id === tid)
+            const cor    = tec ? corTecnico(tec.nome, tidx) : null
+            const isSrcChip = dragSource?.dropKey === dropKey && dragSource?.tecnicoId === tid
+            return (
+              <span
+                key={tid}
+                draggable
+                onDragStart={(e) => { e.stopPropagation(); handleDragStart(e, linha, tid) }}
+                onDragEnd={handleDragEnd}
+                title={tec?.nome}
+                className={clsx(
+                  'inline-flex items-center justify-center px-0 rounded-full text-[10px] font-semibold border select-none cursor-grab active:cursor-grabbing transition-opacity shrink-0',
+                  'w-[72px] overflow-hidden',
+                  cor?.chip ?? 'bg-surface-3 text-accent-muted border-border',
+                  isSrcChip && 'opacity-30'
+                )}
+              >
+                <span className="truncate px-1.5 py-0.5">{tec?.nome ?? '?'}</span>
+              </span>
+            )
+          })}
+        </div>
       </td>
     )
   }
@@ -870,11 +901,11 @@ export function ApoioTecnico() {
               {Array.from({ length: maxGrupos }, (_, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && <col style={{ width: 2 }} />}
-                  <col style={{ width: 100 }} />
+                  <col style={{ width: 160 }} />
+                  <col style={{ width: 130 }} />
                   <col style={{ width: 140 }} />
-                  <col style={{ width: 150 }} />
-                  <col style={{ width: 78 }} />
-                  <col style={{ width: 78 }} />
+                  <col style={{ width: 72 }} />
+                  <col style={{ width: 72 }} />
                   <col style={{ width: 110 }} />
                 </React.Fragment>
               ))}
