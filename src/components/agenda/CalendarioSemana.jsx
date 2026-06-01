@@ -133,6 +133,7 @@ export function CalendarioSemana({
   dias, espacos, agenda, bloqueios,
   onClickSlot, onClickVazio,
   semanaLabel, ocultarCabecalho = false,
+  nomeEspaco = 'TODOS',
   conflictsIdx = new Set(),
   onSugestaoAplicada,
   supaEventos = [],
@@ -183,18 +184,18 @@ export function CalendarioSemana({
 
   return (
     <div className="overflow-x-auto relative">
-      <table className="w-full text-xs border-collapse" style={{ minWidth: 700 }}>
+      <table className="w-full text-xs border-collapse table-fixed" style={{ minWidth: 700 }}>
         <colgroup>
-          <col style={{ width: 190 }} />
-          {dias.map((d) => <col key={isoData(d)} style={{ minWidth: 110 }} />)}
+          <col style={{ width: 160 }} />
+          {dias.map((d) => <col key={isoData(d)} />)}
         </colgroup>
 
         {/* ── Cabeçalho de dias ── */}
         {!ocultarCabecalho && (
           <thead>
             <tr>
-              <th className="px-3 py-2 text-left text-accent-subtle font-medium border-b border-r border-border sticky left-0 bg-surface-1 z-10">
-                Cliente
+              <th className="px-3 py-2 text-left text-accent-subtle font-medium border-b border-r border-border sticky left-0 bg-surface-1 z-10 uppercase tracking-widest text-[10px]">
+                {nomeEspaco}
               </th>
               {dias.map((dia) => {
                 const hoje = isToday(dia)
@@ -224,7 +225,14 @@ export function CalendarioSemana({
         )}
 
         <tbody>
-          {/* Separador semanal removido */}
+          {/* ── Separador de semana com data ── */}
+          {semanaLabel && (
+            <tr className="border-b border-border/60 bg-surface-2/80">
+              <td colSpan={dias.length + 1} className="px-4 py-1 text-[10px] font-bold text-accent-subtle uppercase tracking-widest">
+                {semanaLabel}
+              </td>
+            </tr>
+          )}
 
           {/* ── Por Cliente → cabeçalho + linhas de turnos ── */}
           {espacos.map((espaco) => {

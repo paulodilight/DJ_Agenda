@@ -121,6 +121,10 @@ export function Agenda() {
     ? espacos.filter((e) => e.id === filtroEspaco)
     : espacos
 
+  const nomeEspacoFiltro = filtroEspaco
+    ? (espacos.find(e => e.id === filtroEspaco)?.nome?.trim() ?? 'Cliente')
+    : 'TODOS'
+
   // Indicador de preenchimento — só quando um Cliente está seleccionado
   const totalAgenda  = filtroEspaco ? agenda.length : 0
   const comDJAgenda  = filtroEspaco ? agenda.filter(s => s.dj_id || s.dj_nome).length : 0
@@ -464,8 +468,9 @@ export function Agenda() {
                     bloqueios={bloqueios}
                     onClickSlot={abrirEditarSlot}
                     onClickVazio={abrirNovoSlot}
-                    semanaLabel={`Semana ${si + 1}`}
+                    semanaLabel={format(semana[0], "d 'de' MMMM", { locale: pt })}
                     ocultarCabecalho={si > 0}
+                    nomeEspaco={nomeEspacoFiltro}
                     conflictsIdx={conflictsIdx}
                     onSugestaoAplicada={() => { recarregar(); recarregarMes() }}
                     supaEventos={supaEventos}
