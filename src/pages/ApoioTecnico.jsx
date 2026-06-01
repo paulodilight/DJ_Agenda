@@ -908,7 +908,7 @@ export function ApoioTecnico() {
               >
                 <span className={clsx('font-semibold', cor?.text ?? 'text-accent-muted')}>{t.nome}</span>
                 {(st.datas > 0 || st.folgas > 0 || st.valor > 0) && (
-                  <span className="flex items-center gap-0.5 text-[10px] opacity-55 font-normal shrink-0">
+                  <span className="flex items-center gap-0.5 text-[11px] opacity-80 font-normal shrink-0">
                     {[
                       st.datas  > 0 && ['D', st.datas],
                       st.folgas > 0 && ['F', st.folgas],
