@@ -605,12 +605,12 @@ export function ApoioTecnico() {
       const dataStr = isoData(dia)
       const linhas  = []
       espacos.forEach(espaco => {
-        const k  = `${dataStr}|${espaco.id}`
-        const ev = evIdx[k]
-        const dj = djIdx[k]
-        if (!ev) return
+        const k      = `${dataStr}|${espaco.id}`
+        const ev     = evIdx[k] ?? null
+        const dj     = djIdx[k]
         const ag     = agIdx[k] ?? null
-        const tecIds = evTecIdx[ev.id] ?? (ag?.tecnico_id ? [ag.tecnico_id] : [])
+        const tecIds = ev ? (evTecIdx[ev.id] ?? (ag?.tecnico_id ? [ag.tecnico_id] : []))
+                          : (ag?.tecnico_id ? [ag.tecnico_id] : [])
         linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev, djs: dj ?? [], ag, tecIds })
       })
       result.push({ dataStr, dia, linhas, folgas: folgasIdx[dataStr] ?? [] })
