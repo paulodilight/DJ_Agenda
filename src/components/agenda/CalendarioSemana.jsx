@@ -10,6 +10,11 @@ import { pt } from 'date-fns/locale'
 
 const fds = (d) => d.getDay() === 5 || d.getDay() === 6  // Sexta ou Sábado
 
+const NOMES_DIA = { 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado', 0: 'Domingo' }
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+const nomeDiaCompleto = (d) => NOMES_DIA[d.getDay()] ?? nomeDiaSemana(d)
+const fmtDiaCurto = (d) => cap(format(d, 'dd MMM', { locale: pt }))
+
 // ── Helpers para matching de turno por hora ──────────────────────────────────
 function horaParaMins(hhmm) {
   const [h = 0, m = 0] = (hhmm ?? '00:00').split(':').map(Number)
@@ -204,13 +209,14 @@ export function CalendarioSemana({
                         : hoje ? 'text-accent' : passado ? 'text-accent-subtle' : 'text-accent-muted'
                     )}
                   >
-                    <div className={clsx(
-                      'inline-flex flex-col items-center gap-0.5',
+                    <span className={clsx(
+                      'inline-flex items-center gap-1.5 whitespace-nowrap',
                       hoje && 'bg-white text-black rounded px-2 py-0.5'
                     )}>
-                      <span className="uppercase tracking-wider text-[10px]">{nomeDiaSemana(dia)}</span>
-                      <span>{formatarDataCurta(dia)}</span>
-                    </div>
+                      <span className="font-semibold">{nomeDiaCompleto(dia)}</span>
+                      <span className="text-accent-subtle/60">|</span>
+                      <span>{fmtDiaCurto(dia)}</span>
+                    </span>
                   </th>
                 )
               })}
@@ -219,22 +225,7 @@ export function CalendarioSemana({
         )}
 
         <tbody>
-          {/* ── Separador de semana (vista Mês) ── */}
-          {semanaLabel && (
-            <tr className="bg-surface-2/60 border-b border-border">
-              <td className="px-3 py-2 text-xs font-semibold text-accent-muted uppercase tracking-widest sticky left-0 bg-surface-2/60 z-10 whitespace-nowrap">
-                {semanaLabel}
-              </td>
-              {dias.map((dia) => (
-                <td key={isoData(dia)} className={clsx(
-                  'px-2 py-2 text-xs font-semibold text-center border-l border-border/40',
-                  isToday(dia) ? 'text-status-confirmado' : 'text-accent-muted'
-                )}>
-                  {format(dia, 'd MMM', { locale: pt })}
-                </td>
-              ))}
-            </tr>
-          )}
+          {/* Separador semanal removido */}
 
           {/* ── Por Cliente → cabeçalho + linhas de turnos ── */}
           {espacos.map((espaco) => {
