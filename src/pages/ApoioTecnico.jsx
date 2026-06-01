@@ -595,8 +595,11 @@ export function ApoioTecnico() {
     return m
   }, [tecnicos])
 
-  // Todos os espaços activos aparecem no filtro (incluindo i4DJ)
-  const espacosActivos = useMemo(() => espacos, [espacos])
+  // Só espaços com actividade no mês + LMD sempre presente
+  const espacosActivos = useMemo(() => {
+    const ids = new Set([...eventos.map(e => e.espaco_id), ...slots.map(s => s.espaco_id)])
+    return espacos.filter(e => ids.has(e.id) || e.nome?.trim().toLowerCase() === 'lmd')
+  }, [espacos, eventos, slots])
 
   // Técnicos fixos + i4DJ espaco_id
   const tecnicosFixos = useMemo(() => tecnicos.filter(t => t.tipo === 'fixo'), [tecnicos])
@@ -883,65 +886,25 @@ export function ApoioTecnico() {
       {/* ── Filtros ── */}
       <div className="shrink-0 border-b border-border/50 bg-surface-0/40">
 
-        {/* Linha 1 — Clientes + pesquisa */}
-        <div className="px-5 py-2 flex items-center justify-between gap-3 border-b border-border/30">
-          <div className="flex items-center gap-1 flex-nowrap overflow-hidden">
-            <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Cliente</span>
-            <button onClick={() => setFiltroEspaco('')}
+        {/* Linha 1 — só clientes */}
+        <div className="px-5 py-2 flex items-center gap-1 flex-wrap border-b border-border/30">
+          <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Cliente</span>
+          <button onClick={() => setFiltroEspaco('')}
+            className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
+              filtroEspaco === '' ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
+            Todos
+          </button>
+          {espacosActivos.map(e => (
+            <button key={e.id} onClick={() => setFiltroEspaco(filtroEspaco === e.id ? '' : e.id)}
               className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
-                filtroEspaco === '' ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
-              Todos
+                filtroEspaco === e.id ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
+              {e.nome.trim()}
             </button>
-            {espacosActivos.map(e => (
-              <button key={e.id} onClick={() => setFiltroEspaco(filtroEspaco === e.id ? '' : e.id)}
-                className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
-                  filtroEspaco === e.id ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
-                {e.nome.trim()}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Toggle vista */}
-            <div className="flex bg-surface-2 border border-border rounded p-0.5">
-              <button
-                onClick={() => setVista('colunas')}
-                title="Vista em colunas"
-                className={clsx('p-1.5 rounded transition-colors', vista === 'colunas' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}
-              >
-                <Columns2 size={13} />
-              </button>
-              <button
-                onClick={() => setVista('linhas')}
-                title="Vista em linhas"
-                className={clsx('p-1.5 rounded transition-colors', vista === 'linhas' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}
-              >
-                <AlignJustify size={13} />
-              </button>
-              <button
-                onClick={() => setVista('stats')}
-                title="Estatísticas por colaborador"
-                className={clsx('p-1.5 rounded transition-colors', vista === 'stats' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}
-              >
-                <BarChart3 size={13} />
-              </button>
-            </div>
-
-            {/* Pesquisa */}
-            <div className="relative">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent-subtle pointer-events-none" />
-              <input type="text" placeholder="Pesquisar…" value={pesquisa} onChange={e => setPesquisa(e.target.value)}
-                className="pl-8 pr-7 py-1.5 bg-surface-2 border border-border rounded text-xs text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/20 w-44" />
-              {pesquisa && (
-                <button onClick={() => setPesquisa('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-accent-subtle hover:text-accent">
-                  <X size={11} />
-                </button>
-              )}
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Linha 2 — colaboradores (oculto na vista stats) */}
-        <div className={clsx('px-5 py-2 flex items-center gap-1 flex-wrap', vista === 'stats' && 'hidden')}>
+        {/* Linha 2 — apoio + vista + pesquisa */}
+        <div className="px-5 py-2 flex items-center gap-1 flex-wrap">
           <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Apoio</span>
           <button onClick={() => setFiltroTecnico('')}
             className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
@@ -1023,19 +986,39 @@ export function ApoioTecnico() {
             </span>
           )}
 
-          <div className="ml-auto shrink-0">
-            <button
-              onClick={() => setOcultarVazios(v => !v)}
-              title={ocultarVazios ? 'Mostrar todos os dias' : 'Ocultar dias sem eventos'}
-              className={clsx(
-                'px-3 py-1.5 rounded text-xs border transition-all',
-                ocultarVazios
-                  ? 'bg-surface-3 text-accent border-white/20 font-medium'
-                  : 'bg-surface-2 text-accent-muted border-border hover:text-accent'
-              )}
-            >
-              {ocultarVazios ? '☰ Todos os dias' : '⊟ Ocultar vazios'}
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            {/* Toggle vista */}
+            <div className="flex bg-surface-2 border border-border rounded p-0.5">
+              <button onClick={() => setVista('colunas')} title="Colunas"
+                className={clsx('p-1.5 rounded transition-colors', vista === 'colunas' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}>
+                <Columns2 size={13} />
+              </button>
+              <button onClick={() => setVista('linhas')} title="Linhas"
+                className={clsx('p-1.5 rounded transition-colors', vista === 'linhas' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}>
+                <AlignJustify size={13} />
+              </button>
+              <button onClick={() => setVista('stats')} title="Estatísticas"
+                className={clsx('p-1.5 rounded transition-colors', vista === 'stats' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}>
+                <BarChart3 size={13} />
+              </button>
+            </div>
+            {/* Ocultar vazios */}
+            <button onClick={() => setOcultarVazios(v => !v)}
+              className={clsx('px-2.5 py-1.5 rounded text-xs border transition-all',
+                ocultarVazios ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
+              {ocultarVazios ? '☰ Todos' : '⊟ Ocultar vazios'}
             </button>
+            {/* Pesquisa */}
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent-subtle pointer-events-none" />
+              <input type="text" placeholder="Pesquisar…" value={pesquisa} onChange={e => setPesquisa(e.target.value)}
+                className="pl-8 pr-7 py-1.5 bg-surface-2 border border-border rounded text-xs text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/20 w-36" />
+              {pesquisa && (
+                <button onClick={() => setPesquisa('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-accent-subtle hover:text-accent">
+                  <X size={11} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
