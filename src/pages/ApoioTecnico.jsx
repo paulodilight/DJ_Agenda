@@ -900,11 +900,20 @@ export function ApoioTecnico() {
                 )}
               >
                 <span className="font-semibold">{t.nome}</span>
-                <span className="flex items-center gap-1.5 text-[10px] opacity-60 font-normal">
-                  {st.datas > 0   && <span>D {st.datas}</span>}
-                  {st.folgas > 0  && <span>F {st.folgas}</span>}
-                  {st.valor > 0   && <span>V {Math.round(st.valor)}</span>}
-                </span>
+                {(st.datas > 0 || st.folgas > 0 || st.valor > 0) && (
+                  <span className="flex items-center gap-1 text-[10px] opacity-55 font-normal">
+                    {[
+                      st.datas  > 0 && `D${st.datas}`,
+                      st.folgas > 0 && `F${st.folgas}`,
+                      st.valor  > 0 && `V ${Math.round(st.valor)}`,
+                    ].filter(Boolean).map((s, i, arr) => (
+                      <span key={i} className="flex items-center gap-1">
+                        {s}
+                        {i < arr.length - 1 && <span className="opacity-40">|</span>}
+                      </span>
+                    ))}
+                  </span>
+                )}
               </div>
             )
           })}
