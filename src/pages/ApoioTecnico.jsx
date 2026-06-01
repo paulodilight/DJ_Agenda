@@ -418,7 +418,7 @@ function FolgaChip({ tecnico, cor, dataStr, onDragStart, isDragging }) {
       onDragStart={e => onDragStart(e, dataStr, tecnico.id)}
       onDragEnd={() => {}}
       className={clsx(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border select-none cursor-grab active:cursor-grabbing transition-opacity',
+        'inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold border select-none cursor-grab active:cursor-grabbing transition-opacity',
         cor?.chip ?? 'bg-orange-400/15 text-orange-400 border-orange-400/30',
         isDragging ? 'opacity-30' : 'opacity-100'
       )}
@@ -873,7 +873,7 @@ export function ApoioTecnico() {
                 onDragEnd={handleDragEnd}
                 title={tec?.nome}
                 className={clsx(
-                  'inline-flex items-center justify-center px-0 rounded-full text-[10px] font-semibold border select-none cursor-grab active:cursor-grabbing transition-opacity shrink-0',
+                  'inline-flex items-center justify-center px-0 rounded-md text-[11px] font-semibold border select-none cursor-grab active:cursor-grabbing transition-opacity shrink-0',
                   'w-[72px] overflow-hidden',
                   cor?.chip ?? 'bg-surface-3 text-accent-muted border-border',
                   isSrcChip && 'opacity-30'
@@ -1156,7 +1156,7 @@ export function ApoioTecnico() {
                             if (!tec) return null
                             return (
                               <span key={tid} className={clsx(
-                                'inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0',
+                                'inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold border shrink-0',
                                 cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30'
                               )}>
                                 {tec.nome}
@@ -1304,7 +1304,7 @@ export function ApoioTecnico() {
                             if (!tec) return null
                             return (
                               <span key={tid} className={clsx(
-                                'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0',
+                                'inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold border shrink-0',
                                 cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30'
                               )}>
                                 {tec.nome}
