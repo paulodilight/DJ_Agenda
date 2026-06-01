@@ -733,11 +733,16 @@ export const tecnicosApi = {
   async listar() {
     const { data, error } = await supabase
       .from('tecnicos')
-      .select('id, nome, telefone, ativo')
+      .select('id, nome, telefone, ativo, tipo')
       .eq('ativo', true)
       .order('nome')
     if (error) throw error
     return data
+  },
+
+  async alterarTipo(id, tipo) {
+    const { error } = await supabase.from('tecnicos').update({ tipo }).eq('id', id)
+    if (error) throw error
   },
 
   async criar(tecnico) {

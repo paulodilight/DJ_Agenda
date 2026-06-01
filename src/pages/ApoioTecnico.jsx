@@ -471,7 +471,7 @@ export function ApoioTecnico() {
   const carregar = useCallback(async () => {
     setLoading(true)
     const [tRes, eRes, agRes, evRes, slRes] = await Promise.all([
-      supabase.from('tecnicos').select('*').eq('ativo', true).order('nome'),
+      supabase.from('tecnicos').select('id, nome, ativo, tipo').eq('ativo', true).order('nome'),
       supabase.from('espacos').select('id, nome').eq('activo', true).order('nome'),
       supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicio).lte('data', dataFim),
       supabase.from('supa_eventos')
@@ -595,29 +595,48 @@ export function ApoioTecnico() {
     return m
   }, [tecnicos])
 
-  const espacosActivos = useMemo(() => {
-    const ids = new Set([...eventos.map(e => e.espaco_id), ...slots.map(s => s.espaco_id)])
-    return espacos.filter(e => ids.has(e.id))
-  }, [espacos, eventos, slots])
+  // Todos os espaços activos aparecem no filtro (incluindo i4DJ)
+  const espacosActivos = useMemo(() => espacos, [espacos])
+
+  // Técnicos fixos + i4DJ espaco_id
+  const tecnicosFixos = useMemo(() => tecnicos.filter(t => t.tipo === 'fixo'), [tecnicos])
+  const i4djEspacoId  = useMemo(() => espacos.find(e => e.nome?.trim().toLowerCase() === 'i4dj')?.id ?? null, [espacos])
 
   const linhasBrutas = useMemo(() => {
     const result = []
     dias.forEach(dia => {
-      const dataStr = isoData(dia)
-      const linhas  = []
+      const dataStr    = isoData(dia)
+      const folgasHoje = new Set(folgasIdx[dataStr] ?? [])
+      const linhas     = []
+
       espacos.forEach(espaco => {
         const k      = `${dataStr}|${espaco.id}`
         const ev     = evIdx[k] ?? null
         const dj     = djIdx[k]
         const ag     = agIdx[k] ?? null
-        const tecIds = ev ? (evTecIdx[ev.id] ?? (ag?.tecnico_id ? [ag.tecnico_id] : []))
+        let   tecIds = ev ? (evTecIdx[ev.id] ?? (ag?.tecnico_id ? [ag.tecnico_id] : []))
                           : (ag?.tecnico_id ? [ag.tecnico_id] : [])
+
+        // Auto-i4DJ: adicionar técnicos fixos que estão livres neste dia
+        if (i4djEspacoId && espaco.id === i4djEspacoId) {
+          // Técnicos já atribuídos a qualquer evento neste dia
+          const atribuidos = new Set(
+            evTecnicos
+              .filter(et => { const ev2 = eventos.find(e => e.id === et.evento_id); return ev2?.data_evento === dataStr })
+              .map(et => et.tecnico_id)
+          )
+          const livres = tecnicosFixos
+            .filter(t => !folgasHoje.has(t.id) && !atribuidos.has(t.id))
+            .map(t => t.id)
+          tecIds = [...new Set([...tecIds, ...livres])]
+        }
+
         linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev, djs: dj ?? [], ag, tecIds })
       })
       result.push({ dataStr, dia, linhas, folgas: folgasIdx[dataStr] ?? [] })
     })
     return result
-  }, [dias, espacos, evIdx, djIdx, agIdx, folgasIdx, evTecIdx])
+  }, [dias, espacos, evIdx, djIdx, agIdx, folgasIdx, evTecIdx, evTecnicos, eventos, tecnicosFixos, i4djEspacoId])
 
   const linhasPorDia = useMemo(() => {
     const q = pesquisa.trim().toLowerCase()
@@ -962,6 +981,23 @@ export function ApoioTecnico() {
                 )}
               >
                 <span className={clsx('font-semibold', cor?.text ?? 'text-accent-muted')}>{t.nome}</span>
+                <button
+                  onClick={async e => {
+                    e.stopPropagation()
+                    const novoTipo = t.tipo === 'fixo' ? 'freelancer' : 'fixo'
+                    await supabase.from('tecnicos').update({ tipo: novoTipo }).eq('id', t.id)
+                    carregar()
+                  }}
+                  title={t.tipo === 'fixo' ? 'Fixo — clique para mudar para Freelancer' : 'Freelancer — clique para mudar para Fixo'}
+                  className={clsx(
+                    'text-[9px] font-bold px-1 py-0.5 rounded border transition-all shrink-0',
+                    t.tipo === 'fixo'
+                      ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
+                      : 'bg-surface-3 text-accent-subtle/50 border-border/50 hover:text-accent-subtle'
+                  )}
+                >
+                  {t.tipo === 'fixo' ? 'FIXO' : 'FREE'}
+                </button>
                 {(st.datas > 0 || st.folgas > 0 || st.valor > 0) && (
                   <span className="flex items-center gap-0.5 text-[11px] opacity-80 font-normal shrink-0">
                     {[
