@@ -723,23 +723,40 @@ export function ApoioTecnico() {
 
   const executarDrop = useCallback(async (src, linha) => {
     try {
-      // Adicionar técnico ao evento destino
-      if (linha.ev?.id) {
-        await supabase.from('evento_tecnicos')
-          .upsert({ evento_id: linha.ev.id, tecnico_id: src.tecnicoId }, { onConflict: 'evento_id,tecnico_id' })
-      } else if (linha.ag?.id) {
-        await supabase.from('agendamentos_tecnicos').update({ tecnico_id: src.tecnicoId }).eq('id', linha.ag.id)
+      const dstTecIds    = linha.tecIds ?? []
+      const vemDeEvento  = src.eventoId && src.dropKey !== null
+      const dstTemUm     = dstTecIds.length === 1 && !dstTecIds.includes(src.tecnicoId)
+      const isSwap       = vemDeEvento && linha.ev?.id && dstTemUm
+
+      if (isSwap) {
+        // ── SWAP: Marcio ↔ Wilson ───────────────────────────────────────────
+        const dstTecId = dstTecIds[0]
+        // Remove ambos das posições actuais
+        await Promise.all([
+          supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId),
+          supabase.from('evento_tecnicos').delete().eq('evento_id', linha.ev.id).eq('tecnico_id', dstTecId),
+        ])
+        // Insere em posições trocadas
+        await Promise.all([
+          supabase.from('evento_tecnicos').upsert({ evento_id: linha.ev.id,  tecnico_id: src.tecnicoId }, { onConflict: 'evento_id,tecnico_id' }),
+          supabase.from('evento_tecnicos').upsert({ evento_id: src.eventoId, tecnico_id: dstTecId      }, { onConflict: 'evento_id,tecnico_id' }),
+        ])
       } else {
-        await supabase.from('agendamentos_tecnicos').insert({ data: linha.dataStr, espaco_id: linha.espaco_id, tecnico_id: src.tecnicoId, folga: false })
-      }
-      // Se veio de um evento (não da paleta), remove da origem
-      if (src.eventoId && src.dropKey !== null) {
-        await supabase.from('evento_tecnicos')
-          .delete()
-          .eq('evento_id', src.eventoId)
-          .eq('tecnico_id', src.tecnicoId)
-      } else if (src.agId && src.dropKey !== null) {
-        await supabase.from('agendamentos_tecnicos').delete().eq('id', src.agId)
+        // ── MOVER / ADICIONAR ───────────────────────────────────────────────
+        if (linha.ev?.id) {
+          await supabase.from('evento_tecnicos')
+            .upsert({ evento_id: linha.ev.id, tecnico_id: src.tecnicoId }, { onConflict: 'evento_id,tecnico_id' })
+        } else if (linha.ag?.id) {
+          await supabase.from('agendamentos_tecnicos').update({ tecnico_id: src.tecnicoId }).eq('id', linha.ag.id)
+        } else {
+          await supabase.from('agendamentos_tecnicos').insert({ data: linha.dataStr, espaco_id: linha.espaco_id, tecnico_id: src.tecnicoId, folga: false })
+        }
+        // Remove da origem se veio de um slot (não da paleta)
+        if (vemDeEvento) {
+          await supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId)
+        } else if (src.agId && src.dropKey !== null) {
+          await supabase.from('agendamentos_tecnicos').delete().eq('id', src.agId)
+        }
       }
       carregarComScroll()
     } catch (err) { console.error(err) }
