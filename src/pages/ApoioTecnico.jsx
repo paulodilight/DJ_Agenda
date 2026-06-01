@@ -899,20 +899,6 @@ export function ApoioTecnico() {
               </button>
             </div>
 
-            {/* Toggle dias vazios */}
-            <button
-              onClick={() => setOcultarVazios(v => !v)}
-              title={ocultarVazios ? 'Mostrar todos os dias' : 'Ocultar dias sem eventos'}
-              className={clsx(
-                'px-2.5 py-1.5 rounded text-xs border transition-all',
-                ocultarVazios
-                  ? 'bg-surface-4 text-accent border-white/20 font-medium'
-                  : 'bg-surface-2 text-accent-muted border-border hover:text-accent'
-              )}
-            >
-              {ocultarVazios ? 'Todos os dias' : 'Ocultar vazios'}
-            </button>
-
             {/* Pesquisa */}
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent-subtle pointer-events-none" />
@@ -992,6 +978,21 @@ export function ApoioTecnico() {
               ↓ largar num slot para atribuir
             </span>
           )}
+
+          <div className="ml-auto shrink-0">
+            <button
+              onClick={() => setOcultarVazios(v => !v)}
+              title={ocultarVazios ? 'Mostrar todos os dias' : 'Ocultar dias sem eventos'}
+              className={clsx(
+                'px-3 py-1.5 rounded text-xs border transition-all',
+                ocultarVazios
+                  ? 'bg-surface-3 text-accent border-white/20 font-medium'
+                  : 'bg-surface-2 text-accent-muted border-border hover:text-accent'
+              )}
+            >
+              {ocultarVazios ? '☰ Todos os dias' : '⊟ Ocultar vazios'}
+            </button>
+          </div>
         </div>
       </div>
 
