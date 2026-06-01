@@ -193,11 +193,11 @@ export function CalendarioSemana({
         {/* thead removido — cabeçalho dos dias está nos separadores de semana */}
 
         <tbody>
-          {/* ── Nome do espaço (acima da 1ª semana) ── */}
+          {/* ── Nome do espaço (acima da 1ª semana) — centrado vertical e horizontal ── */}
           {semanaLabel === 1 && (
             <tr className="bg-surface-0 border-b border-border/30">
-              <td colSpan={dias.length + 1} className="px-4 py-2.5 text-right">
-                <span className="text-lg font-black text-accent uppercase tracking-widest">
+              <td colSpan={dias.length + 1} className="px-4 py-4 text-center align-middle">
+                <span className="text-3xl font-black text-accent uppercase tracking-widest">
                   {nomeEspaco}
                 </span>
               </td>
@@ -207,7 +207,7 @@ export function CalendarioSemana({
           {/* ── Separador de semana: número + dias ── */}
           {semanaLabel && (
             <tr className="border-b border-t-2 border-border bg-surface-2/90">
-              <td className="px-4 py-1.5 text-[10px] font-black text-accent-subtle uppercase tracking-widest sticky left-0 bg-surface-2/90 z-10">
+              <td className="px-4 py-2 text-[10px] font-black text-accent-subtle uppercase tracking-widest sticky left-0 bg-surface-2/90 z-10">
                 {semanaLabel}ª SEMANA
               </td>
               {dias.map(dia => {
@@ -215,8 +215,8 @@ export function CalendarioSemana({
                 const passado = isPast(dia) && !hoje
                 return (
                   <td key={isoData(dia)} className={clsx(
-                    'px-2 py-1.5 text-[10px] font-semibold text-center border-l border-border/30',
-                    fds(dia) ? 'text-blue-300/70' : hoje ? 'text-accent' : passado ? 'text-accent-subtle/50' : 'text-accent-subtle'
+                    'px-2 py-2 text-sm font-bold text-center border-l border-border/30',
+                    fds(dia) ? 'text-blue-200/80' : hoje ? 'text-white' : passado ? 'text-accent-subtle/60' : 'text-accent/90'
                   )}>
                     <span className="whitespace-nowrap">
                       {nomeDiaCompleto(dia)}, {fmtDiaCurto(dia)}
