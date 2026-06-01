@@ -216,7 +216,7 @@ export function CalendarioSemana({
                 return (
                   <td key={isoData(dia)} className={clsx(
                     'px-2 py-2 text-[13px] font-normal text-center border-l border-border/30',
-                    hoje ? 'bg-white text-black font-semibold'
+                    hoje ? 'bg-white text-black font-semibold rounded-md'
                       : fds(dia) ? 'text-blue-200/70'
                       : passado ? 'text-accent-subtle/50'
                       : 'text-accent/70'
