@@ -22,7 +22,7 @@ const diaSemanaData = (d) => {
   const dt = new Date(d + 'T00:00:00')
   const nome = NOMES_DIA_SEMANA[dt.getDay()] ?? nomeDiaSem(d)
   const data = cap(format(dt, 'd MMM', { locale: pt }))
-  return `${nome} | ${data}`
+  return `${nome}, ${data}`
 }
 
 // ── Detecção de conflitos ─────────────────────────────────────────────────────

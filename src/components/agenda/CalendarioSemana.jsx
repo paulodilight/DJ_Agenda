@@ -213,8 +213,7 @@ export function CalendarioSemana({
                       'inline-flex items-center gap-1.5 whitespace-nowrap',
                       hoje && 'bg-white text-black rounded px-2 py-0.5'
                     )}>
-                      <span className="font-semibold">{nomeDiaCompleto(dia)}</span>
-                      <span className="text-accent-subtle/60">|</span>
+                      <span className="font-semibold">{nomeDiaCompleto(dia)},</span>
                       <span>{fmtDiaCurto(dia)}</span>
                     </span>
                   </th>
