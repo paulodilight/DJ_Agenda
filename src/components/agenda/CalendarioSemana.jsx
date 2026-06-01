@@ -194,7 +194,7 @@ export function CalendarioSemana({
           <thead>
             <tr>
               <th className="px-3 py-2 text-left text-accent-subtle font-medium border-b border-r border-border sticky left-0 bg-surface-1 z-10">
-                Turno
+                Cliente
               </th>
               {dias.map((dia) => {
                 const hoje = isToday(dia)
@@ -237,22 +237,17 @@ export function CalendarioSemana({
               : [{ id: null, nome: '—' }]
 
             return [
-              /* ── Cabeçalho do Cliente ── */
-              <tr key={`hdr-${espaco.id}`} className="border-t-2 border-border bg-surface-2">
-                <td
-                  colSpan={dias.length + 1}
-                  className="px-4 py-1.5 font-bold text-accent text-[11px] uppercase tracking-widest"
-                >
-                  {espaco.nome}
-                </td>
+              /* ── Separador entre espaços ── */
+              <tr key={`hdr-${espaco.id}`}>
+                <td colSpan={dias.length + 1} className="h-px bg-border/60 p-0" />
               </tr>,
 
               /* ── Uma linha por turno ── */
               ...turnoRows.map((turno, ti) => (
                 <tr key={`${espaco.id}-${turno.id ?? ti}`} className={ti % 2 === 0 ? 'bg-surface-0' : 'bg-surface-1'}>
-                  {/* Nome do turno */}
-                  <td className="px-3 py-2 text-accent-muted border-r border-b border-border sticky left-0 bg-inherit z-10 whitespace-nowrap">
-                    {espaco.nome} <span className="text-accent-subtle">({turno.nome})</span>
+                  {/* Nome do espaço (sem nome do turno) */}
+                  <td className="px-3 py-2 text-accent-muted border-r border-b border-border sticky left-0 bg-inherit z-10 whitespace-nowrap font-medium">
+                    {espaco.nome}
                   </td>
 
                   {/* Células por dia */}
