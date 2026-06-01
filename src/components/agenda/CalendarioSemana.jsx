@@ -190,41 +190,20 @@ export function CalendarioSemana({
           {dias.map((d) => <col key={isoData(d)} />)}
         </colgroup>
 
-        {/* ── Cabeçalho de dias ── */}
-        {!ocultarCabecalho && (
-          <thead>
-            <tr>
-              <th className="px-3 py-2 text-left text-accent-subtle font-medium border-b border-r border-border sticky left-0 bg-surface-1 z-10 uppercase tracking-widest text-[10px]">
-                {nomeEspaco}
-              </th>
-              {dias.map((dia) => {
-                const hoje = isToday(dia)
-                const passado = isPast(dia) && !hoje
-                return (
-                  <th
-                    key={isoData(dia)}
-                    className={clsx(
-                      'px-2 py-2 text-center font-medium border-b border-r border-border min-w-[110px]',
-                      fds(dia)
-                        ? 'bg-blue-400/[0.09] text-blue-300/80'
-                        : hoje ? 'text-accent' : passado ? 'text-accent-subtle' : 'text-accent-muted'
-                    )}
-                  >
-                    <span className={clsx(
-                      'inline-flex items-center gap-1.5 whitespace-nowrap',
-                      hoje && 'bg-white text-black rounded px-2 py-0.5'
-                    )}>
-                      <span className="font-semibold">{nomeDiaCompleto(dia)},</span>
-                      <span>{fmtDiaCurto(dia)}</span>
-                    </span>
-                  </th>
-                )
-              })}
-            </tr>
-          </thead>
-        )}
+        {/* thead removido — cabeçalho dos dias está nos separadores de semana */}
 
         <tbody>
+          {/* ── Nome do espaço (acima da 1ª semana) ── */}
+          {semanaLabel === 1 && (
+            <tr className="bg-surface-0 border-b border-border/30">
+              <td colSpan={dias.length + 1} className="px-4 py-2.5 text-right">
+                <span className="text-lg font-black text-accent uppercase tracking-widest">
+                  {nomeEspaco}
+                </span>
+              </td>
+            </tr>
+          )}
+
           {/* ── Separador de semana: número + dias ── */}
           {semanaLabel && (
             <tr className="border-b border-t-2 border-border bg-surface-2/90">
