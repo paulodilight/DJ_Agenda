@@ -1048,7 +1048,7 @@ export function ApoioTecnico() {
               {linhasPorDia.flatMap(({ dataStr, dia, linhas, folgas }, dayIdx) => {
                 const tecsFolga  = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
                 const zebraCls   = dayIdx % 2 === 1 ? 'bg-white/[0.04]' : ''
-                const isSab      = new Date(dataStr + 'T00:00:00').getDay() === 6
+                const isSab      = new Date(dataStr + 'T00:00:00').getDay() === 0
 
                 const row = (
                   <tr key={dataStr} className={clsx(
@@ -1121,7 +1121,7 @@ export function ApoioTecnico() {
                   </tr>
                 )
 
-                // Separador de fim de semana após Sábado
+                // Separador de semana após Domingo
                 const sep = isSab ? (
                   <tr key={`sep-week-${dataStr}`}>
                     <td colSpan={99} className="h-[3px] bg-border/80 p-0" />
@@ -1167,7 +1167,7 @@ export function ApoioTecnico() {
                 const tecsFolga    = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
                 const rowSpan      = linhas.length || 1
                 const zebraCls     = dayIdx % 2 === 1 ? 'bg-white/[0.04]' : ''
-                const isSabLinhas  = new Date(dataStr + 'T00:00:00').getDay() === 6
+                const isSabLinhas  = new Date(dataStr + 'T00:00:00').getDay() === 0
                 const rowsToRender = linhas.length > 0 ? linhas : [null]
 
                 const rows = rowsToRender.map((linha, li) => (
