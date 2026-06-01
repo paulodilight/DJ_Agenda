@@ -793,7 +793,7 @@ export function ApoioTecnico() {
 
   if (loading) return <LoadingPage />
 
-  const thCls    = 'px-2 py-2 text-left text-[10px] font-bold text-accent-subtle uppercase tracking-widest whitespace-nowrap'
+  const thCls    = 'px-2 py-2 text-left text-[12px] font-bold text-accent-subtle uppercase tracking-widest whitespace-nowrap'
   const sepThCls = 'w-0.5 p-0 bg-border'
 
   // Helper: renderiza a célula de técnico (multi-tech, chips fixed-width, drop zone)
@@ -1124,7 +1124,7 @@ export function ApoioTecnico() {
                 // Separador de fim de semana após Sábado
                 const sep = isSab ? (
                   <tr key={`sep-week-${dataStr}`}>
-                    <td colSpan={99} className="h-px bg-border/60 p-0" />
+                    <td colSpan={99} className="h-[3px] bg-border/80 p-0" />
                   </tr>
                 ) : null
 
@@ -1249,7 +1249,7 @@ export function ApoioTecnico() {
 
                 const sepLinhas = isSabLinhas ? (
                   <tr key={`sep-week-linhas-${dataStr}`}>
-                    <td colSpan={8} className="h-px bg-border/60 p-0" />
+                    <td colSpan={8} className="h-[3px] bg-border/80 p-0" />
                   </tr>
                 ) : null
 
