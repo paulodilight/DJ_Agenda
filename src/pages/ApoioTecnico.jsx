@@ -14,8 +14,16 @@ import { FormEvento } from '@/components/eventos/FormEvento'
 const isoData    = (d) => format(d, 'yyyy-MM-dd')
 const hhmm       = (t) => t?.slice(0, 5) ?? null
 const isFds      = (d) => [5, 6].includes(new Date(d + 'T00:00:00').getDay())
+const NOMES_DIA_SEMANA = { 1:'Segunda', 2:'Terça', 3:'Quarta', 4:'Quinta', 5:'Sexta', 6:'Sábado', 0:'Domingo' }
 const nomeDiaSem = (d) => format(new Date(d + 'T00:00:00'), 'EEE', { locale: pt })
 const dataFmt    = (d) => format(new Date(d + 'T00:00:00'), 'dd/MM')
+const cap        = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+const diaSemanaData = (d) => {
+  const dt = new Date(d + 'T00:00:00')
+  const nome = NOMES_DIA_SEMANA[dt.getDay()] ?? nomeDiaSem(d)
+  const data = cap(format(dt, 'd MMM', { locale: pt }))
+  return `${nome} | ${data}`
+}
 
 // ── Detecção de conflitos ─────────────────────────────────────────────────────
 function detectarConflitos(tecnicoId, data, eventoIdActual, eventos, agendamentos, tecnicos) {
@@ -874,8 +882,7 @@ export function ApoioTecnico() {
             </colgroup>
             <thead className="sticky top-0 z-10 bg-surface-2 border-b-2 border-border">
               <tr>
-                <th className={thCls}>Dia</th>
-                <th className={thCls}>Data</th>
+                <th className={thCls} colSpan={2}>Dia</th>
                 {Array.from({ length: maxGrupos }, (_, i) => [
                   i > 0 && <th key={`sh-sep-${i}`} className={sepThCls} />,
                   <th key={`sh-tec-${i}`} className={clsx(thCls, i > 0 && 'pl-3')}>Técnico</th>,
@@ -900,13 +907,9 @@ export function ApoioTecnico() {
                     'border-b border-border/30 hover:bg-surface-2/20 transition-colors align-middle',
                     isFds(dataStr) ? 'bg-blue-400/[0.04]' : zebraCls
                   )}>
-                    <td onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
-                      className="px-3 py-2 text-accent-muted capitalize font-medium whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors">
-                      {format(dia, 'EEE', { locale: pt })}
-                    </td>
-                    <td onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
-                      className="px-2 py-2 text-accent-subtle tabular-nums whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors">
-                      {format(dia, 'dd/MM')}
+                    <td colSpan={2} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
+                      className="px-3 py-2 font-medium whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors text-accent-muted">
+                      {diaSemanaData(dataStr)}
                     </td>
                     {Array.from({ length: maxGrupos }, (_, i) => {
                       const linha = linhas[i] ?? null
@@ -968,8 +971,7 @@ export function ApoioTecnico() {
         {vista === 'linhas' && (
           <table className="w-full text-xs border-collapse">
             <colgroup>
-              <col style={{ width: 52 }} />
-              <col style={{ width: 50 }} />
+              <col style={{ width: 160 }} />
               <col style={{ width: 105 }} />
               <col style={{ width: 140 }} />
               <col style={{ width: 160 }} />
@@ -981,7 +983,6 @@ export function ApoioTecnico() {
             <thead className="sticky top-0 z-10 bg-surface-2 border-b-2 border-border">
               <tr>
                 <th className={thCls}>Dia</th>
-                <th className={thCls}>Data</th>
                 <th className={thCls}>Técnico</th>
                 <th className={thCls}>Cliente</th>
                 <th className={thCls}>Evento</th>
@@ -993,7 +994,7 @@ export function ApoioTecnico() {
             </thead>
             <tbody>
               {linhasPorDia.length === 0 && (
-                <tr><td colSpan={9} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
+                <tr><td colSpan={8} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
               )}
               {linhasPorDia.map(({ dataStr, dia, linhas, folgas }, dayIdx) => {
                 const tecsFolga = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
@@ -1014,14 +1015,8 @@ export function ApoioTecnico() {
                   >
                     {li === 0 && (
                       <td rowSpan={rowSpan} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
-                        className="px-3 py-2 text-accent-muted capitalize font-medium whitespace-nowrap align-top border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors">
-                        {format(dia, 'EEE', { locale: pt })}
-                      </td>
-                    )}
-                    {li === 0 && (
-                      <td rowSpan={rowSpan} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
-                        className="px-2 py-2 text-accent-subtle tabular-nums whitespace-nowrap align-top border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors">
-                        {format(dia, 'dd/MM')}
+                        className="px-3 py-2 text-accent-muted font-medium whitespace-nowrap align-top border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors">
+                        {diaSemanaData(dataStr)}
                       </td>
                     )}
                     {/* Técnico — draggable */}
