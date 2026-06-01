@@ -446,27 +446,9 @@ export function ApoioTecnico() {
   const [pesquisa, setPesquisa]           = useState('')
   const [vista, setVista]                 = useState('colunas')
 
-  // ── Scroll preservation ─────────────────────────────────────────────────────
-  const scrollRef     = useRef(null)   // ref para o contentor scrollável
-  const savedScroll   = useRef({ top: 0, left: 0 })
-
-  const carregarComScroll = useCallback(() => {
-    if (scrollRef.current) {
-      savedScroll.current = { top: scrollRef.current.scrollTop, left: scrollRef.current.scrollLeft }
-    }
-    return carregar()
-  }, [carregar])
-
-  useEffect(() => {
-    if (!loading && (savedScroll.current.top > 0 || savedScroll.current.left > 0)) {
-      requestAnimationFrame(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop  = savedScroll.current.top
-          scrollRef.current.scrollLeft = savedScroll.current.left
-        }
-      })
-    }
-  }, [loading])
+  // ── Scroll refs ─────────────────────────────────────────────────────────────
+  const scrollRef   = useRef(null)
+  const savedScroll = useRef({ top: 0, left: 0 })
 
   // ── Drag state (técnico) ────────────────────────────────────────────────────
   const [dragSource, setDragSource] = useState(null)  // { dropKey, tecnicoId, eventoId, agId }
@@ -522,6 +504,24 @@ export function ApoioTecnico() {
 
   useEffect(() => { carregar() }, [carregar])
   useEffect(() => { setFiltroEspaco(''); setFiltroTecnico(''); setPesquisa('') }, [anoMes])
+
+  const carregarComScroll = useCallback(() => {
+    if (scrollRef.current) {
+      savedScroll.current = { top: scrollRef.current.scrollTop, left: scrollRef.current.scrollLeft }
+    }
+    return carregar()
+  }, [carregar])
+
+  useEffect(() => {
+    if (!loading && (savedScroll.current.top > 0 || savedScroll.current.left > 0)) {
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop  = savedScroll.current.top
+          scrollRef.current.scrollLeft = savedScroll.current.left
+        }
+      })
+    }
+  }, [loading])
 
   // ── Handlers folga drag ──────────────────────────────────────────────────────
   const handleFolgaDragStart = useCallback((e, data, tecnicoId) => {
