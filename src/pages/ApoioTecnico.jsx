@@ -679,10 +679,10 @@ export function ApoioTecnico() {
 
       const temFolgaDoTecnico = tecFiltroId && (grupo.folgas ?? []).includes(tecFiltroId)
       const temEventos = linhas.some(l => l.ev !== null)
-      // Ocultar dias sem conteúdo: controlado pelo botão ou pela pesquisa
-      if (!temEventos && !temFolgaDoTecnico && (ocultarVazios || q)) return null
-      // Ocultar dia se ficou sem linhas após filtros
-      if (linhas.length === 0 && !temFolgaDoTecnico && (ocultarVazios || q)) return null
+      const hasActiveFilter = !!(filtroEspaco || tecFiltroId || q)
+      // Só ocultar dias inteiros quando há um filtro activo (espaço, técnico ou pesquisa)
+      if (!temEventos && !temFolgaDoTecnico && ocultarVazios && hasActiveFilter) return null
+      if (linhas.length === 0 && !temFolgaDoTecnico && ocultarVazios && hasActiveFilter) return null
 
       return { ...grupo, linhas }
     }).filter(Boolean)
