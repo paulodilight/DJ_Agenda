@@ -600,7 +600,7 @@ export function ApoioTecnico() {
 
   // Técnicos fixos + i4DJ espaco_id
   const tecnicosFixos = useMemo(() => tecnicos.filter(t => t.tipo === 'fixo'), [tecnicos])
-  const i4djEspacoId  = useMemo(() => espacos.find(e => e.nome?.trim().toLowerCase() === 'i4dj')?.id ?? null, [espacos])
+  const i4djEspacoId  = useMemo(() => espacos.find(e => e.nome?.trim().toLowerCase() === 'lmd')?.id ?? null, [espacos])
 
   const linhasBrutas = useMemo(() => {
     const result = []
