@@ -642,10 +642,17 @@ export function ApoioTecnico() {
           tecNomes.toLowerCase().includes(q)
       })
 
+      // Ocultar espaços vazios (sem evento e sem técnico) dentro de cada dia
+      if (ocultarVazios) {
+        linhas = linhas.filter(l => l.ev !== null || (l.tecIds ?? []).length > 0)
+      }
+
       const temFolgaDoTecnico = tecFiltroId && (grupo.folgas ?? []).includes(tecFiltroId)
       const temEventos = linhas.some(l => l.ev !== null)
-      // Oculta dias sem eventos: botão activo, ou filtro por técnico, ou pesquisa
-      if (!temEventos && !temFolgaDoTecnico && (ocultarVazios || tecFiltroId || q)) return null
+      // Ocultar o dia inteiro se não tem nada (filtro por técnico ou pesquisa)
+      if (!temEventos && !temFolgaDoTecnico && (tecFiltroId || q)) return null
+      // Com ocultarVazios: ocultar dia se ficou sem linhas
+      if (ocultarVazios && linhas.length === 0 && !temFolgaDoTecnico) return null
 
       return { ...grupo, linhas }
     }).filter(Boolean)
