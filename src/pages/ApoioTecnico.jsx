@@ -445,6 +445,7 @@ export function ApoioTecnico() {
   const [filtroTecnico, setFiltroTecnico] = useState('')
   const [pesquisa, setPesquisa]           = useState('')
   const [vista, setVista]                 = useState('colunas')
+  const [ocultarVazios, setOcultarVazios] = useState(false)
 
   // ── Scroll refs ─────────────────────────────────────────────────────────────
   const scrollRef   = useRef(null)
@@ -642,11 +643,12 @@ export function ApoioTecnico() {
       })
 
       const temFolgaDoTecnico = tecFiltroId && (grupo.folgas ?? []).includes(tecFiltroId)
-      if (linhas.length === 0 && !temFolgaDoTecnico && (filtroEspaco || tecFiltroId || q)) return null
+      // Oculta vazios só se: botão activo, ou filtro por técnico, ou pesquisa
+      if (linhas.length === 0 && !temFolgaDoTecnico && (ocultarVazios || tecFiltroId || q)) return null
 
       return { ...grupo, linhas }
     }).filter(Boolean)
-  }, [linhasBrutas, filtroEspaco, filtroTecnico, pesquisa, tecnicos])
+  }, [linhasBrutas, filtroEspaco, filtroTecnico, pesquisa, tecnicos, ocultarVazios])
 
   // Estatísticas por técnico — filtradas pelo espaço seleccionado
   const tecStats = useMemo(() => {
@@ -896,6 +898,20 @@ export function ApoioTecnico() {
                 <BarChart3 size={13} />
               </button>
             </div>
+
+            {/* Toggle dias vazios */}
+            <button
+              onClick={() => setOcultarVazios(v => !v)}
+              title={ocultarVazios ? 'Mostrar todos os dias' : 'Ocultar dias sem eventos'}
+              className={clsx(
+                'px-2.5 py-1.5 rounded text-xs border transition-all',
+                ocultarVazios
+                  ? 'bg-surface-4 text-accent border-white/20 font-medium'
+                  : 'bg-surface-2 text-accent-muted border-border hover:text-accent'
+              )}
+            >
+              {ocultarVazios ? 'Todos os dias' : 'Ocultar vazios'}
+            </button>
 
             {/* Pesquisa */}
             <div className="relative">
