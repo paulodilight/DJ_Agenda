@@ -253,9 +253,12 @@ export function CalendarioSemana({
               /* ── Uma linha por turno ── */
               ...turnoRows.map((turno, ti) => (
                 <tr key={`${espaco.id}-${turno.id ?? ti}`} className={ti % 2 === 0 ? 'bg-surface-0' : 'bg-surface-1'}>
-                  {/* Nome do espaço (sem nome do turno) */}
-                  <td className="px-3 py-2 text-accent-muted border-r border-b border-border sticky left-0 bg-inherit z-10 whitespace-nowrap font-medium">
-                    {espaco.nome}
+                  {/* Espaço + Turno */}
+                  <td className="px-3 py-2 text-accent-muted border-r border-b border-border sticky left-0 bg-inherit z-10 whitespace-nowrap">
+                    <span className="font-medium">{espaco.nome}</span>
+                    {turno.nome && turno.nome !== '—' && (
+                      <span className="text-accent-subtle ml-1.5 text-[10px]">({turno.nome})</span>
+                    )}
                   </td>
 
                   {/* Células por dia */}
