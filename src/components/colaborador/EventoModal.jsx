@@ -54,9 +54,9 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onFechar} />
-      <div className="relative w-full sm:max-w-lg bg-surface-1 border border-border rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+      <div className="absolute inset-0 bg-black/70" onClick={onFechar} />
+      <div className="relative z-10 w-full md:max-w-lg bg-surface-1 border border-border rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
 
         <div className="flex items-center gap-3 px-5 pt-5 pb-4 border-b border-border shrink-0">
           <LogoCliente logo={logo} nome={cliente || evento.evento} />
