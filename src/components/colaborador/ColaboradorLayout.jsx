@@ -1,8 +1,10 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LogOut, Home, CalendarDays, ClipboardList, Coffee, LayoutList } from 'lucide-react'
+import { LogOut, Home, CalendarDays, ClipboardList, Coffee, LayoutList, KeyRound } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useState } from 'react'
 import { useColaboradorStore } from '@/store'
 import { Avatar } from './Avatar'
+import { ModalAlterarPin } from './ModalAlterarPin'
 
 const navItens = [
   { to: '/colaborador',          fim: true, rotulo: 'Início',  Icone: Home },
@@ -23,6 +25,7 @@ function LogoXclusive() {
 export function ColaboradorLayout() {
   const { colaborador, sair } = useColaboradorStore()
   const navigate = useNavigate()
+  const [modalPin, setModalPin] = useState(false)
 
   const logout = () => {
     sair()
@@ -41,6 +44,10 @@ export function ColaboradorLayout() {
               <Avatar nome={colaborador?.nome} foto={colaborador?.foto_url} tamanho="sm" />
               <span className="text-xs text-accent-muted">{colaborador?.nome}</span>
             </div>
+            <button onClick={() => setModalPin(true)} title="Alterar PIN"
+              className="text-accent-subtle hover:text-amber-400 transition-colors p-1.5 rounded hover:bg-surface-2">
+              <KeyRound size={16} />
+            </button>
             <button onClick={logout} title="Sair"
               className="text-accent-subtle hover:text-accent transition-colors p-1.5 rounded hover:bg-surface-2">
               <LogOut size={16} />
@@ -65,6 +72,8 @@ export function ColaboradorLayout() {
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-4">
         <Outlet />
       </main>
+
+      {modalPin && <ModalAlterarPin onFechar={() => setModalPin(false)} />}
     </div>
   )
 }

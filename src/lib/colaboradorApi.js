@@ -141,6 +141,15 @@ export const colaboradorApi = {
     if (error) throw error
   },
 
+  // ── Alterar PIN ──────────────────────────────────────────────────────────--
+  async alterarPin(id, pinActual, pinNovo) {
+    const { data, error } = await supabase.rpc('colaborador_change_pin', {
+      p_id: id, p_pin_atual: pinActual, p_pin_novo: pinNovo,
+    })
+    if (error) throw error
+    return data // true = sucesso, false = PIN actual errado
+  },
+
   // ── Foto de perfil ────────────────────────────────────────────────────────--
   async uploadFoto(tecnicoId, file) {
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
