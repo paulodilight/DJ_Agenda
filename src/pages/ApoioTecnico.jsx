@@ -1134,10 +1134,12 @@ export function ApoioTecnico() {
                         if (src?.tecnicoId) {
                           e.preventDefault()
                           dragSourceRef.current = null; setDragSource(null)
-                          await supabase.from('agendamentos_tecnicos').upsert(
-                            { data: dataStr, tecnico_id: src.tecnicoId, folga: true },
-                            { onConflict: 'data,tecnico_id' }
-                          )
+                          const { data: existeFolga } = await supabase.from('agendamentos_tecnicos')
+                            .select('id').eq('data', dataStr).eq('tecnico_id', src.tecnicoId).eq('folga', true).maybeSingle()
+                          if (!existeFolga) {
+                            await supabase.from('agendamentos_tecnicos')
+                              .insert({ data: dataStr, tecnico_id: src.tecnicoId, folga: true })
+                          }
                           carregarComScroll()
                           return
                         }
@@ -1170,10 +1172,13 @@ export function ApoioTecnico() {
                           if (!src?.tecnicoId) return
                           dragSourceRef.current = null; setDragSource(null)
                           // Criar agendamento no LMD para este técnico neste dia
-                          await supabase.from('agendamentos_tecnicos').upsert(
-                            { data: dataStr, espaco_id: i4djEspacoId, tecnico_id: src.tecnicoId, folga: false },
-                            { onConflict: 'data,espaco_id,tecnico_id' }
-                          )
+                          // Verificar se já existe antes de inserir
+                          const { data: existente } = await supabase.from('agendamentos_tecnicos')
+                            .select('id').eq('data', dataStr).eq('espaco_id', i4djEspacoId).eq('tecnico_id', src.tecnicoId).maybeSingle()
+                          if (!existente) {
+                            await supabase.from('agendamentos_tecnicos')
+                              .insert({ data: dataStr, espaco_id: i4djEspacoId, tecnico_id: src.tecnicoId, folga: false })
+                          }
                           // Se veio de outro evento, remove da origem
                           if (src.eventoId && src.dropKey !== null) {
                             await supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId)
@@ -1335,10 +1340,13 @@ export function ApoioTecnico() {
                           const src = dragSourceRef.current
                           if (!src?.tecnicoId) return
                           dragSourceRef.current = null; setDragSource(null)
-                          await supabase.from('agendamentos_tecnicos').upsert(
-                            { data: dataStr, espaco_id: i4djEspacoId, tecnico_id: src.tecnicoId, folga: false },
-                            { onConflict: 'data,espaco_id,tecnico_id' }
-                          )
+                          // Verificar se já existe antes de inserir
+                          const { data: existente } = await supabase.from('agendamentos_tecnicos')
+                            .select('id').eq('data', dataStr).eq('espaco_id', i4djEspacoId).eq('tecnico_id', src.tecnicoId).maybeSingle()
+                          if (!existente) {
+                            await supabase.from('agendamentos_tecnicos')
+                              .insert({ data: dataStr, espaco_id: i4djEspacoId, tecnico_id: src.tecnicoId, folga: false })
+                          }
                           if (src.eventoId && src.dropKey !== null) {
                             await supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId)
                           }
