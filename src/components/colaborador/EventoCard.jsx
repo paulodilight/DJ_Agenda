@@ -12,14 +12,24 @@ import { hhmm, dataLonga } from './format'
 const statusVar = (s) =>
   ({ confirmado: 'confirmado', proposta: 'proposta', cancelado: 'cancelado' }[s] ?? 'default')
 
-function Campo({ Icone, rotulo, valor }) {
+const mapaUrl = (v) => /^https?:\/\//i.test(v)
+  ? v
+  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}`
+
+function Campo({ Icone, rotulo, valor, isLink }) {
   if (!valor) return null
   return (
     <div className="flex items-start gap-2">
       <Icone size={14} className="text-accent-subtle mt-0.5 shrink-0" />
       <div className="min-w-0">
         <p className="text-[10px] uppercase tracking-wider text-accent-subtle">{rotulo}</p>
-        <p className="text-sm text-accent break-words">{valor}</p>
+        {isLink
+          ? <a href={mapaUrl(valor)} target="_blank" rel="noopener noreferrer"
+              className="text-sm text-amber-400 underline underline-offset-2 hover:text-amber-400/80 break-words">
+              {valor}
+            </a>
+          : <p className="text-sm text-accent break-words">{valor}</p>
+        }
       </div>
     </div>
   )
@@ -87,7 +97,7 @@ export function EventoCard({ evento, mapaTecnicos = {}, className }) {
             <Campo Icone={User}          rotulo="Cliente"               valor={cliente} />
             <Campo Icone={User}          rotulo="Técnico responsável"   valor={tecnico} />
             <Campo Icone={Phone}         rotulo="Contacto"              valor={evento.contacto_pelo_evento} />
-            <Campo Icone={MapPin}        rotulo="Morada"                valor={morada} />
+            <Campo Icone={MapPin}        rotulo="Morada"                valor={morada} isLink />
           </div>
 
           <button onClick={() => setVerso(true)}

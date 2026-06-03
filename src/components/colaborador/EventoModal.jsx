@@ -19,12 +19,22 @@ function LogoCliente({ logo, nome }) {
   )
 }
 
-function Campo({ rotulo, valor, realce, colSpan }) {
+const mapaUrl = (v) => /^https?:\/\//i.test(v)
+  ? v
+  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}`
+
+function Campo({ rotulo, valor, realce, colSpan, isLink }) {
   if (!valor) return null
   return (
     <div className={clsx('flex flex-col gap-0.5 py-2.5 border-b border-border/40 last:border-0', colSpan === 2 && 'col-span-2')}>
       <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">{rotulo}</p>
-      <p className={clsx('text-sm', realce ? 'text-accent font-semibold' : 'text-accent-muted')}>{valor}</p>
+      {isLink
+        ? <a href={mapaUrl(valor)} target="_blank" rel="noopener noreferrer"
+            className="text-sm text-amber-400 underline underline-offset-2 hover:text-amber-400/80 break-words">
+            {valor}
+          </a>
+        : <p className={clsx('text-sm', realce ? 'text-accent font-semibold' : 'text-accent-muted')}>{valor}</p>
+      }
     </div>
   )
 }
@@ -93,7 +103,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               <Campo rotulo="Status"         valor={labelEstado(evento.status) || evento.status} />
               <Campo rotulo="Técnico responsável" valor={tecnico} />
               <Campo rotulo="Contacto pelo evento" valor={evento.contacto_pelo_evento} />
-              <Campo rotulo="Morada"         valor={evento.morada} />
+              <Campo rotulo="Morada"         valor={evento.morada} isLink />
               <Campo rotulo="Dia de instalação"  valor={evento.dia_instalacao ? dataLonga(evento.dia_instalacao) : null} />
               <Campo rotulo="Hora de instalação" valor={hhmm(evento.hora_instalacao)} />
               <Campo rotulo="Data do evento" valor={evento.data_evento ? dataLonga(evento.data_evento) : null} realce colSpan={2} />
