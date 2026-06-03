@@ -1128,7 +1128,21 @@ export function ApoioTecnico() {
                       onClick={() => setModalFolga({ data: dataStr })}
                       onDragOver={e => { e.preventDefault(); setDragOverFolga(dataStr) }}
                       onDragLeave={() => setDragOverFolga(null)}
-                      onDrop={e => handleFolgaDrop(e, dataStr)}
+                      onDrop={async e => {
+                        // Chip de técnico da paleta/slot → adicionar folga
+                        const src = dragSourceRef.current
+                        if (src?.tecnicoId) {
+                          e.preventDefault()
+                          dragSourceRef.current = null; setDragSource(null)
+                          await supabase.from('agendamentos_tecnicos').upsert(
+                            { data: dataStr, tecnico_id: src.tecnicoId, folga: true },
+                            { onConflict: 'data,tecnico_id' }
+                          )
+                          carregarComScroll()
+                          return
+                        }
+                        handleFolgaDrop(e, dataStr)
+                      }}
                       title="Gerir folgas · arrastar para mover folga"
                       className={clsx(
                         'px-2 py-2 border-l border-border/40 cursor-pointer transition-colors whitespace-nowrap',
@@ -1146,9 +1160,27 @@ export function ApoioTecnico() {
                         : <span className="text-border/20 text-[10px]">—</span>
                       }
                     </td>
-                    {/* Coluna LMD */}
+                    {/* Coluna LMD — aceita drag de técnicos */}
                     {i4djEspacoId && (
-                      <td className="px-2 py-2 border-l border-red-500/20 whitespace-nowrap align-middle">
+                      <td
+                        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                        onDrop={async e => {
+                          e.preventDefault()
+                          const src = dragSourceRef.current
+                          if (!src?.tecnicoId) return
+                          dragSourceRef.current = null; setDragSource(null)
+                          // Criar agendamento no LMD para este técnico neste dia
+                          await supabase.from('agendamentos_tecnicos').upsert(
+                            { data: dataStr, espaco_id: i4djEspacoId, tecnico_id: src.tecnicoId, folga: false },
+                            { onConflict: 'data,espaco_id,tecnico_id' }
+                          )
+                          // Se veio de outro evento, remove da origem
+                          if (src.eventoId && src.dropKey !== null) {
+                            await supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId)
+                          }
+                          carregarComScroll()
+                        }}
+                        className="px-2 py-2 border-l border-red-500/20 whitespace-nowrap align-middle cursor-pointer hover:bg-red-500/5 transition-colors">
                         <span className="inline-flex flex-nowrap gap-1 overflow-hidden">
                           {(lmdPorDia[dataStr] ?? []).map(tid => {
                             const tec = tecnicos.find(t => t.id === tid)
@@ -1294,9 +1326,25 @@ export function ApoioTecnico() {
                         }
                       </td>
                     )}
-                    {/* LMD — rowSpan */}
+                    {/* LMD — rowSpan, aceita drag */}
                     {li === 0 && i4djEspacoId && (
-                      <td rowSpan={rowSpan} className="px-2 py-2 border-l border-red-500/20 align-middle whitespace-nowrap">
+                      <td rowSpan={rowSpan}
+                        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                        onDrop={async e => {
+                          e.preventDefault()
+                          const src = dragSourceRef.current
+                          if (!src?.tecnicoId) return
+                          dragSourceRef.current = null; setDragSource(null)
+                          await supabase.from('agendamentos_tecnicos').upsert(
+                            { data: dataStr, espaco_id: i4djEspacoId, tecnico_id: src.tecnicoId, folga: false },
+                            { onConflict: 'data,espaco_id,tecnico_id' }
+                          )
+                          if (src.eventoId && src.dropKey !== null) {
+                            await supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId)
+                          }
+                          carregarComScroll()
+                        }}
+                        className="px-2 py-2 border-l border-red-500/20 align-middle whitespace-nowrap cursor-pointer hover:bg-red-500/5 transition-colors">
                         <span className="inline-flex flex-nowrap gap-1 overflow-hidden">
                           {(lmdPorDia[dataStr] ?? []).map(tid => {
                             const tec = tecnicos.find(t => t.id === tid)
