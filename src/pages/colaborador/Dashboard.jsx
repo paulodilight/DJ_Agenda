@@ -54,7 +54,13 @@ export function ColaboradorDashboard() {
   }, [colaborador])
 
   const hoje = hojeISO()
-  const proximos = eventos.filter(e => e.meu && e.data_evento && e.data_evento >= hoje)
+  const chaveOrdem = (e) => {
+    const hora = e.hora_instalacao ?? e.hora_inicio ?? '00:00'
+    return `${e.data_evento ?? '9999-99-99'}T${hora}`
+  }
+  const proximos = eventos
+    .filter(e => e.meu && e.data_evento && e.data_evento >= hoje)
+    .sort((a, b) => chaveOrdem(a).localeCompare(chaveOrdem(b)))
   const proximoEvento = proximos[0] ?? null
 
   const localProximo   = proximoEvento?.espacos?.nome || proximoEvento?.cliente || null
