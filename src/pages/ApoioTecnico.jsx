@@ -534,6 +534,27 @@ export function ApoioTecnico() {
   const handleFolgaDrop = useCallback(async (e, targetData) => {
     e.preventDefault()
     e.stopPropagation()
+
+    // ── Caso 1: drag de chip de técnico (paleta ou slot) ────────────────────
+    const tecIdFromTransfer = e.dataTransfer.getData('tecnicoId')
+    const tecId = tecIdFromTransfer || dragSourceRef.current?.tecnicoId
+    if (tecId) {
+      const srcEvento  = e.dataTransfer.getData('eventoId')  || dragSourceRef.current?.eventoId || null
+      const srcDropKey = e.dataTransfer.getData('dropKey')   || dragSourceRef.current?.dropKey  || null
+      dragSourceRef.current = null; setDragSource(null); setDragOverFolga(null)
+      try {
+        const { data: existe } = await supabase.from('agendamentos_tecnicos')
+          .select('id').eq('data', targetData).eq('tecnico_id', tecId).eq('folga', true).maybeSingle()
+        if (!existe) await supabase.from('agendamentos_tecnicos')
+          .insert({ data: targetData, tecnico_id: tecId, folga: true })
+        if (srcEvento && srcDropKey) await supabase.from('evento_tecnicos')
+          .delete().eq('evento_id', srcEvento).eq('tecnico_id', tecId)
+        carregarComScroll()
+      } catch (err) { console.error('Folga drop (tech):', err) }
+      return
+    }
+
+    // ── Caso 2: drag de FolgaChip (mover folga) ─────────────────────────────
     if (!dragFolga || dragFolga.data === targetData) { setDragFolga(null); setDragOverFolga(null); return }
     try {
       const folgaOrigem = agendamentos.find(a => a.data === dragFolga.data && a.tecnico_id === dragFolga.tecnicoId && a.folga)
@@ -541,7 +562,7 @@ export function ApoioTecnico() {
       const jaExiste = agendamentos.find(a => a.data === targetData && a.tecnico_id === dragFolga.tecnicoId && a.folga)
       if (!jaExiste) await supabase.from('agendamentos_tecnicos').insert({ data: targetData, tecnico_id: dragFolga.tecnicoId, folga: true })
       carregarComScroll()
-    } catch (err) { console.error(err) }
+    } catch (err) { console.error('Folga drop (move):', err) }
     finally { setDragFolga(null); setDragOverFolga(null) }
   }, [dragFolga, agendamentos, carregarComScroll])
 
@@ -1134,23 +1155,7 @@ export function ApoioTecnico() {
                       onClick={() => setModalFolga({ data: dataStr })}
                       onDragOver={e => { e.preventDefault(); setDragOverFolga(dataStr) }}
                       onDragLeave={() => setDragOverFolga(null)}
-                      onDrop={async e => {
-                        e.preventDefault()
-                        const tecnicoId = e.dataTransfer.getData('tecnicoId') || dragSourceRef.current?.tecnicoId
-                        const eventoId  = e.dataTransfer.getData('eventoId')  || dragSourceRef.current?.eventoId || null
-                        const dropKey   = e.dataTransfer.getData('dropKey')   || dragSourceRef.current?.dropKey  || null
-                        dragSourceRef.current = null; setDragSource(null); setDragOver(null)
-                        if (!tecnicoId) { handleFolgaDrop(e, dataStr); return }
-                        try {
-                          const { data: existe } = await supabase.from('agendamentos_tecnicos')
-                            .select('id').eq('data', dataStr).eq('tecnico_id', tecnicoId).eq('folga', true).maybeSingle()
-                          if (!existe) await supabase.from('agendamentos_tecnicos')
-                            .insert({ data: dataStr, tecnico_id: tecnicoId, folga: true })
-                          if (eventoId && dropKey) await supabase.from('evento_tecnicos')
-                            .delete().eq('evento_id', eventoId).eq('tecnico_id', tecnicoId)
-                          carregarComScroll()
-                        } catch (err) { console.error('Folga drop error:', err) }
-                      }}
+                      onDrop={e => handleFolgaDrop(e, dataStr)}
                       title="Gerir folgas · arrastar para mover folga"
                       className={clsx(
                         'px-2 py-2 border-l border-border/40 cursor-pointer transition-colors whitespace-nowrap',
