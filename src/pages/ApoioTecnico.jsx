@@ -739,6 +739,9 @@ export function ApoioTecnico() {
     }
     dragSourceRef.current = src
     setDragSource(src)
+    e.dataTransfer.setData('tecnicoId', tecnicoId)
+    e.dataTransfer.setData('eventoId', src.eventoId ?? '')
+    e.dataTransfer.setData('dropKey', src.dropKey ?? '')
   }, [tecnicos])
 
   const handleDragEnd = useCallback(() => {
@@ -938,6 +941,9 @@ export function ApoioTecnico() {
                   const paletteSrc = { dropKey: null, tecnicoId: t.id, eventoId: null, agId: null }
                   dragSourceRef.current = paletteSrc
                   setDragSource(paletteSrc)
+                  e.dataTransfer.setData('tecnicoId', t.id)
+                  e.dataTransfer.setData('eventoId', '')
+                  e.dataTransfer.setData('dropKey', '')
                 }}
                 onDragEnd={() => { dragSourceRef.current = null; setDragSource(null) }}
                 onClick={() => setFiltroTecnico(filtroTecnico === t.nome ? '' : t.nome)}
@@ -1129,21 +1135,21 @@ export function ApoioTecnico() {
                       onDragOver={e => { e.preventDefault(); setDragOverFolga(dataStr) }}
                       onDragLeave={() => setDragOverFolga(null)}
                       onDrop={async e => {
-                        // Chip de técnico da paleta/slot → adicionar folga
-                        const src = dragSourceRef.current
-                        if (src?.tecnicoId) {
-                          e.preventDefault()
-                          dragSourceRef.current = null; setDragSource(null)
-                          const { data: existeFolga } = await supabase.from('agendamentos_tecnicos')
-                            .select('id').eq('data', dataStr).eq('tecnico_id', src.tecnicoId).eq('folga', true).maybeSingle()
-                          if (!existeFolga) {
-                            await supabase.from('agendamentos_tecnicos')
-                              .insert({ data: dataStr, tecnico_id: src.tecnicoId, folga: true })
-                          }
+                        e.preventDefault()
+                        const tecnicoId = e.dataTransfer.getData('tecnicoId') || dragSourceRef.current?.tecnicoId
+                        const eventoId  = e.dataTransfer.getData('eventoId')  || dragSourceRef.current?.eventoId || null
+                        const dropKey   = e.dataTransfer.getData('dropKey')   || dragSourceRef.current?.dropKey  || null
+                        dragSourceRef.current = null; setDragSource(null); setDragOver(null)
+                        if (!tecnicoId) { handleFolgaDrop(e, dataStr); return }
+                        try {
+                          const { data: existe } = await supabase.from('agendamentos_tecnicos')
+                            .select('id').eq('data', dataStr).eq('tecnico_id', tecnicoId).eq('folga', true).maybeSingle()
+                          if (!existe) await supabase.from('agendamentos_tecnicos')
+                            .insert({ data: dataStr, tecnico_id: tecnicoId, folga: true })
+                          if (eventoId && dropKey) await supabase.from('evento_tecnicos')
+                            .delete().eq('evento_id', eventoId).eq('tecnico_id', tecnicoId)
                           carregarComScroll()
-                          return
-                        }
-                        handleFolgaDrop(e, dataStr)
+                        } catch (err) { console.error('Folga drop error:', err) }
                       }}
                       title="Gerir folgas · arrastar para mover folga"
                       className={clsx(
@@ -1337,20 +1343,20 @@ export function ApoioTecnico() {
                         onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
                         onDrop={async e => {
                           e.preventDefault()
-                          const src = dragSourceRef.current
-                          if (!src?.tecnicoId) return
+                          const tecnicoId = e.dataTransfer.getData('tecnicoId') || dragSourceRef.current?.tecnicoId
+                          const eventoId  = e.dataTransfer.getData('eventoId')  || dragSourceRef.current?.eventoId || null
+                          const dropKey   = e.dataTransfer.getData('dropKey')   || dragSourceRef.current?.dropKey  || null
                           dragSourceRef.current = null; setDragSource(null)
-                          // Verificar se já existe antes de inserir
-                          const { data: existente } = await supabase.from('agendamentos_tecnicos')
-                            .select('id').eq('data', dataStr).eq('espaco_id', i4djEspacoId).eq('tecnico_id', src.tecnicoId).maybeSingle()
-                          if (!existente) {
-                            await supabase.from('agendamentos_tecnicos')
-                              .insert({ data: dataStr, espaco_id: i4djEspacoId, tecnico_id: src.tecnicoId, folga: false })
-                          }
-                          if (src.eventoId && src.dropKey !== null) {
-                            await supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId)
-                          }
-                          carregarComScroll()
+                          if (!tecnicoId) return
+                          try {
+                            const { data: existe } = await supabase.from('agendamentos_tecnicos')
+                              .select('id').eq('data', dataStr).eq('espaco_id', i4djEspacoId).eq('tecnico_id', tecnicoId).maybeSingle()
+                            if (!existe) await supabase.from('agendamentos_tecnicos')
+                              .insert({ data: dataStr, espaco_id: i4djEspacoId, tecnico_id: tecnicoId, folga: false })
+                            if (eventoId && dropKey) await supabase.from('evento_tecnicos')
+                              .delete().eq('evento_id', eventoId).eq('tecnico_id', tecnicoId)
+                            carregarComScroll()
+                          } catch (err) { console.error('LMD drop error:', err) }
                         }}
                         className="px-2 py-2 border-l border-red-500/20 align-middle whitespace-nowrap cursor-pointer hover:bg-red-500/5 transition-colors">
                         <span className="inline-flex flex-nowrap gap-1 overflow-hidden">
