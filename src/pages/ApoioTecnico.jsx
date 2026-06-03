@@ -444,8 +444,8 @@ export function ApoioTecnico() {
   const [filtroEspaco, setFiltroEspaco]   = useState('')
   const [filtroTecnico, setFiltroTecnico] = useState('')
   const [pesquisa, setPesquisa]           = useState('')
-  const [vista, setVista]                 = useState('colunas')
-  const [ocultarVazios, setOcultarVazios] = useState(false)
+  const [vista, setVista]                 = useState('linhas')
+  const [ocultarVazios, setOcultarVazios] = useState(true)
 
   // ── Scroll refs ─────────────────────────────────────────────────────────────
   const scrollRef   = useRef(null)
