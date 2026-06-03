@@ -115,7 +115,7 @@ export function ColaboradorEventos() {
         {FILTROS.map(f => (
           <button key={f.id} onClick={() => setFiltro(f.id)}
             className={clsx(
-              'flex-1 py-1.5 rounded-xl text-xs font-medium border transition-all',
+              'px-4 py-1.5 rounded-full text-xs font-medium border transition-all',
               filtro === f.id
                 ? 'bg-white text-black border-white'
                 : 'bg-surface-1 text-accent-muted border-border hover:border-white/20',
