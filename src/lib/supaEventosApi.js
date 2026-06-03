@@ -12,7 +12,7 @@ export const supaEventosApi = {
   async listar({ dataInicio, dataFim } = {}) {
     let query = supabase
       .from(TABLE)
-      .select('*, espacos(id, nome), artistas(id, nome, foto_url, bio, instagram_url, rede_social_url, presskit_url)')
+      .select('*, espacos(id, nome), artistas!artista_id(id, nome, foto_url, bio, instagram_url, rede_social_url, presskit_url)')
       .order('data_evento', { ascending: true })
       .order('hora_inicio', { ascending: true })
 

@@ -46,3 +46,31 @@ export const useMesStore = create((set, get) => ({
     set({ anoMes: format(addMonths(new Date(ano, mes - 1, 1), dir), 'yyyy-MM') })
   },
 }))
+
+// ─── Sessão do colaborador (app Apoio T — login por nome + PIN) ────────────────
+const COLAB_KEY = 'colaborador-sessao'
+
+function lerSessaoColab() {
+  try { return JSON.parse(localStorage.getItem(COLAB_KEY)) } catch { return null }
+}
+
+export const useColaboradorStore = create((set) => ({
+  colaborador: lerSessaoColab(), // { id, nome, foto_url } | null
+
+  entrar: (colaborador) => {
+    localStorage.setItem(COLAB_KEY, JSON.stringify(colaborador))
+    set({ colaborador })
+  },
+
+  sair: () => {
+    localStorage.removeItem(COLAB_KEY)
+    set({ colaborador: null })
+  },
+
+  actualizarFoto: (foto_url) => set((s) => {
+    if (!s.colaborador) return s
+    const colaborador = { ...s.colaborador, foto_url }
+    localStorage.setItem(COLAB_KEY, JSON.stringify(colaborador))
+    return { colaborador }
+  }),
+}))

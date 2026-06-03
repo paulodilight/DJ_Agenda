@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useAuthStore } from '@/store'
+import { useAuthStore, useColaboradorStore } from '@/store'
 import { Layout } from '@/components/ui/Layout'
 import { Login } from '@/pages/Login'
 import { Dashboard } from '@/pages/Dashboard'
@@ -28,11 +28,24 @@ import { ArtistaPerfil } from '@/pages/ArtistaPerfil'
 import { ResetPassword } from '@/pages/ResetPassword'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { UndoProvider } from '@/contexts/UndoContext'
+import { ColaboradorLayout } from '@/components/colaborador/ColaboradorLayout'
+import { ColaboradorLogin } from '@/pages/colaborador/Login'
+import { ColaboradorDashboard } from '@/pages/colaborador/Dashboard'
+import { ColaboradorEventos } from '@/pages/colaborador/Eventos'
+import { ColaboradorTarefas } from '@/pages/colaborador/Tarefas'
+import { ColaboradorFolgas } from '@/pages/colaborador/Folgas'
+import { ColaboradorAgenda } from '@/pages/colaborador/Agenda'
 
 function RotaProtegida({ children }) {
   const { session, loading } = useAuthStore()
   if (loading) return <div className="min-h-screen bg-surface-0 flex items-center justify-center"><LoadingPage /></div>
   if (!session) return <Navigate to="/login" replace />
+  return children
+}
+
+function RotaColaborador({ children }) {
+  const colaborador = useColaboradorStore((s) => s.colaborador)
+  if (!colaborador) return <Navigate to="/colaborador/login" replace />
   return children
 }
 
@@ -79,6 +92,23 @@ export default function App() {
           </Route>
           <Route path="configuracoes" element={<Configuracoes />} />
         </Route>
+        {/* ── Área dos colaboradores (Apoio T) ── */}
+        <Route path="/colaborador/login" element={<ColaboradorLogin />} />
+        <Route
+          path="/colaborador"
+          element={
+            <RotaColaborador>
+              <ColaboradorLayout />
+            </RotaColaborador>
+          }
+        >
+          <Route index element={<ColaboradorDashboard />} />
+          <Route path="agenda"  element={<ColaboradorAgenda />} />
+          <Route path="eventos" element={<ColaboradorEventos />} />
+          <Route path="tarefas" element={<ColaboradorTarefas />} />
+          <Route path="folgas" element={<ColaboradorFolgas />} />
+        </Route>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
