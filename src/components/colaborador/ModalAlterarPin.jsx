@@ -116,9 +116,9 @@ export function ModalAlterarPin({ onFechar }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70" onClick={onFechar} />
-      <div className="relative z-10 w-full md:max-w-sm bg-surface-1 border border-border rounded-t-3xl md:rounded-2xl shadow-2xl p-6 flex flex-col gap-5">
+      <div className="relative z-10 w-full max-w-sm bg-surface-1 border border-border rounded-2xl shadow-2xl p-6 flex flex-col gap-5">
 
         {/* Header */}
         <div className="flex items-center justify-between">
