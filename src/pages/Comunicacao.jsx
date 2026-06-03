@@ -466,7 +466,7 @@ export function Comunicacao() {
           .order('hora_inicio'),
         supabase
           .from('supa_eventos')
-          .select('id, data_evento, hora_inicio, hora_fim, evento, status, espaco_id, tipo, xclusive, artista_id, espacos(id, nome), artistas(id, nome, foto_url, bio, instagram_url, rede_social_url, presskit_url)')
+          .select('id, data_evento, hora_inicio, hora_fim, evento, status, espaco_id, tipo, xclusive, artista_id, espacos(id, nome), artistas!artista_id(id, nome, foto_url, bio, instagram_url, rede_social_url, presskit_url)')
           .gte('data_evento', mktMesInicio)
           .lte('data_evento', mktMesFim)
           .order('data_evento')
