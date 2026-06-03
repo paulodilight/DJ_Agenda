@@ -43,9 +43,10 @@ export const colaboradorApi = {
       .eq('tecnico_id', tecnicoId)
     const equipaIds = new Set((et ?? []).map((r) => r.evento_id))
 
+    const COLS = 'id,evento,tipo,status,tecnico_id,contacto_pelo_evento,morada,dia_instalacao,hora_instalacao,data_evento,hora_inicio,hora_fim,notas_operacionais,Equipamentos,notas_colaborador,espaco_id,responsavel,espacos(nome,logo_url)'
     const { data, error } = await supabase
       .from('supa_eventos')
-      .select('*, espacos(nome, logo_url)')
+      .select(COLS)
       .neq('status', 'cancelado')
       .order('data_evento', { ascending: true })
     if (error) throw error
@@ -75,9 +76,10 @@ export const colaboradorApi = {
       .from('evento_tecnicos').select('evento_id').eq('tecnico_id', tecnicoId)
     const equipaIds = new Set((et ?? []).map(r => r.evento_id))
 
+    const COLS = 'id,evento,tipo,status,tecnico_id,contacto_pelo_evento,morada,dia_instalacao,hora_instalacao,data_evento,hora_inicio,hora_fim,notas_operacionais,Equipamentos,notas_colaborador,espaco_id,responsavel,espacos(nome)'
     const { data, error } = await supabase
       .from('supa_eventos')
-      .select('*, espacos(nome)')
+      .select(COLS)
       .gte('data_evento', dataInicio)
       .lte('data_evento', dataFim)
       .neq('status', 'cancelado')
