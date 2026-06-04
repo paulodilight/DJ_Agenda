@@ -95,10 +95,12 @@ export const espacosApi = {
   },
 
   async activar(id) {
-    const { error } = await supabase
-      .from('espacos')
-      .update({ activo: true })
-      .eq('id', id)
+    const { error } = await supabase.from('espacos').update({ activo: true }).eq('id', id)
+    if (error) throw error
+  },
+
+  async desactivar(id) {
+    const { error } = await supabase.from('espacos').update({ activo: false }).eq('id', id)
     if (error) throw error
   },
 

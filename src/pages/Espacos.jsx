@@ -1,6 +1,6 @@
 ﻿import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapPin, Plus, Pencil, Settings2, Search } from 'lucide-react'
+import { MapPin, Plus, Pencil, Settings2, Search, Power, PowerOff } from 'lucide-react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -21,7 +21,21 @@ export function Espacos() {
   const [espacoSeleccionado, setEspacoSeleccionado] = useState(null)
   const [atividadeMes, setAtividadeMes] = useState({})
 
-  const [pesquisa, setPesquisa] = useState('')
+  const [pesquisa, setPesquisa]   = useState('')
+  const [toggling, setToggling]   = useState(null) // id do espaço a ser toggled
+
+  const toggleActivo = async (e) => {
+    setToggling(e.id)
+    try {
+      if (e.activo) await espacosApi.desactivar(e.id)
+      else          await espacosApi.activar(e.id)
+      recarregar()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setToggling(null)
+    }
+  }
 
   // Busca actividade (slots DJ + eventos) para o mês seleccionado
   useEffect(() => {
@@ -107,11 +121,20 @@ export function Espacos() {
                   <p className="text-base font-semibold text-accent truncate">{e.nome}</p>
                   <Badge variante="default" className="mt-1">{labelTipoEspaco(e.tipo)}</Badge>
                 </div>
-                <div className="shrink-0">
-                  {estaAtivo
-                    ? <Badge variante="confirmado">Ativo</Badge>
-                    : <Badge variante="cancelado">Desativado</Badge>
-                  }
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variante={e.activo ? 'confirmado' : 'cancelado'}>
+                    {e.activo ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                  <button
+                    onClick={() => toggleActivo(e)}
+                    disabled={toggling === e.id}
+                    title={e.activo ? 'Desactivar cliente' : 'Activar cliente'}
+                    className={`p-1.5 rounded transition-colors disabled:opacity-40 ${e.activo
+                      ? 'text-status-confirmado hover:bg-status-confirmado/10'
+                      : 'text-accent-subtle hover:bg-surface-3 hover:text-accent'}`}
+                  >
+                    {e.activo ? <Power size={14} /> : <PowerOff size={14} />}
+                  </button>
                 </div>
               </div>
 
