@@ -34,7 +34,7 @@ export const supaEventosApi = {
     const { data, error } = await supabase
       .from(TABLE)
       .insert(payload)
-      .select()
+      .select('id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, espaco_id, tecnico_id, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, artista_id, xclusive')
       .single()
     if (error) throw error
     return data
@@ -47,7 +47,7 @@ export const supaEventosApi = {
       .from(TABLE)
       .update(payload)
       .eq('id', id)
-      .select()
+      .select('id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, espaco_id, tecnico_id, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, artista_id, xclusive')
       .single()
     if (error) throw error
     return data
