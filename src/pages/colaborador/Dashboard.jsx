@@ -123,6 +123,12 @@ export function ColaboradorDashboard() {
             </p>
             <p className="text-lg font-bold text-accent leading-snug">{proximoEvento.evento}</p>
             <div className="mt-2 flex flex-col gap-1.5">
+              {instalProximo && (
+                <span className="flex items-center gap-2 text-sm text-accent-muted">
+                  <Wrench size={13} className="text-accent-subtle shrink-0" />
+                  Instalação: {instalProximo}
+                </span>
+              )}
               <span className="flex items-center gap-2 text-sm text-accent-muted">
                 <CalendarClock size={13} className="text-accent-subtle shrink-0" />
                 <span className="capitalize">{dataLonga(proximoEvento.data_evento)}</span>
@@ -132,12 +138,6 @@ export function ColaboradorDashboard() {
                 <span className="flex items-center gap-2 text-sm text-accent-muted">
                   <MapPin size={13} className="text-accent-subtle shrink-0" />
                   {localProximo}
-                </span>
-              )}
-              {instalProximo && (
-                <span className="flex items-center gap-2 text-xs text-accent-subtle">
-                  <Wrench size={12} className="shrink-0" />
-                  Instalação: {instalProximo}
                 </span>
               )}
             </div>
