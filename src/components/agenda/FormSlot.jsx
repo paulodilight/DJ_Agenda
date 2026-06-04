@@ -347,14 +347,10 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           {simplificado ? (
             /* ── MODO SIMPLIFICADO ── */
             <>
-              {/* Horário (read-only) + Valor (editável) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-surface-2 border border-border rounded px-3 py-2">
-                  <p className="text-[10px] text-accent-subtle uppercase tracking-wider mb-0.5">Horário</p>
-                  <p className="text-sm font-medium text-accent tabular-nums">
-                    {formatarHora(form.hora_inicio)}–{formatarHora(form.hora_fim)}
-                  </p>
-                </div>
+              {/* Horário (editável, vem predefinido) + Valor */}
+              <div className="grid grid-cols-3 gap-3">
+                <Input label="Início" value={form.hora_inicio} onChange={set('hora_inicio')} type="time" required />
+                <Input label="Fim" value={form.hora_fim} onChange={set('hora_fim')} type="time" required />
                 <Input
                   label="Valor (€)"
                   value={form.valor}
