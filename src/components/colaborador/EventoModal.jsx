@@ -34,17 +34,17 @@ function TecChip({ nome, idx = 0 }) {
   )
 }
 
-function Campo({ rotulo, valor, negrito, isLink }) {
+function Campo({ rotulo, valor, negrito, isLink, full, size = 13 }) {
   if (!valor) return null
   return (
-    <div className="flex flex-col gap-0.5 py-2 border-b border-border/30 last:border-0">
+    <div className={clsx('flex flex-col gap-0.5 py-2 border-b border-border/30', full ? 'col-span-2' : '')}>
       <p className="font-semibold uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>{rotulo}</p>
       {isLink
         ? <a href={mapaUrl(valor)} target="_blank" rel="noopener noreferrer"
             className="text-amber-400 underline underline-offset-2 hover:text-amber-400/80 break-words"
-            style={{ fontSize: 13 }}>{valor}</a>
+            style={{ fontSize: size }}>{valor}</a>
         : <p className={clsx('break-words', negrito ? 'text-white font-bold' : 'text-accent-muted')}
-            style={{ fontSize: negrito ? 13 : 13 }}>{valor}</p>
+            style={{ fontSize: size }}>{valor}</p>
       }
     </div>
   )
@@ -151,7 +151,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 )}
                 {outrosTecs.length > 0 && (
                   <div>
-                    <p className="uppercase tracking-wider text-accent-subtle mb-1.5" style={{ fontSize: 10 }}>Equipa</p>
+                    <p className="uppercase tracking-wider text-accent-subtle mb-1.5" style={{ fontSize: 10 }}>Apoio</p>
                     <div className="flex gap-1 flex-wrap">
                       {outrosTecs.map((n, i) => <TecChip key={n} nome={n} idx={i + 1} />)}
                     </div>
@@ -201,15 +201,22 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 </div>
               )}
 
-              {/* Linha 5 — Nome do evento */}
-              <Campo rotulo="Nome do evento" valor={evento.evento} />
+              {/* Grid 2 colunas para os restantes campos */}
+              <div className="grid grid-cols-2 gap-x-4">
+                {/* Linha 5 — Nome do evento (14px, largura total) */}
+                <Campo rotulo="Nome do evento" valor={evento.evento} full size={14} />
 
-              {/* Restantes */}
-              <Campo rotulo="Tipo"     valor={evento.tipo} />
-              <Campo rotulo="Cliente"  valor={cliente} />
-              <Campo rotulo="Status"   valor={labelEstado(evento.status) || evento.status} />
-              <Campo rotulo="Contacto pelo evento" valor={evento.contacto_pelo_evento} />
-              <Campo rotulo="Morada"   valor={evento.morada} isLink />
+                {/* Tipo | Status */}
+                <Campo rotulo="Tipo"   valor={evento.tipo} />
+                <Campo rotulo="Status" valor={labelEstado(evento.status) || evento.status} />
+
+                {/* LOCAL | Contacto */}
+                <Campo rotulo="Local"    valor={cliente} />
+                <Campo rotulo="Contacto" valor={evento.contacto_pelo_evento} />
+
+                {/* Morada — coluna única */}
+                <Campo rotulo="Morada" valor={evento.morada} isLink full />
+              </div>
             </div>
 
           ) : (
