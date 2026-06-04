@@ -108,6 +108,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   const guardar = async () => {
     if (!form.evento.trim()) { setErro('Nome do evento obrigatório.'); return }
     if (!form.data_evento)   { setErro('Data obrigatória.'); return }
+    if (!form.espaco_id)     { setErro('Cliente/Espaço obrigatório.'); return }
 
     setLoading(true)
     setErro(null)
