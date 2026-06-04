@@ -2,6 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Tema escuro (default) ── */
+:root {
+  --surface-0: 10 10 10;
+  --surface-1: 17 17 17;
+  --surface-2: 26 26 26;
+  --surface-3: 36 36 36;
+  --surface-4: 46 46 46;
+  --border:        46 46 46;
+  --border-subtle: 31 31 31;
+  --accent:        255 255 255;
+  --accent-muted:  160 160 160;
+  --accent-subtle: 96 96 96;
+}
+
+/* ── Tema claro ── */
+.light-mode {
+  --surface-0: 255 255 255;
+  --surface-1: 244 244 245;
+  --surface-2: 228 228 231;
+  --surface-3: 212 212 216;
+  --surface-4: 161 161 170;
+  --border:        212 212 216;
+  --border-subtle: 228 228 231;
+  --accent:        9 9 11;
+  --accent-muted:  82 82 91;
+  --accent-subtle: 113 113 122;
+}
+
 /* Zebra striping removido — feito por dia no ApoioTecnico */
 
 /* Animações do modal colaborador */

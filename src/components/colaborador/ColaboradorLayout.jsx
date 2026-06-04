@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LogOut, Home, CalendarDays, ClipboardList, LayoutList, KeyRound } from 'lucide-react'
+import { LogOut, Home, CalendarDays, ClipboardList, LayoutList, KeyRound, Sun, Moon } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
 import { useColaboradorStore } from '@/store'
@@ -40,6 +40,15 @@ export function ColaboradorLayout() {
   const navigate  = useNavigate()
   const portrait  = usePortrait()
   const [modalPin, setModalPin] = useState(false)
+  const [lightMode, setLightMode] = useState(() => localStorage.getItem('collab-theme') === 'light')
+
+  const toggleTheme = () => {
+    setLightMode(v => {
+      const next = !v
+      localStorage.setItem('collab-theme', next ? 'light' : 'dark')
+      return next
+    })
+  }
 
   const logout = () => {
     sair()
@@ -47,7 +56,7 @@ export function ColaboradorLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-0 text-accent flex flex-col">
+    <div className={clsx('min-h-screen bg-surface-0 text-accent flex flex-col', lightMode && 'light-mode')}>
 
       {/* ── Header: logo + acções ── */}
       <header className={clsx(
@@ -66,6 +75,10 @@ export function ColaboradorLayout() {
               <Avatar nome={colaborador?.nome} foto={colaborador?.foto_url} tamanho="sm" />
               <span className="text-xs text-accent-muted">{colaborador?.nome}</span>
             </div>
+            <button onClick={toggleTheme} title={lightMode ? 'Modo escuro' : 'Modo claro'}
+              className="text-accent-subtle hover:text-amber-400 transition-colors p-1.5 rounded hover:bg-surface-2">
+              {lightMode ? <Moon size={17} /> : <Sun size={17} />}
+            </button>
             <button onClick={() => setModalPin(true)} title="Alterar PIN"
               className="text-accent-subtle hover:text-amber-400 transition-colors p-1.5 rounded hover:bg-surface-2">
               <KeyRound size={17} />

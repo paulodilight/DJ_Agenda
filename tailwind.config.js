@@ -8,27 +8,27 @@ export default {
     extend: {
       colors: {
         surface: {
-          0: '#0a0a0a',
-          1: '#111111',
-          2: '#1a1a1a',
-          3: '#242424',
-          4: '#2e2e2e',
+          0: 'rgb(var(--surface-0) / <alpha-value>)',
+          1: 'rgb(var(--surface-1) / <alpha-value>)',
+          2: 'rgb(var(--surface-2) / <alpha-value>)',
+          3: 'rgb(var(--surface-3) / <alpha-value>)',
+          4: 'rgb(var(--surface-4) / <alpha-value>)',
         },
         border: {
-          DEFAULT: '#2e2e2e',
-          subtle: '#1f1f1f',
+          DEFAULT: 'rgb(var(--border) / <alpha-value>)',
+          subtle:  'rgb(var(--border-subtle) / <alpha-value>)',
         },
         accent: {
-          DEFAULT: '#ffffff',
-          muted: '#a0a0a0',
-          subtle: '#606060',
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          muted:   'rgb(var(--accent-muted) / <alpha-value>)',
+          subtle:  'rgb(var(--accent-subtle) / <alpha-value>)',
         },
         status: {
           confirmado: '#22c55e',
-          proposta: '#16eef9',
-          cancelado: '#ef4444',
-          lock: '#3b82f6',
-          vazio: '#3f3f3f',
+          proposta:   '#16eef9',
+          cancelado:  '#ef4444',
+          lock:       '#3b82f6',
+          vazio:      '#3f3f3f',
         },
       },
       fontFamily: {
