@@ -28,6 +28,14 @@ export const supaEventosApi = {
     }))
   },
 
+  // ── Sincronizar tecnico_id em evento_tecnicos ─────────────────────────────
+  async _syncTecnico(eventoId, tecnicoId) {
+    if (!tecnicoId) return
+    await supabase
+      .from('evento_tecnicos')
+      .upsert({ evento_id: eventoId, tecnico_id: tecnicoId }, { onConflict: 'evento_id,tecnico_id' })
+  },
+
   // ── Criar ─────────────────────────────────────────────────────────────────
   async criar(dados) {
     const { id: _id, created_at, espacos: _e, espaco_nome: _en, espaco_id_dj: _eidj, ...payload } = dados
@@ -37,6 +45,7 @@ export const supaEventosApi = {
       .select('id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, espaco_id, tecnico_id, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, artista_id, xclusive')
       .single()
     if (error) throw error
+    await this._syncTecnico(data.id, data.tecnico_id)
     return data
   },
 
@@ -50,6 +59,7 @@ export const supaEventosApi = {
       .select('id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, espaco_id, tecnico_id, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, artista_id, xclusive')
       .single()
     if (error) throw error
+    await this._syncTecnico(data.id, data.tecnico_id)
     return data
   },
 

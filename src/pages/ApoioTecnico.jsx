@@ -588,15 +588,21 @@ export function ApoioTecnico() {
     return idx
   }, [eventos])
 
-  // evento_id → tecnico_id[]
+  // evento_id → tecnico_id[] (inclui tecnico_id responsável se não estiver já na junção)
   const evTecIdx = useMemo(() => {
     const idx = {}
     evTecnicos.forEach(({ evento_id, tecnico_id }) => {
       if (!idx[evento_id]) idx[evento_id] = []
       if (!idx[evento_id].includes(tecnico_id)) idx[evento_id].push(tecnico_id)
     })
+    // garantir que tecnico_id (responsável) também aparece
+    eventos.forEach(e => {
+      if (!e.tecnico_id) return
+      if (!idx[e.id]) idx[e.id] = []
+      if (!idx[e.id].includes(e.tecnico_id)) idx[e.id].push(e.tecnico_id)
+    })
     return idx
-  }, [evTecnicos])
+  }, [evTecnicos, eventos])
 
   const djIdx = useMemo(() => {
     const idx = {}
