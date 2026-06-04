@@ -105,19 +105,22 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
       <div className="relative z-10 w-full max-w-lg bg-surface-1 border border-border rounded-2xl shadow-2xl flex flex-col"
         style={{ height: '82vh', maxHeight: '92vh' }}>
 
-        {/* Cabeçalho */}
-        <div className="flex items-center gap-3 px-5 pt-5 pb-4 border-b border-border shrink-0">
-          <LogoCliente logo={logo} nome={cliente || evento.evento} />
-          <div className="flex-1 min-w-0">
-            <p className="font-black text-accent truncate leading-tight" style={{ fontSize: 16 }}>{evento.evento}</p>
-            {cliente && <p className="font-medium text-accent-muted mt-0.5" style={{ fontSize: 14 }}>{cliente}</p>}
+        {/* Cabeçalho — 2 linhas: logo+cliente+badge+X / nome do evento */}
+        <div className="px-5 pt-4 pb-3 border-b border-border shrink-0">
+          <div className="flex items-center gap-3">
+            <LogoCliente logo={logo} nome={cliente || evento.evento} />
+            <div className="flex-1 min-w-0">
+              {cliente && <p className="font-medium text-accent-muted truncate" style={{ fontSize: 14 }}>{cliente}</p>}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {evento.status && <Badge variante={statusVar(evento.status)}>{labelEstado(evento.status) || evento.status}</Badge>}
+              <button onClick={onFechar} className="text-accent-subtle hover:text-accent p-1.5 -mr-1">
+                <X size={24} />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {evento.status && <Badge variante={statusVar(evento.status)}>{labelEstado(evento.status) || evento.status}</Badge>}
-            <button onClick={onFechar} className="text-accent-subtle hover:text-accent p-1 -mr-1">
-              <X size={18} />
-            </button>
-          </div>
+          {/* 2ª linha — Nome do evento */}
+          <p className="mt-2 font-black text-accent leading-tight" style={{ fontSize: 16 }}>{evento.evento}</p>
         </div>
 
         {/* Abas */}
@@ -159,23 +162,19 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 )}
               </div>
 
-              {/* Linha 2 — Instalação (branco translúcido) */}
+              {/* Linha 2 — Instalação em 2 colunas (branco translúcido) */}
               {(dataInstal || horaInstal) && (
-                <div className="my-2 rounded-lg bg-white/[0.08] border border-white/10 px-3 py-2 flex items-center gap-6">
-                  {dataInstal && (
-                    <div>
-                      <p className="text-white/50 uppercase tracking-wider" style={{ fontSize: 10 }}>Instalação</p>
-                      <p className="text-white/90 font-medium capitalize" style={{ fontSize: 14 }}>
-                        {dataLonga(dataInstal)}
-                      </p>
-                    </div>
-                  )}
-                  {horaInstal && (
-                    <div>
-                      <p className="text-white/50 uppercase tracking-wider" style={{ fontSize: 10 }}>Hora</p>
-                      <p className="text-white/90 font-medium" style={{ fontSize: 14 }}>{horaInstal}</p>
-                    </div>
-                  )}
+                <div className="my-2 rounded-lg bg-white/[0.08] border border-white/10 px-3 py-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-white/50 uppercase tracking-wider" style={{ fontSize: 10 }}>Instalação</p>
+                    <p className="text-white/90 font-medium capitalize" style={{ fontSize: 14 }}>
+                      {dataInstal ? dataLonga(dataInstal) : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-white/50 uppercase tracking-wider" style={{ fontSize: 10 }}>Hora</p>
+                    <p className="text-white/90 font-medium" style={{ fontSize: 14 }}>{horaInstal || '—'}</p>
+                  </div>
                 </div>
               )}
 
@@ -189,14 +188,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 </div>
               )}
 
-              {/* Linha 4 — Horário */}
+              {/* Linha 4 — Hora início | Hora fim em 2 colunas */}
               {(evento.hora_inicio || evento.hora_fim) && (
-                <div className="py-2 border-b border-border/30">
-                  <p className="uppercase tracking-wider text-accent-subtle mb-0.5" style={{ fontSize: 10 }}>Horário</p>
-                  <div className="flex items-baseline gap-2">
-                    {evento.hora_inicio && <span className="font-black text-white tabular-nums" style={{ fontSize: 14 }}>{hhmm(evento.hora_inicio)}</span>}
-                    {evento.hora_inicio && evento.hora_fim && <span className="text-white/30 font-light text-lg">—</span>}
-                    {evento.hora_fim && <span className="font-black text-white tabular-nums" style={{ fontSize: 14 }}>{hhmm(evento.hora_fim)}</span>}
+                <div className="py-2 border-b border-border/30 grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="uppercase tracking-wider text-accent-subtle mb-0.5" style={{ fontSize: 10 }}>Hora de início</p>
+                    <span className="font-black text-white tabular-nums" style={{ fontSize: 14 }}>{hhmm(evento.hora_inicio) || '—'}</span>
+                  </div>
+                  <div>
+                    <p className="uppercase tracking-wider text-accent-subtle mb-0.5" style={{ fontSize: 10 }}>Hora de fim</p>
+                    <span className="font-black text-white tabular-nums" style={{ fontSize: 14 }}>{hhmm(evento.hora_fim) || '—'}</span>
                   </div>
                 </div>
               )}
@@ -246,7 +247,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={4}
                   placeholder="Adiciona notas antes ou depois do evento…"
                   style={{ fontSize: 13 }}
-                  className="w-full bg-surface-2 border border-border rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/25 resize-none" />
+                  className="w-full bg-surface-2 border border-white/30 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/60 resize-none" />
                 {erro && <p className="text-xs text-status-cancelado mt-1">{erro}</p>}
                 <div className="flex justify-end mt-2">
                   <button onClick={guardar} disabled={guardando}

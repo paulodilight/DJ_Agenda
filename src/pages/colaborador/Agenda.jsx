@@ -302,7 +302,7 @@ export function ColaboradorAgenda() {
       )}
 
       {/* ── Tabela ── */}
-      <div className="flex-1 overflow-auto">
+      <div className={clsx('flex-1 overflow-auto', !portrait ? 'text-[10px]' : '')}>
         {linhasPorDia.length === 0 ? (
           <p className="text-center text-accent-subtle/40 py-16 text-sm">
             {pesquisa || filtroEspaco ? 'Nenhum resultado.' : 'Sem eventos neste mês.'}

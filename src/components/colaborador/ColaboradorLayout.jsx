@@ -75,7 +75,7 @@ export function ColaboradorLayout() {
                   isActive ? 'text-amber-400' : 'text-accent-subtle hover:text-accent',
                 )
               }>
-              <Icone size={20} />
+              <Icone size={24} />
               <span className="text-[10px] font-medium">{rotulo}</span>
             </NavLink>
           ))}
