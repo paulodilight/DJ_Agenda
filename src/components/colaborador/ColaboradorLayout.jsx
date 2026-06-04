@@ -38,7 +38,7 @@ export function ColaboradorLayout() {
       {/* ── Header: logo + acções ── */}
       <header className="sticky top-0 z-30 bg-surface-1/90 backdrop-blur border-b border-border">
         {/* Safe area top — espaço transparente acima do logo */}
-        <div style={{ height: 'max(env(safe-area-inset-top, 0px), 8px)' }} />
+        <div style={{ height: 'max(env(safe-area-inset-top, 0px), 6px)' }} />
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <NavLink to="/colaborador">
             <LogoXclusive />
@@ -83,7 +83,7 @@ export function ColaboradorLayout() {
           ))}
         </div>
         {/* Safe area bottom — espaço transparente abaixo do menu */}
-        <div style={{ height: 'max(env(safe-area-inset-bottom, 0px), 8px)' }} />
+        <div style={{ height: 'max(env(safe-area-inset-bottom, 0px), 6px)' }} />
       </nav>
 
       {modalPin && <ModalAlterarPin onFechar={() => setModalPin(false)} />}

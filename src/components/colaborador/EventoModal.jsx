@@ -114,9 +114,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {evento.status && <Badge variante={statusVar(evento.status)}>{labelEstado(evento.status) || evento.status}</Badge>}
-            <button onClick={onFechar} className="text-accent-subtle hover:text-accent p-1.5 -mr-1">
-              <X size={24} />
-            </button>
           </div>
         </div>
 
@@ -257,6 +254,14 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Cruz fechar — em baixo à direita */}
+        <div className="flex justify-end px-5 py-3 border-t border-border/40 shrink-0">
+          <button onClick={onFechar}
+            className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
+            <X size={22} />
+          </button>
         </div>
       </div>
     </div>
