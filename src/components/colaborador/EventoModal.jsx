@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
 import { colaboradorApi } from '@/lib/colaboradorApi'
+import { usePresenca } from '@/hooks/usePresenca'
+import { useColaboradorStore } from '@/store'
 import { labelEstado } from '@/utils/formatacao'
 import { corTecnico } from '@/utils/tecnicoColor'
 import { hhmm, dataLonga, dataCompleta } from './format'
@@ -58,6 +60,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [guardado, setGuardado]   = useState(false)
   const [erro, setErro]           = useState(null)
   const touchX = useRef(null)
+
+  // ── Assinatura de presença do técnico (GPS) ──
+  const colaborador = useColaboradorStore(s => s.colaborador)
+  const pres = usePresenca({ kind: 'tecnico', refId: evento.id, ownerId: colaborador?.id ?? null, signedBy: 'tecnico' })
+  const [aConfirmarPres, setConfirmarPres] = useState(false)
 
   useEffect(() => {
     if (evento) setNotas(evento.notas_colaborador ?? '')
@@ -256,8 +263,42 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
           )}
         </div>
 
-        {/* Cruz fechar — em baixo à direita */}
-        <div className="flex justify-end px-5 py-3 border-t border-border/40 shrink-0">
+        {/* Rodapé — assinatura de presença + fechar */}
+        <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 shrink-0">
+          <div>
+            {pres.status === 'signed' && pres.presenca ? (
+              <span
+                title={`Presente · ${new Date(pres.presenca.signed_at).toLocaleString('pt-PT')}${pres.presenca.latitude != null ? ` · ${Number(pres.presenca.latitude).toFixed(5)}, ${Number(pres.presenca.longitude).toFixed(5)}${pres.presenca.accuracy_m != null ? ` (±${pres.presenca.accuracy_m}m)` : ''}` : ' · sem GPS'}`}
+                className="inline-flex items-center gap-1.5 text-status-confirmado text-sm font-medium">
+                <Check size={16} /> Presente · {new Date(pres.presenca.signed_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            ) : pres.status === 'loading' ? (
+              <span className="inline-flex items-center gap-1.5 text-accent-subtle text-sm">
+                <Loader2 size={15} className="animate-spin" /> A localizar…
+              </span>
+            ) : pres.status === 'error' ? (
+              <button onClick={() => pres.assinar()} title={pres.erro || ''}
+                className="inline-flex items-center gap-1.5 text-status-cancelado text-sm hover:opacity-80">
+                <AlertCircle size={15} /> Erro — repetir
+              </button>
+            ) : aConfirmarPres ? (
+              <span className="inline-flex items-center gap-2">
+                <button onClick={() => { setConfirmarPres(false); pres.assinar() }}
+                  className="px-3 py-1.5 rounded-lg bg-status-confirmado/15 border border-status-confirmado/40 text-status-confirmado text-xs font-medium hover:bg-status-confirmado/25 transition-colors">
+                  Confirmar presença
+                </button>
+                <button onClick={() => setConfirmarPres(false)}
+                  className="px-2 py-1.5 rounded-lg border border-border text-accent-subtle text-xs hover:text-accent transition-colors">
+                  Cancelar
+                </button>
+              </span>
+            ) : (
+              <button onClick={() => setConfirmarPres(true)} disabled={!colaborador}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-accent-muted text-xs font-medium hover:text-accent hover:border-white/25 transition-colors disabled:opacity-40">
+                <MapPin size={14} /> Marcar presença
+              </button>
+            )}
+          </div>
           <button onClick={onFechar}
             className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
             <X size={22} />

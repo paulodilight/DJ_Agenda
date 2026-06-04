@@ -6,17 +6,22 @@ import { useColaboradorStore } from '@/store'
 import { Avatar } from './Avatar'
 import { ModalAlterarPin } from './ModalAlterarPin'
 
-const usePortrait = () => {
-  const [portrait, setPortrait] = useState(
-    () => typeof window === 'undefined' || window.innerWidth <= window.innerHeight
-  )
+// Mostra o header (logo) e a navegação. Só os esconde em telemóvel DEITADO
+// (landscape pequeno) para não tapar conteúdo. No computador e no telemóvel
+// em pé, ficam sempre visíveis.
+const useMostrarChrome = () => {
+  const calc = () =>
+    typeof window === 'undefined'
+      ? true
+      : !(window.innerWidth > window.innerHeight && window.innerWidth < 768)
+  const [mostrar, setMostrar] = useState(calc)
   useEffect(() => {
-    const fn = () => setPortrait(window.innerWidth <= window.innerHeight)
+    const fn = () => setMostrar(calc())
     window.addEventListener('resize', fn)
     window.addEventListener('orientationchange', fn)
     return () => { window.removeEventListener('resize', fn); window.removeEventListener('orientationchange', fn) }
   }, [])
-  return portrait
+  return mostrar
 }
 
 const navItens = [
@@ -38,7 +43,7 @@ function LogoXclusive() {
 export function ColaboradorLayout() {
   const { colaborador, sair } = useColaboradorStore()
   const navigate  = useNavigate()
-  const portrait  = usePortrait()
+  const mostrarChrome = useMostrarChrome()
   const [modalPin, setModalPin] = useState(false)
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('collab-theme') === 'light')
 
@@ -71,7 +76,7 @@ export function ColaboradorLayout() {
       {/* ── Header: logo + acções ── */}
       <header className={clsx(
         'sticky top-0 z-30 bg-surface-1/90 backdrop-blur border-b border-border transition-transform duration-300',
-        !portrait && '-translate-y-full pointer-events-none'
+        !mostrarChrome && '-translate-y-full pointer-events-none'
       )}>
         {/* Safe area top — espaço transparente acima do logo */}
         <div style={{ height: 'max(env(safe-area-inset-top, 0px), 6px)' }} />
@@ -104,7 +109,7 @@ export function ColaboradorLayout() {
       {/* ── Conteúdo ── */}
       <main className={clsx(
         'flex-1 max-w-5xl w-full mx-auto px-4 py-4 transition-all duration-300',
-        portrait ? 'pb-20' : 'pb-4'
+        mostrarChrome ? 'pb-20' : 'pb-4'
       )}>
         <Outlet />
       </main>
@@ -112,7 +117,7 @@ export function ColaboradorLayout() {
       {/* ── Nav inferior ── */}
       <nav className={clsx(
         'fixed bottom-0 left-0 right-0 z-30 bg-surface-1/95 backdrop-blur border-t border-border transition-transform duration-300',
-        !portrait && 'translate-y-full pointer-events-none'
+        !mostrarChrome && 'translate-y-full pointer-events-none'
       )}>
         <div className="max-w-5xl mx-auto flex items-center justify-around px-2 py-1">
           {navItens.map(({ to, fim, rotulo, Icone }) => (
