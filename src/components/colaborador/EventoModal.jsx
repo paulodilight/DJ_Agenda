@@ -34,7 +34,7 @@ function TecChip({ nome, idx = 0 }) {
   )
 }
 
-function Campo({ rotulo, valor, negrito, isLink, full, size = 13 }) {
+function Campo({ rotulo, valor, negrito, isLink, full, size = 14 }) {
   if (!valor) return null
   return (
     <div className={clsx('flex flex-col gap-0.5 py-2 border-b border-border/30', full ? 'col-span-2' : '')}>
@@ -222,7 +222,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 </p>
                 <div className={clsx('whitespace-pre-wrap rounded-xl px-3 py-2.5 border',
                   evento.notas_operacionais ? 'text-accent-muted bg-surface-2 border-border' : 'text-accent-subtle/40 italic bg-surface-2/40 border-border/40')}
-                  style={{ fontSize: 13 }}>
+                  style={{ fontSize: 14 }}>
                   {evento.notas_operacionais || 'Sem notas de evento.'}
                 </div>
               </div>
@@ -232,7 +232,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 </p>
                 <div className={clsx('whitespace-pre-wrap rounded-xl px-3 py-2.5 border',
                   evento.Equipamentos ? 'text-accent-muted bg-surface-2 border-border' : 'text-accent-subtle/40 italic bg-surface-2/40 border-border/40')}
-                  style={{ fontSize: 13 }}>
+                  style={{ fontSize: 14 }}>
                   {evento.Equipamentos || 'Sem equipamentos definidos.'}
                 </div>
               </div>
@@ -240,7 +240,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>As minhas notas</p>
                 <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={4}
                   placeholder="Adiciona notas antes ou depois do evento…"
-                  style={{ fontSize: 13 }}
+                  style={{ fontSize: 14 }}
                   className="w-full bg-surface-2 border border-white/30 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/60 resize-none" />
                 {erro && <p className="text-xs text-status-cancelado mt-1">{erro}</p>}
                 <div className="flex justify-end mt-2">
