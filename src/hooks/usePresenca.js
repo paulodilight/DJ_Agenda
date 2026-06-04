@@ -22,6 +22,30 @@ const CFG = {
   tecnico: { tabela: 'presencas_tecnicos', fk: 'evento_id', owner: 'tecnico_id', onConflict: 'evento_id,tecnico_id' },
 }
 
+// Tolerância (minutos) para a janela de assinatura.
+export const TOLERANCIA_MIN = 5
+
+/** Date do início a partir de data (YYYY-MM-DD) + hora (HH:MM[:SS]). */
+export function inicioEvento(data, hora) {
+  if (!data) return null
+  const h = (hora || '00:00').slice(0, 5)
+  const d = new Date(`${data}T${h}:00`)
+  return isNaN(d.getTime()) ? null : d
+}
+
+/** Só permite assinar a partir de TOLERANCIA_MIN minutos antes do início. */
+export function podeAssinar(data, hora) {
+  const ini = inicioEvento(data, hora)
+  return !!ini && Date.now() >= ini.getTime() - TOLERANCIA_MIN * 60000
+}
+
+/** True se a assinatura foi feita mais de TOLERANCIA_MIN minutos depois do início (atrasada). */
+export function presencaAtrasada(presenca, data, hora) {
+  const ini = inicioEvento(data, hora)
+  if (!ini || !presenca?.signed_at) return false
+  return new Date(presenca.signed_at).getTime() > ini.getTime() + TOLERANCIA_MIN * 60000
+}
+
 /**
  * Obtém a posição GPS. Se o browser não suportar, recusar ou falhar (timeout 10s),
  * resolve com coordenadas a null — a presença grava na mesma (manual).

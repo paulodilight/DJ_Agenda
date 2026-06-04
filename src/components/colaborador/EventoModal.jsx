@@ -3,7 +3,7 @@ import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle } from 
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
 import { colaboradorApi } from '@/lib/colaboradorApi'
-import { usePresenca } from '@/hooks/usePresenca'
+import { usePresenca, podeAssinar, presencaAtrasada } from '@/hooks/usePresenca'
 import { useColaboradorStore } from '@/store'
 import { labelEstado } from '@/utils/formatacao'
 import { corTecnico } from '@/utils/tecnicoColor'
@@ -65,6 +65,8 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const colaborador = useColaboradorStore(s => s.colaborador)
   const pres = usePresenca({ kind: 'tecnico', refId: evento.id, ownerId: colaborador?.id ?? null, signedBy: 'tecnico' })
   const [aConfirmarPres, setConfirmarPres] = useState(false)
+  const presDisponivel = podeAssinar(evento.data_evento, evento.hora_inicio)
+  const presAtrasada = presencaAtrasada(pres.presenca, evento.data_evento, evento.hora_inicio)
 
   useEffect(() => {
     if (evento) setNotas(evento.notas_colaborador ?? '')
@@ -269,7 +271,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
             {pres.status === 'signed' && pres.presenca ? (
               <span
                 title={`Presente · ${new Date(pres.presenca.signed_at).toLocaleString('pt-PT')}${pres.presenca.latitude != null ? ` · ${Number(pres.presenca.latitude).toFixed(5)}, ${Number(pres.presenca.longitude).toFixed(5)}${pres.presenca.accuracy_m != null ? ` (±${pres.presenca.accuracy_m}m)` : ''}` : ' · sem GPS'}`}
-                className="inline-flex items-center gap-1.5 text-status-confirmado text-sm font-medium">
+                className={clsx('inline-flex items-center gap-1.5 text-sm font-medium', presAtrasada ? 'text-status-cancelado' : 'text-status-confirmado')}>
                 <Check size={16} /> Presente · {new Date(pres.presenca.signed_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
               </span>
             ) : pres.status === 'loading' ? (
@@ -292,11 +294,13 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   Cancelar
                 </button>
               </span>
-            ) : (
+            ) : presDisponivel ? (
               <button onClick={() => setConfirmarPres(true)} disabled={!colaborador}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-accent-muted text-xs font-medium hover:text-accent hover:border-white/25 transition-colors disabled:opacity-40">
                 <MapPin size={14} /> Marcar presença
               </button>
+            ) : (
+              <span className="text-accent-subtle/60 text-xs">Disponível 5 min antes do início</span>
             )}
           </div>
           <button onClick={onFechar}
