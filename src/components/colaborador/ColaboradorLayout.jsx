@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LogOut, Home, CalendarDays, ClipboardList, Coffee, LayoutList, KeyRound } from 'lucide-react'
+import { LogOut, Home, CalendarDays, ClipboardList, LayoutList, KeyRound } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState } from 'react'
 import { useColaboradorStore } from '@/store'
@@ -34,44 +34,53 @@ export function ColaboradorLayout() {
 
   return (
     <div className="min-h-screen bg-surface-0 text-accent flex flex-col">
+
+      {/* ── Header: logo + acções ── */}
       <header className="sticky top-0 z-30 bg-surface-1/90 backdrop-blur border-b border-border">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <NavLink to="/colaborador">
             <LogoXclusive />
           </NavLink>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-5">
             <div className="hidden sm:flex items-center gap-2">
               <Avatar nome={colaborador?.nome} foto={colaborador?.foto_url} tamanho="sm" />
               <span className="text-xs text-accent-muted">{colaborador?.nome}</span>
             </div>
             <button onClick={() => setModalPin(true)} title="Alterar PIN"
               className="text-accent-subtle hover:text-amber-400 transition-colors p-1.5 rounded hover:bg-surface-2">
-              <KeyRound size={16} />
+              <KeyRound size={17} />
             </button>
             <button onClick={logout} title="Sair"
               className="text-accent-subtle hover:text-accent transition-colors p-1.5 rounded hover:bg-surface-2">
-              <LogOut size={16} />
+              <LogOut size={17} />
             </button>
           </div>
         </div>
-        <nav className="max-w-5xl mx-auto px-2 flex items-center gap-1 overflow-x-auto">
+      </header>
+
+      {/* ── Conteúdo ── */}
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-4 pb-20">
+        <Outlet />
+      </main>
+
+      {/* ── Nav inferior ── */}
+      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-surface-1/95 backdrop-blur border-t border-border">
+        <div className="max-w-5xl mx-auto flex items-center justify-around px-2 py-1">
           {navItens.map(({ to, fim, rotulo, Icone }) => (
             <NavLink key={to} to={to} end={fim}
               className={({ isActive }) =>
                 clsx(
-                  'flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 -mb-px whitespace-nowrap transition-colors',
-                  isActive ? 'border-amber-400 text-amber-400' : 'border-transparent text-accent-muted hover:text-accent',
+                  'flex flex-col items-center gap-0.5 px-4 py-2 transition-colors',
+                  isActive ? 'text-amber-400' : 'text-accent-subtle hover:text-accent',
                 )
               }>
-              <Icone size={14} /> {rotulo}
+              <Icone size={20} />
+              <span className="text-[10px] font-medium">{rotulo}</span>
             </NavLink>
           ))}
-        </nav>
-      </header>
-
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-4">
-        <Outlet />
-      </main>
+        </div>
+      </nav>
 
       {modalPin && <ModalAlterarPin onFechar={() => setModalPin(false)} />}
     </div>

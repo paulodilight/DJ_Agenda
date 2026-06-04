@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, X, Eye, EyeOff, RotateCcw } from 'lucide-react'
 import { clsx } from 'clsx'
 import { supabase } from '@/lib/supabase'
 import { useMesStore, useColaboradorStore } from '@/store'
@@ -36,6 +36,14 @@ export function ColaboradorAgenda() {
   const { colaborador }      = useColaboradorStore()
 
   const [loading, setLoading]     = useState(true)
+  const [portrait, setPortrait]   = useState(() => typeof window !== 'undefined' && window.innerWidth < window.innerHeight)
+
+  useEffect(() => {
+    const handler = () => setPortrait(window.innerWidth < window.innerHeight)
+    window.addEventListener('resize', handler)
+    window.addEventListener('orientationchange', handler)
+    return () => { window.removeEventListener('resize', handler); window.removeEventListener('orientationchange', handler) }
+  }, [])
   const [tecnicos, setTecnicos]   = useState([])
   const [eventos, setEventos]     = useState([])
   const [evTecnicos, setEvTecs]   = useState([])
@@ -224,13 +232,17 @@ export function ColaboradorAgenda() {
             className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors shrink-0">
             <ChevronRight size={14} />
           </button>
-          <button onClick={() => setOcultar(v => !v)}
-            className={clsx('px-2.5 py-1.5 rounded text-xs border transition-all',
-              ocultarVazios
-                ? 'bg-surface-3 text-accent border-white/20 font-medium'
-                : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
-            {ocultarVazios ? '☰ Todos os dias' : '⊟ Ocultar dias vazios'}
-          </button>
+          {/* Toggle ícones */}
+          <div className="flex border border-border rounded-lg overflow-hidden shrink-0">
+            <button onClick={() => setOcultar(false)} title="Todos os dias"
+              className={clsx('px-2.5 py-1.5 transition-colors', !ocultarVazios ? 'bg-amber-400/20 text-amber-400' : 'text-accent-muted hover:text-accent bg-surface-2')}>
+              <Eye size={15} />
+            </button>
+            <button onClick={() => setOcultar(true)} title="Ocultar dias vazios"
+              className={clsx('px-2.5 py-1.5 border-l border-border transition-colors', ocultarVazios ? 'bg-amber-400/20 text-amber-400' : 'text-accent-muted hover:text-accent bg-surface-2')}>
+              <EyeOff size={15} />
+            </button>
+          </div>
           <div className="relative ml-auto">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent-subtle pointer-events-none" />
             <input type="text" placeholder="Pesquisar…" value={pesquisa} onChange={e => setPesquisa(e.target.value)}
@@ -280,6 +292,14 @@ export function ColaboradorAgenda() {
           </div>
         )}
       </div>
+
+      {/* Aviso landscape (mobile portrait) */}
+      {portrait && (
+        <div className="mx-4 mb-2 flex items-center gap-2 rounded-xl bg-amber-400/10 border border-amber-400/20 px-3 py-2 text-amber-400/80">
+          <RotateCcw size={14} className="shrink-0" />
+          <p className="text-xs">Roda o telemóvel para melhor visibilidade</p>
+        </div>
+      )}
 
       {/* ── Tabela ── */}
       <div className="flex-1 overflow-auto">

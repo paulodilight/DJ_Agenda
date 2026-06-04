@@ -51,12 +51,24 @@ export const colaboradorApi = {
       .order('data_evento', { ascending: true })
     if (error) throw error
 
+    // Carregar TODOS os evento_tecnicos para mostrar "outros técnicos" no modal
+    const evIds = (data ?? []).map(e => e.id)
+    let etIdx = {}
+    if (evIds.length > 0) {
+      const { data: allEt } = await supabase
+        .from('evento_tecnicos').select('evento_id, tecnico_id').in('evento_id', evIds)
+      ;(allEt ?? []).forEach(({ evento_id, tecnico_id }) => {
+        if (!etIdx[evento_id]) etIdx[evento_id] = []
+        etIdx[evento_id].push(tecnico_id)
+      })
+    }
+
     return (data ?? []).map((e) => {
       const isResp   = e.tecnico_id === tecnicoId
       const isEquipa = equipaIds.has(e.id)
       const meu      = isResp || isEquipa
       const fonte    = isResp && isEquipa ? 'ambos' : isResp ? 'responsavel' : isEquipa ? 'equipa' : null
-      return { ...e, meu, fonte }
+      return { ...e, meu, fonte, _tecnicosIds: etIdx[e.id] ?? [] }
     })
   },
 
