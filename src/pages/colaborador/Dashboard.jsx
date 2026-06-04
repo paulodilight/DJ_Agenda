@@ -70,9 +70,14 @@ export function ColaboradorDashboard() {
       if (!e.meu || !e.data_evento) return false
       if (e.data_evento > hoje) return true          // dias futuros — sempre incluir
       if (e.data_evento < hoje) return false         // dias passados — excluir
-      // hoje: incluir só se ainda não terminou (hora_fim) ou não começou (hora_inicio)
+      // hoje: incluir se ainda não terminou
       const fim    = e.hora_fim?.slice(0, 5)
       const inicio = e.hora_inicio?.slice(0, 5)
+      if (fim && inicio) {
+        // evento cruza meia-noite (ex: 18:30 → 00:00) → ainda activo hoje
+        if (fim <= inicio) return true
+        return fim > agoraHHMM
+      }
       if (fim)    return fim    > agoraHHMM
       if (inicio) return inicio > agoraHHMM
       return true  // sem hora definida — incluir
