@@ -46,9 +46,19 @@ export function ColaboradorLayout() {
     setLightMode(v => {
       const next = !v
       localStorage.setItem('collab-theme', next ? 'light' : 'dark')
+      // aplica no root para que os fixed (modais) também herdem
+      if (next) document.documentElement.classList.add('light-mode')
+      else       document.documentElement.classList.remove('light-mode')
       return next
     })
   }
+
+  // sincronizar no mount
+  useEffect(() => {
+    if (lightMode) document.documentElement.classList.add('light-mode')
+    else           document.documentElement.classList.remove('light-mode')
+    return () => document.documentElement.classList.remove('light-mode')
+  }, [])
 
   const logout = () => {
     sair()
@@ -56,7 +66,7 @@ export function ColaboradorLayout() {
   }
 
   return (
-    <div className={clsx('min-h-screen bg-surface-0 text-accent flex flex-col', lightMode && 'light-mode')}>
+    <div className="min-h-screen bg-surface-0 text-accent flex flex-col">
 
       {/* ── Header: logo + acções ── */}
       <header className={clsx(

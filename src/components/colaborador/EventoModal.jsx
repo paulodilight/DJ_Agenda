@@ -43,7 +43,7 @@ function Campo({ rotulo, valor, negrito, isLink, full, size = 13 }) {
         ? <a href={mapaUrl(valor)} target="_blank" rel="noopener noreferrer"
             className="text-amber-400 underline underline-offset-2 hover:text-amber-400/80 break-words"
             style={{ fontSize: size }}>{valor}</a>
-        : <p className={clsx('break-words', negrito ? 'text-white font-bold' : 'text-accent-muted')}
+        : <p className={clsx('break-words', negrito ? 'text-accent font-bold' : 'text-accent-muted')}
             style={{ fontSize: size }}>{valor}</p>
       }
     </div>
@@ -158,16 +158,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
               {/* Linha 2 — Instalação em 2 colunas (branco translúcido) */}
               {(dataInstal || horaInstal) && (
-                <div className="my-2 rounded-lg bg-white/[0.08] border border-white/10 px-3 py-2 grid grid-cols-2 gap-2">
+                <div className="my-2 rounded-lg bg-accent/[0.06] border border-accent/10 px-3 py-2 grid grid-cols-2 gap-2">
                   <div>
-                    <p className="text-white/50 uppercase tracking-wider" style={{ fontSize: 10 }}>Instalação</p>
-                    <p className="text-white/90 font-medium capitalize" style={{ fontSize: 14 }}>
+                    <p className="text-accent-subtle uppercase tracking-wider" style={{ fontSize: 10 }}>Instalação</p>
+                    <p className="text-accent font-medium capitalize" style={{ fontSize: 14 }}>
                       {dataInstal ? dataLonga(dataInstal) : '—'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-white/50 uppercase tracking-wider" style={{ fontSize: 10 }}>Hora</p>
-                    <p className="text-white/90 font-medium" style={{ fontSize: 14 }}>{horaInstal || '—'}</p>
+                    <p className="text-accent-subtle uppercase tracking-wider" style={{ fontSize: 10 }}>Hora</p>
+                    <p className="text-accent font-medium" style={{ fontSize: 14 }}>{horaInstal || '—'}</p>
                   </div>
                 </div>
               )}
@@ -176,7 +176,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               {evento.data_evento && (
                 <div className="py-2 border-b border-border/30">
                   <p className="uppercase tracking-wider text-accent-subtle mb-0.5" style={{ fontSize: 10 }}>Data do evento</p>
-                  <p className="font-bold text-white capitalize leading-snug" style={{ fontSize: 13 }}>
+                  <p className="font-bold text-accent capitalize leading-snug" style={{ fontSize: 13 }}>
                     {dataCompleta(evento.data_evento)}
                   </p>
                 </div>
@@ -187,11 +187,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 <div className="py-2 border-b border-border/30 grid grid-cols-2 gap-2">
                   <div>
                     <p className="uppercase tracking-wider text-accent-subtle mb-0.5" style={{ fontSize: 10 }}>Hora de início</p>
-                    <span className="font-black text-white tabular-nums" style={{ fontSize: 14 }}>{hhmm(evento.hora_inicio) || '—'}</span>
+                    <span className="font-black text-accent tabular-nums" style={{ fontSize: 14 }}>{hhmm(evento.hora_inicio) || '—'}</span>
                   </div>
                   <div>
                     <p className="uppercase tracking-wider text-accent-subtle mb-0.5" style={{ fontSize: 10 }}>Hora de fim</p>
-                    <span className="font-black text-white tabular-nums" style={{ fontSize: 14 }}>{hhmm(evento.hora_fim) || '—'}</span>
+                    <span className="font-black text-accent tabular-nums" style={{ fontSize: 14 }}>{hhmm(evento.hora_fim) || '—'}</span>
                   </div>
                 </div>
               )}
