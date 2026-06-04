@@ -124,8 +124,8 @@ export function ColaboradorDashboard() {
             <p className="text-lg font-bold text-accent leading-snug">{proximoEvento.evento}</p>
             <div className="mt-2 flex flex-col gap-1.5">
               {instalProximo && (
-                <span className="flex items-center gap-2 text-sm text-accent-muted">
-                  <Wrench size={13} className="text-accent-subtle shrink-0" />
+                <span className="flex items-center gap-2 text-sm text-accent font-semibold">
+                  <Wrench size={13} className="text-accent shrink-0" />
                   Instalação: {instalProximo}
                 </span>
               )}
