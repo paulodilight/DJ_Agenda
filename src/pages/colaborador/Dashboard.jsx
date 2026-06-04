@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom'
 import { CalendarDays, ClipboardList, Camera, ChevronRight, MapPin, CalendarClock, Wrench, LayoutList } from 'lucide-react'
 import { useColaboradorStore } from '@/store'
 import { colaboradorApi } from '@/lib/colaboradorApi'
-import { Avatar } from '@/components/apoiot/Avatar'
-import { EventoModal } from '@/components/apoiot/EventoModal'
+import { Avatar } from '@/components/colaborador/Avatar'
+import { EventoModal } from '@/components/colaborador/EventoModal'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
-import { hhmm, dataLonga } from '@/components/apoiot/format'
+import { hhmm, dataLonga } from '@/components/colaborador/format'
 
 const hojeISO = () => {
   const d = new Date()
