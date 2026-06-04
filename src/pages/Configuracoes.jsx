@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
-import { Settings, AlertTriangle, Ban } from 'lucide-react'
-import { configuracoesApi } from '@/lib/api'
+import { Settings, AlertTriangle, Ban, ScrollText } from 'lucide-react'
+import { configuracoesApi, regrasAtuacaoApi } from '@/lib/api'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -37,14 +37,15 @@ function Toggle({ checked, onChange, label, descricao }) {
 export function Configuracoes() {
   const setConfig = useAppStore((s) => s.setConfig)
   const [config, setConfigLocal] = useState({})
+  const [regras, setRegras] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState(null)
   const [sucesso, setSucesso] = useState(false)
 
   useEffect(() => {
-    configuracoesApi.listar()
-      .then((c) => { setConfigLocal(c); setConfig(c) })
+    Promise.all([configuracoesApi.listar(), regrasAtuacaoApi.obter()])
+      .then(([c, r]) => { setConfigLocal(c); setConfig(c); setRegras(r) })
       .catch((e) => setErro(e.message))
       .finally(() => setLoading(false))
   }, [setConfig])
@@ -61,6 +62,7 @@ export function Configuracoes() {
       for (const [chave, valor] of Object.entries(config)) {
         await configuracoesApi.actualizar(chave, valor)
       }
+      await regrasAtuacaoApi.guardar(regras)
       setConfig(config)
       setSucesso(true)
       setTimeout(() => setSucesso(false), 3000)
@@ -85,6 +87,28 @@ export function Configuracoes() {
 
       {erro && <Alerta tipo="erro" mensagem={erro} className="mb-4" />}
       {sucesso && <Alerta tipo="sucesso" mensagem="Configurações guardadas com sucesso." className="mb-4" />}
+
+      {/* ── Regras de atuação (visíveis aos DJs) ── */}
+      <Card className="mb-4">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ScrollText size={13} className="text-accent-muted" />
+            <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Regras de atuação — visíveis aos DJs</p>
+          </div>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-2">
+          <p className="text-xs text-accent-subtle">
+            Este texto aparece no modal de <span className="text-accent-muted font-medium">todas as datas</span> e para <span className="text-accent-muted font-medium">todos os DJs</span> na app deles. Cada linha é mostrada tal como aqui escrita.
+          </p>
+          <textarea
+            value={regras}
+            onChange={(e) => setRegras(e.target.value)}
+            rows={8}
+            placeholder={'Ex:\n• Chegar 30 min antes do início.\n• Dress code: preto.\n• Confirmar presença por WhatsApp até 48h antes.'}
+            className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-accent/30 transition-colors resize-y leading-relaxed"
+          />
+        </CardBody>
+      </Card>
 
       {/* ── Espaçamentos ── */}
       <Card className="mb-4">

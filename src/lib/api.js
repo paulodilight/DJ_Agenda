@@ -616,6 +616,30 @@ export const configuracoesApi = {
   },
 }
 
+// ─── Regras de atuação (mostradas aos DJs no modal de cada data) ──────────────
+
+export const regrasAtuacaoApi = {
+  async obter() {
+    const { data, error } = await supabase
+      .from('regras_atuacao')
+      .select('conteudo')
+      .eq('id', 1)
+      .maybeSingle()
+    if (error) throw error
+    return data?.conteudo ?? ''
+  },
+
+  async guardar(conteudo) {
+    const { error } = await supabase
+      .from('regras_atuacao')
+      .upsert(
+        { id: 1, conteudo: conteudo ?? '', atualizado_em: new Date().toISOString() },
+        { onConflict: 'id' }
+      )
+    if (error) throw error
+  },
+}
+
 // ─── Preferências DJ por Cliente ──────────────────────────────────────────────
 
 export const djPreferenciasEspacoApi = {
