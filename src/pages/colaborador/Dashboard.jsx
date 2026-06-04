@@ -58,8 +58,25 @@ export function ColaboradorDashboard() {
     const hora = e.hora_instalacao ?? e.hora_inicio ?? '00:00'
     return `${e.data_evento ?? '9999-99-99'}T${hora}`
   }
+
+  // Hora actual em HH:MM para comparar com eventos de hoje
+  const agoraHHMM = (() => {
+    const n = new Date()
+    return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`
+  })()
+
   const proximos = eventos
-    .filter(e => e.meu && e.data_evento && e.data_evento >= hoje)
+    .filter(e => {
+      if (!e.meu || !e.data_evento) return false
+      if (e.data_evento > hoje) return true          // dias futuros — sempre incluir
+      if (e.data_evento < hoje) return false         // dias passados — excluir
+      // hoje: incluir só se ainda não terminou (hora_fim) ou não começou (hora_inicio)
+      const fim    = e.hora_fim?.slice(0, 5)
+      const inicio = e.hora_inicio?.slice(0, 5)
+      if (fim)    return fim    > agoraHHMM
+      if (inicio) return inicio > agoraHHMM
+      return true  // sem hora definida — incluir
+    })
     .sort((a, b) => chaveOrdem(a).localeCompare(chaveOrdem(b)))
   const proximoEvento = proximos[0] ?? null
 
