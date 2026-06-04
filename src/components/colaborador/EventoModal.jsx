@@ -105,22 +105,19 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
       <div className="relative z-10 w-full max-w-lg bg-surface-1 border border-border rounded-2xl shadow-2xl flex flex-col"
         style={{ height: '82vh', maxHeight: '92vh' }}>
 
-        {/* Cabeçalho — 2 linhas: logo+cliente+badge+X / nome do evento */}
-        <div className="px-5 pt-4 pb-3 border-b border-border shrink-0">
-          <div className="flex items-center gap-3">
-            <LogoCliente logo={logo} nome={cliente || evento.evento} />
-            <div className="flex-1 min-w-0">
-              {cliente && <p className="font-medium text-accent-muted truncate" style={{ fontSize: 14 }}>{cliente}</p>}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {evento.status && <Badge variante={statusVar(evento.status)}>{labelEstado(evento.status) || evento.status}</Badge>}
-              <button onClick={onFechar} className="text-accent-subtle hover:text-accent p-1.5 -mr-1">
-                <X size={24} />
-              </button>
-            </div>
+        {/* Cabeçalho */}
+        <div className="flex items-center gap-3 px-5 pt-4 pb-3 border-b border-border shrink-0">
+          <LogoCliente logo={logo} nome={cliente || evento.evento} />
+          <div className="flex-1 min-w-0">
+            <p className="font-black text-accent truncate leading-tight" style={{ fontSize: 16 }}>{evento.evento}</p>
+            {cliente && <p className="font-medium text-accent-muted mt-0.5 truncate" style={{ fontSize: 14 }}>{cliente}</p>}
           </div>
-          {/* 2ª linha — Nome do evento */}
-          <p className="mt-2 font-black text-accent leading-tight" style={{ fontSize: 16 }}>{evento.evento}</p>
+          <div className="flex items-center gap-2 shrink-0">
+            {evento.status && <Badge variante={statusVar(evento.status)}>{labelEstado(evento.status) || evento.status}</Badge>}
+            <button onClick={onFechar} className="text-accent-subtle hover:text-accent p-1.5 -mr-1">
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Abas */}
