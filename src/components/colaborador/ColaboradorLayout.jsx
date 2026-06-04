@@ -20,10 +20,10 @@ const usePortrait = () => {
 }
 
 const navItens = [
-  { to: '/colaborador',          fim: true, rotulo: 'Início',  Icone: Home },
-  { to: '/colaborador/agenda',              rotulo: 'Agenda',  Icone: LayoutList },
-  { to: '/colaborador/eventos',             rotulo: 'Eventos', Icone: CalendarDays },
-  { to: '/colaborador/tarefas',             rotulo: 'Tarefas', Icone: ClipboardList },
+  { to: '/apoiot',          fim: true, rotulo: 'Início',  Icone: Home },
+  { to: '/apoiot/agenda',              rotulo: 'Agenda',  Icone: LayoutList },
+  { to: '/apoiot/eventos',             rotulo: 'Eventos', Icone: CalendarDays },
+  { to: '/apoiot/tarefas',             rotulo: 'Tarefas', Icone: ClipboardList },
 ]
 
 function LogoXclusive() {
@@ -62,7 +62,7 @@ export function ColaboradorLayout() {
 
   const logout = () => {
     sair()
-    navigate('/colaborador/login', { replace: true })
+    navigate('/apoiot/login', { replace: true })
   }
 
   return (
@@ -76,7 +76,7 @@ export function ColaboradorLayout() {
         {/* Safe area top — espaço transparente acima do logo */}
         <div style={{ height: 'max(env(safe-area-inset-top, 0px), 6px)' }} />
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <NavLink to="/colaborador">
+          <NavLink to="/apoiot">
             <LogoXclusive />
           </NavLink>
 

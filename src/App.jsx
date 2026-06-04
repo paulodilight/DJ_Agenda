@@ -45,7 +45,7 @@ function RotaProtegida({ children }) {
 
 function RotaColaborador({ children }) {
   const colaborador = useColaboradorStore((s) => s.colaborador)
-  if (!colaborador) return <Navigate to="/colaborador/login" replace />
+  if (!colaborador) return <Navigate to="/apoiot/login" replace />
   return children
 }
 
@@ -93,9 +93,9 @@ export default function App() {
           <Route path="configuracoes" element={<Configuracoes />} />
         </Route>
         {/* ── Área dos colaboradores (Apoio T) ── */}
-        <Route path="/colaborador/login" element={<ColaboradorLogin />} />
+        <Route path="/apoiot/login" element={<ColaboradorLogin />} />
         <Route
-          path="/colaborador"
+          path="/apoiot"
           element={
             <RotaColaborador>
               <ColaboradorLayout />

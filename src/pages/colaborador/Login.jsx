@@ -33,7 +33,7 @@ export function ColaboradorLogin() {
       const colab = await colaboradorApi.login(sel.nome, codigo)
       if (!colab) { setErro('PIN incorrecto.'); setPin(''); return }
       entrar(colab)
-      navigate('/colaborador', { replace: true })
+      navigate('/apoiot', { replace: true })
     } catch (e) { setErro(e.message); setPin('') }
     finally { setAEntrar(false) }
   }

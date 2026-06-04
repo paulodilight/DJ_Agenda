@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom'
 import { CalendarDays, ClipboardList, Camera, ChevronRight, MapPin, CalendarClock, Wrench, LayoutList } from 'lucide-react'
 import { useColaboradorStore } from '@/store'
 import { colaboradorApi } from '@/lib/colaboradorApi'
-import { Avatar } from '@/components/colaborador/Avatar'
-import { EventoModal } from '@/components/colaborador/EventoModal'
+import { Avatar } from '@/components/apoiot/Avatar'
+import { EventoModal } from '@/components/apoiot/EventoModal'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
-import { hhmm, dataLonga } from '@/components/colaborador/format'
+import { hhmm, dataLonga } from '@/components/apoiot/format'
 
 const hojeISO = () => {
   const d = new Date()
@@ -144,9 +144,9 @@ export function ColaboradorDashboard() {
       {/* ── Direita: navegação ── */}
       <div className="order-3 flex flex-col gap-3">
         <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2">As minhas páginas</p>
-        <CardNav to="/colaborador/agenda"  Icone={LayoutList}    rotulo="Agenda" />
-        <CardNav to="/colaborador/eventos" Icone={CalendarDays}  rotulo="Eventos" />
-        <CardNav to="/colaborador/tarefas" Icone={ClipboardList} rotulo="Tarefas" />
+        <CardNav to="/apoiot/agenda"  Icone={LayoutList}    rotulo="Agenda" />
+        <CardNav to="/apoiot/eventos" Icone={CalendarDays}  rotulo="Eventos" />
+        <CardNav to="/apoiot/tarefas" Icone={ClipboardList} rotulo="Tarefas" />
       </div>
 
       {eventoAberto && (
