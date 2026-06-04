@@ -4,6 +4,18 @@
 
 /* Zebra striping removido — feito por dia no ApoioTecnico */
 
+/* Animações do modal colaborador */
+@keyframes tabFromRight {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes tabFromLeft {
+  from { opacity: 0; transform: translateX(-28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.tab-from-right { animation: tabFromRight 0.22s ease-out; }
+.tab-from-left  { animation: tabFromLeft  0.22s ease-out; }
+
 /* Controlo dos cabeçalhos/rodapés de impressão (substitui os defaults do Chrome) */
 @page {
   @top-left    { content: none; }
