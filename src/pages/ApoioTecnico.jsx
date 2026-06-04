@@ -12,6 +12,7 @@ import { corTecnico } from '@/utils/tecnicoColor'
 import { FormEvento } from '@/components/eventos/FormEvento'
 
 const isoData    = (d) => format(d, 'yyyy-MM-dd')
+const hojeStr    = isoData(new Date())
 const hhmm       = (t) => t?.slice(0, 5) ?? null
 const isFds      = (d) => [5, 6].includes(new Date(d + 'T00:00:00').getDay())
 const NOMES_DIA_SEMANA = { 1:'Segunda', 2:'Terça', 3:'Quarta', 4:'Quinta', 5:'Sexta', 6:'Sábado', 0:'Domingo' }
@@ -1104,11 +1105,12 @@ export function ApoioTecnico() {
                 const tecsFolga  = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
                 const zebraCls   = dayIdx % 2 === 1 ? 'bg-white/[0.04]' : ''
                 const isSab      = new Date(dataStr + 'T00:00:00').getDay() === 0
+                const isHoje     = dataStr === hojeStr
 
                 const row = (
                   <tr key={dataStr} className={clsx(
                     'border-b border-border/20 hover:bg-surface-2/20 transition-colors align-middle',
-                    zebraCls
+                    isHoje ? 'bg-amber-400/[0.07] outline outline-1 outline-amber-400/25 outline-offset-[-1px]' : zebraCls
                   )}>
                     <td colSpan={2} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
                       className="px-3 py-2 font-medium whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors text-accent-muted">
@@ -1266,6 +1268,7 @@ export function ApoioTecnico() {
                 const rowSpan      = linhas.length || 1
                 const zebraCls     = dayIdx % 2 === 1 ? 'bg-white/[0.04]' : ''
                 const isSabLinhas  = new Date(dataStr + 'T00:00:00').getDay() === 0
+                const isHojeLinhas = dataStr === hojeStr
                 const rowsToRender = linhas.length > 0 ? linhas : [null]
 
                 const rows = rowsToRender.map((linha, li) => (
@@ -1273,12 +1276,13 @@ export function ApoioTecnico() {
                     className={clsx(
                       'hover:bg-surface-2/20 transition-colors',
                       li < rowsToRender.length - 1 ? 'border-b border-border/10' : 'border-b border-border/20',
-                      zebraCls
+                      isHojeLinhas ? 'bg-amber-400/[0.07]' : zebraCls
                     )}
                   >
                     {li === 0 && (
                       <td rowSpan={rowSpan} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
-                        className="px-3 py-2 text-accent-muted font-medium whitespace-nowrap align-top border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors">
+                        className={clsx('px-3 py-2 font-medium whitespace-nowrap align-top border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors',
+                          isHojeLinhas ? 'text-amber-400 font-bold' : 'text-accent-muted')}>
                         {diaSemanaData(dataStr)}
                       </td>
                     )}
