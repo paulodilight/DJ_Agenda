@@ -11,7 +11,7 @@ import { useConflitos } from '@/hooks/useConflitos'
 import { useEspacos } from '@/hooks/useEspacos'
 import {
   agendaApi, disponibilidadesApi,
-  djsApi, djPreferenciasEspacoApi, categoriasDjApi, djCategoriasApi,
+  djsApi, djPreferenciasEspacoApi, espacoDjPreferenciasApi, categoriasDjApi, djCategoriasApi,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { useUndo } from '@/contexts/UndoContext'
@@ -47,10 +47,10 @@ const ESTADO_OPCOES = [
 ]
 
 const RATINGS = [
-  { campo: 'qualidade_artistica', label: 'Qualidade Artística' },
-  { campo: 'assiduidade',         label: 'Assiduidade' },
-  { campo: 'profissionalismo',    label: 'Profissionalismo' },
-  { campo: 'adaptacao_espaco',    label: 'Adaptação ao Cliente' },
+  { campo: 'qualidade_artistica', label: 'Qualidade Artística', sub: 'Musicalidade | Energia | Conexão' },
+  { campo: 'assiduidade',         label: 'Assiduidade',         sub: 'Frequência | Pontualidade' },
+  { campo: 'profissionalismo',    label: 'Profissionalismo',    sub: 'Imagem | Postura | Conduta' },
+  { campo: 'adaptacao_espaco',    label: 'Adaptação ao Espaço', sub: 'Leitura | Progressão | Envolvência' },
 ]
 
 const PREFS_OPCOES = [
@@ -85,13 +85,14 @@ const MESES_DISP = gerarMeses()
 
 // ── Shared small components ──────────────────────────────────────────────────
 
-function RatingSelector({ label, value, onChange }) {
+function RatingSelector({ label, sub, value, onChange }) {
   return (
     <div>
-      <p className="text-xs font-medium text-accent-muted mb-1.5">
+      <p className="text-xs font-medium text-accent-muted mb-0.5">
         {label}
         <span className="ml-1.5 text-accent-subtle font-normal">{value}/5</span>
       </p>
+      {sub && <p className="text-[10px] text-accent-subtle/70 mb-1.5">{sub}</p>}
       <div className="flex gap-1">
         {[0, 1, 2, 3, 4, 5].map((n) => (
           <button key={n} type="button" onClick={() => onChange(n)}
@@ -194,6 +195,7 @@ export function DJPerfil() {
   const [perfilErro, setPerfilErro]     = useState(null)
   const [perfilSucesso, setPerfilSucesso] = useState(false)
   const [prefsEspaco, setPrefsEspaco]   = useState({})
+  const [prefsClienteDj, setPrefsClienteDj] = useState({}) // { [espaco_id]: 'preferido'|'excluido' } — o que os espaços marcaram sobre este DJ
   const [catsSel, setCatsSel]           = useState(['', '', ''])
   const [categorias, setCategorias]     = useState([])
   const [fotoFile, setFotoFile]         = useState(null)
@@ -297,6 +299,15 @@ export function DJPerfil() {
         const map = {}
         rows.forEach(r => { map[r.espaco_id] = r.preferencia })
         setPrefsEspaco(map)
+      }).catch(() => {})
+    // Sentido inverso: o que os espaços marcaram sobre este DJ (preferido/excluido)
+    espacoDjPreferenciasApi.listarPorDj(id)
+      .then(rows => {
+        const map = {}
+        ;(rows ?? []).forEach(r => {
+          if (r.tipo === 'preferido' || r.tipo === 'excluido') map[r.espaco_id] = r.tipo
+        })
+        setPrefsClienteDj(map)
       }).catch(() => {})
   }, [aba, dj, id])
 
@@ -425,6 +436,12 @@ export function DJPerfil() {
         .filter(([, v]) => v && v !== 'neutro')
         .map(([espaco_id, preferencia]) => ({ espaco_id, preferencia }))
       await djPreferenciasEspacoApi.guardar(id, prefs)
+
+      // Sentido inverso: o que os espaços marcam sobre este DJ (preferido/excluido)
+      const prefsClientes = Object.entries(prefsClienteDj)
+        .filter(([, v]) => v === 'preferido' || v === 'excluido')
+        .map(([espaco_id, tipo]) => ({ espaco_id, tipo }))
+      await espacoDjPreferenciasApi.guardarPorDj(id, prefsClientes)
 
       setFotoFile(null)
       recarregarDJ()
@@ -776,17 +793,18 @@ export function DJPerfil() {
               </div>
             )}
 
-            {/* ── Avaliação ── */}
+            {/* ── Scoring ── */}
             <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
               <div className="px-5 py-3.5 border-b border-border/50">
-                <p className="text-xs font-semibold text-accent uppercase tracking-wider">Avaliação</p>
+                <p className="text-xs font-semibold text-accent uppercase tracking-wider">Scoring</p>
               </div>
               <div className="px-5 py-4">
                 <div className="grid grid-cols-2 gap-5">
-                  {RATINGS.map(({ campo, label }) => (
+                  {RATINGS.map(({ campo, label, sub }) => (
                     <RatingSelector
                       key={campo}
                       label={label}
+                      sub={sub}
                       value={perfilForm[campo] ?? 0}
                       onChange={val => setPerfilForm(f => ({ ...f, [campo]: val }))}
                     />
@@ -844,6 +862,47 @@ export function DJPerfil() {
                 />
               </div>
             </div>
+
+            {/* ── Preferências dos Clientes (sentido espaço → DJ, editável) ── */}
+            {espacos.length > 0 && (
+              <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-border/50">
+                  <p className="text-xs font-semibold text-accent uppercase tracking-wider">Preferências dos Clientes</p>
+                  <p className="text-[11px] text-accent-subtle mt-0.5">Como cada cliente classifica este DJ.</p>
+                </div>
+                <div className="px-5 py-4 flex flex-col gap-3">
+                  {espacos.map(esp => {
+                    const pref = prefsClienteDj[esp.id] ?? 'neutro'
+                    return (
+                      <div key={esp.id} className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-accent-muted w-36 truncate">{esp.nome}</span>
+                        <div className="flex gap-1">
+                          {[
+                            { value: 'preferido', label: 'Preferido', cor: 'bg-status-confirmado/20 text-status-confirmado border-status-confirmado/40' },
+                            { value: 'neutro',    label: 'Neutro',    cor: 'bg-surface-2 text-accent-muted border-border' },
+                            { value: 'excluido',  label: 'Excluído',  cor: 'bg-status-cancelado/20 text-status-cancelado border-status-cancelado/40' },
+                          ].map(op => (
+                            <button
+                              key={op.value}
+                              type="button"
+                              onClick={() => setPrefsClienteDj(p => ({ ...p, [esp.id]: op.value }))}
+                              className={clsx(
+                                'px-2.5 py-1 rounded border text-[11px] font-medium transition-colors',
+                                pref === op.value
+                                  ? op.cor
+                                  : 'bg-surface-2 text-accent-subtle border-border hover:text-accent-muted'
+                              )}
+                            >
+                              {op.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ── Preferências por Cliente ── */}
             {espacos.length > 0 && (

@@ -43,10 +43,10 @@ const ESTADO_OPCOES = [
 ]
 
 const RATINGS = [
-  { campo: 'qualidade_artistica', label: 'Qualidade Artística' },
-  { campo: 'assiduidade',         label: 'Assiduidade' },
-  { campo: 'profissionalismo',    label: 'Profissionalismo' },
-  { campo: 'adaptacao_espaco',    label: 'Adaptação ao Cliente' },
+  { campo: 'qualidade_artistica', label: 'Qualidade Artística', sub: 'Musicalidade | Energia | Conexão' },
+  { campo: 'assiduidade',         label: 'Assiduidade',         sub: 'Frequência | Pontualidade' },
+  { campo: 'profissionalismo',    label: 'Profissionalismo',    sub: 'Imagem | Postura | Conduta' },
+  { campo: 'adaptacao_espaco',    label: 'Adaptação ao Espaço', sub: 'Leitura | Progressão | Envolvência' },
 ]
 
 const PREFS_OPCOES = [
@@ -55,13 +55,14 @@ const PREFS_OPCOES = [
   { value: 'recusa',  label: 'Recusa',   cor: 'bg-status-cancelado/20 text-status-cancelado border-status-cancelado/40' },
 ]
 
-function RatingSelector({ label, value, onChange }) {
+function RatingSelector({ label, sub, value, onChange }) {
   return (
     <div>
-      <p className="text-xs font-medium text-accent-muted mb-1.5">
+      <p className="text-xs font-medium text-accent-muted mb-0.5">
         {label}
         <span className="ml-1.5 text-accent-subtle font-normal">{value}/5</span>
       </p>
+      {sub && <p className="text-[10px] text-accent-subtle/70 mb-1.5">{sub}</p>}
       <div className="flex gap-1">
         {[0, 1, 2, 3, 4, 5].map((n) => (
           <button
@@ -376,12 +377,13 @@ export function FormDJ({ aberto, dj, onFechar, onGuardado }) {
 
           {/* Ratings */}
           <div className="border-t border-border pt-4 flex flex-col gap-4">
-            <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Avaliação</p>
+            <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Scoring</p>
             <div className="grid grid-cols-2 gap-4">
-              {RATINGS.map(({ campo, label }) => (
+              {RATINGS.map(({ campo, label, sub }) => (
                 <RatingSelector
                   key={campo}
                   label={label}
+                  sub={sub}
                   value={form[campo]}
                   onChange={setRating(campo)}
                 />

@@ -656,8 +656,9 @@ export function ApoioTecnico() {
     dias.forEach(dia => {
       const dataStr = isoData(dia)
       const linhas  = []
-      // Excluir LMD das linhas principais (é mostrado como coluna)
-      espacos.filter(e => e.id !== i4djEspacoId).forEach(espaco => {
+      // LMD é cliente real: entra nas linhas como qualquer outro espaço
+      // (continua também a ser mostrado na coluna especial "LMD" à direita)
+      espacos.forEach(espaco => {
         const k      = `${dataStr}|${espaco.id}`
         const ev     = evIdx[k] ?? null
         const dj     = djIdx[k]

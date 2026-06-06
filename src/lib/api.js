@@ -76,11 +76,11 @@ export const espacosApi = {
         .gte('data', dataInicio)
         .lte('data', dataFim)
         .neq('estado', 'cancelado'),
-      supabase.from('eventos')
+      supabase.from('supa_eventos')
         .select('espaco_id')
-        .gte('data', dataInicio)
-        .lte('data', dataFim)
-        .neq('estado', 'cancelado'),
+        .gte('data_evento', dataInicio)
+        .lte('data_evento', dataFim)
+        .neq('status', 'cancelado'),
     ])
     const mapa = {}
     ;(agendaRes.data ?? []).forEach(r => {
@@ -694,6 +694,33 @@ export const espacoDjPreferenciasApi = {
     const { data, error } = await supabase
       .from('espaco_dj_preferencias')
       .insert(prefs.map((p) => ({ espaco_id: espacoId, dj_id: p.dj_id, tipo: p.tipo })))
+      .select()
+    if (error) throw error
+    return data
+  },
+
+  // Sentido inverso: gerir as preferências dos espaços a partir do perfil do DJ
+  async listarPorDj(djId) {
+    const { data, error } = await supabase
+      .from('espaco_dj_preferencias')
+      .select('espaco_id, tipo, espacos(nome)')
+      .eq('dj_id', djId)
+    if (error) throw error
+    return data
+  },
+
+  async guardarPorDj(djId, prefs) {
+    // prefs = [{ espaco_id, tipo }] — só entradas 'preferido' e 'excluido'
+    const { error: delErr } = await supabase
+      .from('espaco_dj_preferencias')
+      .delete()
+      .eq('dj_id', djId)
+      .in('tipo', ['preferido', 'excluido'])
+    if (delErr) throw delErr
+    if (!prefs.length) return []
+    const { data, error } = await supabase
+      .from('espaco_dj_preferencias')
+      .insert(prefs.map((p) => ({ espaco_id: p.espaco_id, dj_id: djId, tipo: p.tipo })))
       .select()
     if (error) throw error
     return data
