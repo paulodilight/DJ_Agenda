@@ -30,9 +30,10 @@ function LogoCliente({ logo, nome, size = 48 }) {
   )
 }
 
-function EventoLinha({ evento, onClick }) {
-  const logo    = evento.espacos?.logo_url
-  const cliente = evento.espacos?.nome || evento.cliente || null
+function EventoLinha({ evento, mapaTecnicos, onClick }) {
+  const logo      = evento.espacos?.logo_url
+  const cliente   = evento.espacos?.nome || evento.cliente || null
+  const tecnico   = (mapaTecnicos && evento.tecnico_id ? mapaTecnicos[evento.tecnico_id] : null) || evento.responsavel || null
   const dataInst = evento.dia_instalacao
     ? dataLonga(evento.dia_instalacao)
     : evento.data_evento ? dataLonga(evento.data_evento) : null
@@ -50,6 +51,7 @@ function EventoLinha({ evento, onClick }) {
             {[dataInst, horaInst].filter(Boolean).join(' · ')}
           </p>
         )}
+        {tecnico && <p className="text-xs text-accent-subtle/70 truncate">{tecnico}</p>}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {evento.status && (
@@ -130,7 +132,7 @@ export function ColaboradorEventos() {
       ) : (
         <div className="flex flex-col gap-2">
           {lista.map(ev => (
-            <EventoLinha key={ev.id} evento={ev} onClick={() => setAberto(ev)} />
+            <EventoLinha key={ev.id} evento={ev} mapaTecnicos={mapaTecnicos} onClick={() => setAberto(ev)} />
           ))}
         </div>
       )}
