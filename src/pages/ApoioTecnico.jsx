@@ -1,8 +1,8 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle } from 'lucide-react'
-import { useMesStore } from '@/store'
+import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, CheckCircle } from 'lucide-react'
+import { useMesStore, useColaboradorStore } from '@/store'
 import { supabase } from '@/lib/supabase'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -429,9 +429,160 @@ function FolgaChip({ tecnico, cor, dataStr, onDragStart, isDragging }) {
   )
 }
 
+// ── Modal detalhe de evento (notas pessoais + assinatura) ────────────────────
+function ModalDetalheEvento({ linha, tecnicos, tecCorMap, onFechar, onGuardado }) {
+  const colaborador = useColaboradorStore(s => s.colaborador)
+  const [notas, setNotas]               = useState('')
+  const [loadingNotas, setLoadingNotas] = useState(false)
+  const [salvando, setSalvando]         = useState(false)
+  const [assinando, setAssinando]       = useState(false)
+
+  const estouAtribuido = colaborador && (linha?.tecIds ?? []).includes(colaborador.id)
+  const souResponsavel = colaborador && linha?.ev?.tecnico_id === colaborador.id
+
+  useEffect(() => {
+    if (!estouAtribuido || !linha?.ev?.id) { setNotas(''); return }
+    let activo = true
+    setLoadingNotas(true)
+    supabase.from('evento_tecnicos')
+      .select('notas').eq('evento_id', linha.ev.id).eq('tecnico_id', colaborador.id).maybeSingle()
+      .then(({ data }) => { if (activo) { setNotas(data?.notas ?? ''); setLoadingNotas(false) } })
+    return () => { activo = false }
+  }, [linha?.ev?.id, colaborador?.id, estouAtribuido])
+
+  const guardarNotas = async () => {
+    if (!colaborador || !linha?.ev?.id) return
+    setSalvando(true)
+    await supabase.from('evento_tecnicos').update({ notas })
+      .eq('evento_id', linha.ev.id).eq('tecnico_id', colaborador.id)
+    setSalvando(false)
+  }
+
+  const assinar = async () => {
+    if (!colaborador || !linha?.ev?.id) return
+    setAssinando(true)
+    await supabase.from('supa_eventos')
+      .update({ assinado_em: new Date().toISOString(), assinado_por: colaborador.id })
+      .eq('id', linha.ev.id)
+    setAssinando(false)
+    onGuardado()
+    onFechar()
+  }
+
+  if (!linha) return null
+
+  return (
+    <Modal aberto onFechar={onFechar} largura="max-w-sm">
+      <div className="flex flex-col">
+        <div className="flex items-start justify-between px-5 py-4 border-b border-border">
+          <div>
+            <p className="text-sm font-bold text-accent">{linha.ev?.evento ?? '—'}</p>
+            <p className="text-[11px] text-accent-subtle mt-0.5">
+              {linha.espacoNome} · {diaSemanaData(linha.dataStr)}
+              {linha.ev?.hora_inicio && ` · ${hhmm(linha.ev.hora_inicio)}`}
+            </p>
+          </div>
+          <button onClick={onFechar} className="text-accent-subtle hover:text-accent shrink-0 ml-3"><X size={15} /></button>
+        </div>
+
+        <div className="px-5 py-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
+          {/* Horários */}
+          {(linha.ev?.hora_instalacao || linha.ev?.hora_inicio) && (
+            <div className="flex gap-6">
+              {linha.ev?.hora_instalacao && (
+                <div>
+                  <p className="text-[9px] text-accent-subtle uppercase tracking-widest mb-0.5">Instalação</p>
+                  <p className="text-lg font-black text-accent tabular-nums">{hhmm(linha.ev.hora_instalacao)}</p>
+                </div>
+              )}
+              {linha.ev?.hora_inicio && (
+                <div>
+                  <p className="text-[9px] text-accent-subtle uppercase tracking-widest mb-0.5">Início</p>
+                  <p className="text-lg font-black text-accent tabular-nums">{hhmm(linha.ev.hora_inicio)}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Técnicos */}
+          {(linha.tecIds ?? []).length > 0 && (
+            <div>
+              <p className="text-[9px] text-accent-subtle uppercase tracking-widest mb-1.5">Técnicos</p>
+              <div className="flex flex-wrap gap-1">
+                {(linha.tecIds ?? []).map(tid => {
+                  const tec = tecnicos.find(t => t.id === tid)
+                  const cor = tecCorMap[tid]
+                  if (!tec) return null
+                  return (
+                    <span key={tid} className={clsx(
+                      'inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold border',
+                      cor?.chip ?? 'bg-surface-3 text-accent-muted border-border'
+                    )}>{tec.nome}</span>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* DJs */}
+          {(linha.djs ?? []).length > 0 && (
+            <div>
+              <p className="text-[9px] text-accent-subtle uppercase tracking-widest mb-1">DJ</p>
+              <p className="text-xs text-accent-muted">{linha.djs.join(' · ')}</p>
+            </div>
+          )}
+
+          {/* Notas pessoais — só visível se o técnico está atribuído ao evento */}
+          {estouAtribuido && (
+            <div>
+              <p className="text-[9px] text-accent-subtle uppercase tracking-widest mb-1.5">As minhas notas</p>
+              {loadingNotas ? (
+                <p className="text-xs text-accent-subtle/40">A carregar…</p>
+              ) : (
+                <>
+                  <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={3}
+                    className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-xs text-accent resize-none focus:outline-none focus:border-white/20 placeholder:text-accent-subtle/40"
+                    placeholder="Notas pessoais sobre este evento…" />
+                  <div className="flex justify-end mt-1.5">
+                    <Button onClick={guardarNotas} disabled={salvando}>
+                      {salvando ? 'A guardar…' : 'Guardar notas'}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Assinatura — só para o responsável principal do evento */}
+          {souResponsavel && (
+            <div>
+              <p className="text-[9px] text-accent-subtle uppercase tracking-widest mb-1.5">Assinatura de Presença</p>
+              {linha.ev.assinado_em ? (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-status-confirmado/10 border border-status-confirmado/25">
+                  <CheckCircle size={13} className="text-status-confirmado shrink-0" />
+                  <span className="text-xs text-status-confirmado">
+                    Confirmado {format(new Date(linha.ev.assinado_em), "d MMM yyyy 'às' HH:mm", { locale: pt })}
+                  </span>
+                </div>
+              ) : (
+                <button onClick={assinar} disabled={assinando}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-status-confirmado/15 hover:bg-status-confirmado/25 border border-status-confirmado/30 text-status-confirmado text-xs font-bold transition-all disabled:opacity-50">
+                  <CheckCircle size={13} />
+                  {assinando ? 'A assinar…' : 'Confirmar presença'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 export function ApoioTecnico() {
   const { anoMes } = useMesStore()
+  const colaborador = useColaboradorStore(s => s.colaborador)
   const [loading, setLoading]           = useState(true)
   const [tecnicos, setTecnicos]         = useState([])
   const [agendamentos, setAgendamentos] = useState([])
@@ -442,11 +593,12 @@ export function ApoioTecnico() {
   const [modalAtrib, setModalAtrib]       = useState(null)
   const [modalFolga, setModalFolga]       = useState(null)
   const [modalEditEvento, setModalEditEvento] = useState(null) // evento obj
+  const [modalDetalhe, setModalDetalhe]   = useState(null)   // linha obj
   const [filtroEspaco, setFiltroEspaco]   = useState('')
   const [filtroTecnico, setFiltroTecnico] = useState('')
   const [pesquisa, setPesquisa]           = useState('')
   const [vista, setVista]                 = useState('linhas')
-  const [ocultarVazios, setOcultarVazios] = useState(true)
+  const [ocultarVazios, setOcultarVazios] = useState(false)
 
   // ── Scroll refs ─────────────────────────────────────────────────────────────
   const scrollRef   = useRef(null)
@@ -476,7 +628,7 @@ export function ApoioTecnico() {
       supabase.from('espacos').select('id, nome').eq('activo', true).order('nome'),
       supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicio).lte('data', dataFim),
       supabase.from('supa_eventos')
-        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_instalacao, status, tecnico_id, valor_apoio_tecnico')
+        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_instalacao, status, tecnico_id, valor_apoio_tecnico, assinado_em, assinado_por')
         .gte('data_evento', dataInicio).lte('data_evento', dataFim).neq('status', 'cancelado'),
       supabase.from('agenda')
         .select('id, espaco_id, data, dj_nome, dj_id, tipo_slot, estado, djs(nome, nome_artistico)')
@@ -867,12 +1019,12 @@ export function ApoioTecnico() {
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, linha)}
         onClick={!isDraggingAny
-          ? () => setModalAtrib({
+          ? e => { e.stopPropagation(); setModalAtrib({
               data: linha.dataStr, espaco_id: linha.espaco_id,
               espaco: linha.espacoNome, agendamento: linha.ag,
               evento: linha.ev, dj: linha.djs?.join(', '),
               tecIds,
-            })
+            }) }
           : undefined
         }
         className={clsx(
@@ -920,25 +1072,14 @@ export function ApoioTecnico() {
       {/* ── Filtros ── */}
       <div className="shrink-0 border-b border-border/50 bg-surface-0/40">
 
-        {/* Linha 1 — só clientes */}
-        <div className="px-5 py-2 flex items-center gap-1 flex-wrap border-b border-border/30">
-          <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Cliente</span>
-          <button onClick={() => setFiltroEspaco('')}
-            className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
-              filtroEspaco === '' ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
-            Todos
-          </button>
-          {espacosActivos.map(e => (
-            <button key={e.id} onClick={() => setFiltroEspaco(filtroEspaco === e.id ? '' : e.id)}
-              className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
-                filtroEspaco === e.id ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
-              {e.nome.trim()}
-            </button>
-          ))}
-        </div>
-
-        {/* Linha 2 — apoio + vista + pesquisa */}
+        {/* Linha única — cliente dropdown + apoio + vista + pesquisa */}
         <div className="px-5 py-2 flex items-center gap-1 flex-wrap">
+          <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest">Cliente</span>
+          <select value={filtroEspaco} onChange={e => setFiltroEspaco(e.target.value)}
+            className="bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-white/20 mr-3">
+            <option value="">Todos</option>
+            {espacosActivos.map(e => <option key={e.id} value={e.id}>{e.nome.trim()}</option>)}
+          </select>
           <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Apoio</span>
           <button onClick={() => setFiltroTecnico('')}
             className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
@@ -1110,10 +1251,10 @@ export function ApoioTecnico() {
 
                 const row = (
                   <tr key={dataStr} className={clsx(
-                    'border-b border-border/20 hover:bg-surface-2/20 transition-colors align-middle',
+                    'border-b border-border/20 hover:bg-surface-2/20 align-middle',
                     isHoje ? 'bg-zinc-100 [&_td]:!text-gray-700' : zebraCls
                   )}>
-                    <td colSpan={2} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
+                    <td colSpan={2} onClick={e => { e.stopPropagation(); setModalFolga({ data: dataStr }) }} title="Gerir folgas"
                       className={clsx('px-3 py-2 font-medium whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors',
                         isHoje ? 'text-gray-800 font-bold' : 'text-accent-muted')}>
                       {diaSemanaData(dataStr)}
@@ -1124,21 +1265,21 @@ export function ApoioTecnico() {
                         i > 0 && <td key={`sep-${dataStr}-${i}`} className="p-0 bg-border/30 w-px" />,
                         renderTecCell(linha, i > 0 ? 'pl-3' : ''),
                         <td key={`esp-${dataStr}-${i}`} className={clsx('px-2 py-2 font-medium whitespace-nowrap', linha?.espacoNome?.toLowerCase() === 'lmd' ? 'text-red-400' : 'text-accent-muted')}>{linha?.espacoNome ?? ''}</td>,
-                        /* Evento — clique para editar, criar com espaço, ou criar só com data */
+                        /* Evento — click na linha abre detalhe; lápis edita */
                         <td key={`ev-${dataStr}-${i}`}
-                          onClick={() => {
-                            if (linha?.ev) setModalEditEvento(linha.ev)
-                            else if (linha) setModalEditEvento({ espaco_id: linha.espaco_id, data_evento: dataStr })
-                            else if (i === 0) setModalEditEvento({ data_evento: dataStr })
-                          }}
-                          className="px-2 py-2 text-accent-muted max-w-0 group cursor-pointer hover:text-accent transition-colors">
+                          onClick={() => linha?.ev && setModalDetalhe(linha)}
+                          className={clsx('px-2 py-2 text-accent-muted max-w-0 group', linha?.ev && 'cursor-pointer hover:text-accent')}>
                           <span className="flex items-center gap-1">
                             <span className="block truncate">{linha?.ev?.evento ?? ''}</span>
                             {linha?.ev
-                              ? <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
+                              ? <Pencil size={10}
+                                  onClick={e => { e.stopPropagation(); setModalEditEvento(linha.ev) }}
+                                  className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity cursor-pointer" />
                               : linha
-                                ? <span className="opacity-0 group-hover:opacity-30 text-[10px]">+ evento</span>
-                                : i === 0 && <span className="opacity-0 group-hover:opacity-40 text-[10px] text-status-confirmado/70">+ evento</span>}
+                                ? <span onClick={e => { e.stopPropagation(); setModalEditEvento({ espaco_id: linha.espaco_id, data_evento: dataStr }) }}
+                                    className="opacity-0 group-hover:opacity-30 text-[10px] cursor-pointer">+ evento</span>
+                                : i === 0 && <span onClick={e => { e.stopPropagation(); setModalEditEvento({ data_evento: dataStr }) }}
+                                    className="opacity-0 group-hover:opacity-40 text-[10px] text-status-confirmado/70 cursor-pointer">+ evento</span>}
                           </span>
                         </td>,
                         <td key={`ins-${dataStr}-${i}`} className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium">
@@ -1156,7 +1297,7 @@ export function ApoioTecnico() {
                     })}
                     {/* Folga */}
                     <td
-                      onClick={() => setModalFolga({ data: dataStr })}
+                      onClick={e => { e.stopPropagation(); setModalFolga({ data: dataStr }) }}
                       onDragOver={e => { e.preventDefault(); setDragOverFolga(dataStr) }}
                       onDragLeave={() => setDragOverFolga(null)}
                       onDrop={e => handleFolgaDrop(e, dataStr)}
@@ -1275,14 +1416,16 @@ export function ApoioTecnico() {
 
                 const rows = rowsToRender.map((linha, li) => (
                   <tr key={linha ? `${dataStr}-${linha.espaco_id}` : `${dataStr}-empty`}
+                    onClick={() => linha?.ev && setModalDetalhe(linha)}
                     className={clsx(
-                      'hover:bg-surface-2/20 transition-colors',
+                      'hover:bg-surface-2/20',
+                      linha?.ev && 'cursor-pointer',
                       li < rowsToRender.length - 1 ? 'border-b border-border/10' : 'border-b border-border/20',
                       isHojeLinhas ? 'bg-zinc-100 [&_td]:!text-gray-700' : zebraCls
                     )}
                   >
                     {li === 0 && (
-                      <td rowSpan={rowSpan} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
+                      <td rowSpan={rowSpan} onClick={e => { e.stopPropagation(); setModalFolga({ data: dataStr }) }} title="Gerir folgas"
                         className={clsx('px-3 py-2 font-medium whitespace-nowrap align-top border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors',
                           isHojeLinhas ? 'text-gray-800 font-bold' : 'text-accent-muted')}>
                         {diaSemanaData(dataStr)}
@@ -1292,21 +1435,19 @@ export function ApoioTecnico() {
                     {linha ? renderTecCell(linha) : <td className="px-2 py-2" />}
                     {/* Cliente */}
                     <td className={clsx('px-2 py-2 font-medium whitespace-nowrap', linha?.espacoNome?.toLowerCase() === 'lmd' ? 'text-red-400' : 'text-accent-muted')}>{linha?.espacoNome ?? ''}</td>
-                    {/* Evento — clique para editar, criar com espaço, ou criar só com data */}
-                    <td
-                      onClick={() => {
-                        if (linha?.ev) setModalEditEvento(linha.ev)
-                        else if (linha) setModalEditEvento({ espaco_id: linha.espaco_id, data_evento: dataStr })
-                        else setModalEditEvento({ data_evento: dataStr })
-                      }}
-                      className="px-2 py-2 text-accent-muted max-w-0 group cursor-pointer hover:text-accent transition-colors">
+                    {/* Evento — lápis edita (stopPropagation), resto da linha abre detalhe via <tr> */}
+                    <td className="px-2 py-2 text-accent-muted max-w-0 group">
                       <span className="flex items-center gap-1">
                         <span className="block truncate">{linha?.ev?.evento ?? ''}</span>
                         {linha?.ev
-                          ? <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
+                          ? <Pencil size={10}
+                              onClick={e => { e.stopPropagation(); setModalEditEvento(linha.ev) }}
+                              className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity cursor-pointer hover:opacity-70" />
                           : linha
-                            ? <span className="opacity-0 group-hover:opacity-30 text-[10px]">+ evento</span>
-                            : <span className="opacity-0 group-hover:opacity-40 text-[10px] text-status-confirmado/70">+ evento</span>}
+                            ? <span onClick={e => { e.stopPropagation(); setModalEditEvento({ espaco_id: linha.espaco_id, data_evento: dataStr }) }}
+                                className="opacity-0 group-hover:opacity-30 text-[10px] cursor-pointer">+ evento</span>
+                            : <span onClick={e => { e.stopPropagation(); setModalEditEvento({ data_evento: dataStr }) }}
+                                className="opacity-0 group-hover:opacity-40 text-[10px] text-status-confirmado/70 cursor-pointer">+ evento</span>}
                       </span>
                     </td>
                     {/* Hora Inst. */}
@@ -1326,7 +1467,7 @@ export function ApoioTecnico() {
                     {/* Folga — rowSpan */}
                     {li === 0 && (
                       <td rowSpan={rowSpan}
-                        onClick={() => setModalFolga({ data: dataStr })}
+                        onClick={e => { e.stopPropagation(); setModalFolga({ data: dataStr }) }}
                         onDragOver={e => { e.preventDefault(); setDragOverFolga(dataStr) }}
                         onDragLeave={() => setDragOverFolga(null)}
                         onDrop={e => handleFolgaDrop(e, dataStr)}
@@ -1433,6 +1574,15 @@ export function ApoioTecnico() {
         onFechar={() => setModalEditEvento(null)}
         onGuardado={() => { setModalEditEvento(null); carregarComScroll() }}
       />
+      {modalDetalhe && (
+        <ModalDetalheEvento
+          linha={modalDetalhe}
+          tecnicos={tecnicos}
+          tecCorMap={tecCorMap}
+          onFechar={() => setModalDetalhe(null)}
+          onGuardado={() => { setModalDetalhe(null); carregarComScroll() }}
+        />
+      )}
 
       {/* Modal conflito drag & drop */}
       {conflitoDrag && (
