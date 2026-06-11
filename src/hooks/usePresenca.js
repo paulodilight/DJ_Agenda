@@ -23,7 +23,7 @@ const CFG = {
 }
 
 // Tolerância (minutos) para a janela de assinatura.
-export const TOLERANCIA_MIN = 5
+export const TOLERANCIA_MIN = 30
 
 /** Date do início a partir de data (YYYY-MM-DD) + hora (HH:MM[:SS]). */
 export function inicioEvento(data, hora) {

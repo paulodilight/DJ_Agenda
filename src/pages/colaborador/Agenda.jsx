@@ -260,31 +260,30 @@ export function ColaboradorAgenda() {
         <div className="px-4 py-2 flex items-center gap-1 flex-wrap border-b border-border/30">
           <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-1">Apoio</span>
           <button onClick={() => setFiltroMeu(false)}
-            className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
-              !filtroMeu ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
+            className={clsx('px-3 py-1.5 rounded text-xs border',
+              !filtroMeu ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border')}>
             Todos
           </button>
           {colaborador && (
             <button onClick={() => setFiltroMeu(true)}
-              className={clsx('px-3 py-1.5 rounded text-xs transition-colors border font-medium',
+              className={clsx('px-3 py-1.5 rounded text-xs border font-medium',
                 filtroMeu
                   ? (tecCorMap[colaborador.id]?.chip ?? 'bg-amber-400/15 text-amber-400 border-amber-400/30')
-                  : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
+                  : 'bg-surface-2 text-accent-muted border-border')}>
               {colaborador.nome}
             </button>
           )}
+          {espacosActivos.length > 0 && (
+            <>
+              <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest ml-3 mr-1">Cliente</span>
+              <select value={filtroEspaco} onChange={e => setFiltro(e.target.value)}
+                className="bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-white/20">
+                <option value="">Todos</option>
+                {espacosActivos.map(e => <option key={e.id} value={e.id}>{e.nome.trim()}</option>)}
+              </select>
+            </>
+          )}
         </div>
-
-        {espacosActivos.length > 0 && (
-          <div className="px-4 py-2 flex items-center gap-2">
-            <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest">Cliente</span>
-            <select value={filtroEspaco} onChange={e => setFiltro(e.target.value)}
-              className="bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-white/20">
-              <option value="">Todos</option>
-              {espacosActivos.map(e => <option key={e.id} value={e.id}>{e.nome.trim()}</option>)}
-            </select>
-          </div>
-        )}
       </div>
 
       {/* Aviso landscape (mobile portrait) */}
@@ -349,7 +348,7 @@ export function ColaboradorAgenda() {
                         ev && 'cursor-pointer',
                         li < linhas.length - 1 ? 'border-b border-border/10' : 'border-b border-border/20',
                         isHoje
-                          ? 'bg-zinc-100 [&_td]:!text-gray-700'
+                          ? 'bg-zinc-400/25'
                           : clsx(zebraCls, isWeekend && 'bg-amber-400/[0.03]'),
                       )}>
 
@@ -384,7 +383,7 @@ export function ColaboradorAgenda() {
                       <td className="px-2 py-2 text-accent-muted">
                         {ev ? (
                           <button onClick={() => setAberto(ev)}
-                            className="hover:text-amber-400 transition-colors text-left leading-snug line-clamp-2">
+                            className="text-left leading-snug line-clamp-2">
                             {ev.evento}
                           </button>
                         ) : null}
