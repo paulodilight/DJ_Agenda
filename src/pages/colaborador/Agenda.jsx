@@ -275,7 +275,6 @@ export function ColaboradorAgenda() {
           )}
           {espacosActivos.length > 0 && (
             <>
-              <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest ml-3 mr-1">Cliente</span>
               <select value={filtroEspaco} onChange={e => setFiltro(e.target.value)}
                 className="bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-white/20">
                 <option value="">Todos</option>
