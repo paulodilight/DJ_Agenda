@@ -46,12 +46,12 @@ function EventoLinha({ evento, mapaTecnicos, onClick }) {
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
         <p className="text-sm font-bold text-accent truncate">{evento.evento}</p>
         {cliente && <p className="text-xs text-accent-muted truncate">{cliente}</p>}
-        {(dataInst || horaInst) && (
+        {(dataInst || horaInst || tecnico) && (
           <p className="text-xs text-accent-subtle truncate capitalize">
             {[dataInst, horaInst].filter(Boolean).join(' · ')}
+            {tecnico && <span className="font-bold text-white normal-case"> · {tecnico}</span>}
           </p>
         )}
-        {tecnico && <p className="text-xs text-accent-subtle/70 truncate">{tecnico}</p>}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {evento.status && (
