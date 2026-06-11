@@ -46,7 +46,7 @@ export function EspacoPerfil() {
 
   const [form, setForm] = useState({
     nome: '', tipo: 'club', budget_max: '',
-    dias_sem_repeticao: 14, dias_espacamento: 7, notas: '',
+    dias_sem_repeticao: 14, dias_espacamento: 7, notas: '', notas_gerais: '',
     ordem_distribuicao: '', logo_url: '',
   })
   const [logoUploading, setLogoUploading] = useState(false)
@@ -84,6 +84,7 @@ export function EspacoPerfil() {
         dias_sem_repeticao: data.dias_sem_repeticao ?? 14,
         dias_espacamento: data.dias_espacamento ?? 7,
         notas: data.notas ?? '',
+        notas_gerais: data.notas_gerais ?? '',
         ordem_distribuicao: data.ordem_distribuicao ?? '',
         logo_url: data.logo_url ?? '',
         grupo: data.grupo ?? '',
@@ -393,6 +394,7 @@ export function EspacoPerfil() {
               </div>
             </div>
             <Textarea label="Notas / regras do Cliente" value={form.notas} onChange={setField('notas')} placeholder="Regras específicas, preferências..." />
+            <Textarea label="Notas Gerais para o DJ" value={form.notas_gerais} onChange={setField('notas_gerais')} placeholder="Informações que o DJ vê na sua app: rider, parqueamento, contactos, regras do espaço…" rows={5} />
           </CardBody>
         </Card>
 
