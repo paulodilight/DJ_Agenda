@@ -703,7 +703,7 @@ export const espacoDjPreferenciasApi = {
   async listarPorDj(djId) {
     const { data, error } = await supabase
       .from('espaco_dj_preferencias')
-      .select('espaco_id, tipo, espacos(nome)')
+      .select('espaco_id, tipo, interesse, espacos(nome)')
       .eq('dj_id', djId)
     if (error) throw error
     return data

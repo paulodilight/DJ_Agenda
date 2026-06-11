@@ -58,18 +58,21 @@ export function useConflitos({ agenda, dataInicio, dataFim }) {
 
   useEffect(() => { carregar() }, [carregar])
 
-  const conflictsIdx = useMemo(() => {
-    const bad = new Set()
+  const conflictsMap = useMemo(() => {
+    const map = new Map() // id → Set de razões
+
+    const addRazao = (id, razao) => {
+      if (!map.has(id)) map.set(id, new Set())
+      map.get(id).add(razao)
+    }
 
     // Só considera slots activos para deteção de duplicados
     const ESTADOS_INACTIVOS = new Set(['cancelado', 'sem_efeito'])
     const activos = agenda.filter(s => !ESTADOS_INACTIVOS.has(s.estado))
 
     // 1. Duplicado: mesmo DJ em 2+ slots activos na mesma data
-    //    Agrupa por dj_id (quando disponível) ou por dj_nome normalizado (fallback)
     const byDjData = {}
     activos.forEach(s => {
-      // Chave de agrupamento: preferir dj_id; se nulo, usar dj_nome normalizado
       const chave = s.dj_id ?? (s.dj_nome ? `nome:${s.dj_nome.trim().toLowerCase()}` : null)
       if (!chave) return
       const k = `${chave}|${s.data}`
@@ -77,21 +80,23 @@ export function useConflitos({ agenda, dataInicio, dataFim }) {
       byDjData[k].push(s.id)
     })
     Object.values(byDjData).forEach(ids => {
-      if (ids.length > 1) ids.forEach(id => bad.add(id))
+      if (ids.length > 1) ids.forEach(id => addRazao(id, 'duplo'))
     })
 
     // 2. DJ indisponível nesta data
     activos.forEach(s => {
-      if (s.dj_id && indisponibilidades.has(`${s.dj_id}|${s.data}`)) bad.add(s.id)
+      if (s.dj_id && indisponibilidades.has(`${s.dj_id}|${s.data}`)) addRazao(s.id, 'indisponivel')
     })
 
     // 3. DJ recusa Cliente / Cliente excluiu DJ
     activos.forEach(s => {
-      if (s.dj_id && s.espaco_id && recusas.has(`${s.dj_id}|${s.espaco_id}`)) bad.add(s.id)
+      if (s.dj_id && s.espaco_id && recusas.has(`${s.dj_id}|${s.espaco_id}`)) addRazao(s.id, 'recusa')
     })
 
-    return bad
+    return map
   }, [agenda, indisponibilidades, recusas])
 
-  return { conflictsIdx }
+  const conflictsIdx = useMemo(() => new Set(conflictsMap.keys()), [conflictsMap])
+
+  return { conflictsIdx, conflictsMap }
 }

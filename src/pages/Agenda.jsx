@@ -1,4 +1,5 @@
 ﻿import { useState, useMemo, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 import { ChevronLeft, ChevronRight, Printer, Trophy } from 'lucide-react'
 import { startOfWeek, addDays, addWeeks, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, format } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -115,7 +116,7 @@ export function Agenda() {
   const { espacos } = useEspacos({ anoMes })
   const { bloqueios } = useBloqueios()
   // Usa agendaMes (sem filtro de Cliente) para detectar choques cross-Cliente
-  const { conflictsIdx } = useConflitos({ agenda: agendaMes, dataInicio: mesInicio, dataFim: mesFim })
+  const { conflictsIdx, conflictsMap } = useConflitos({ agenda: agendaMes, dataInicio: mesInicio, dataFim: mesFim })
 
   const espacosFiltrados = filtroEspaco
     ? espacos.filter((e) => e.id === filtroEspaco)
@@ -280,6 +281,31 @@ export function Agenda() {
   }
 
   const fecharModal = () => { setModalAberto(false); setSlotActual(null) }
+
+  // Toggle marketing_destaque: activa este slot e desactiva os outros do mesmo dia/espaço
+  const toggleDestaque = async (slot) => {
+    const novoValor = !slot.marketing_destaque
+    try {
+      if (novoValor) {
+        // Desactivar todos os outros slots do mesmo dia/espaço
+        await supabase.from('agenda')
+          .update({ marketing_destaque: false })
+          .eq('espaco_id', slot.espaco_id)
+          .eq('data', slot.data)
+        // Activar este
+        await supabase.from('agenda')
+          .update({ marketing_destaque: true })
+          .eq('id', slot.id)
+      } else {
+        await supabase.from('agenda')
+          .update({ marketing_destaque: false })
+          .eq('id', slot.id)
+      }
+      recarregarSilencioso?.()
+    } catch (e) {
+      console.error('Erro ao definir destaque:', e.message)
+    }
+  }
 
   // Vista mês — tabela de semanas
   const semanasDoMes = useMemo(() => {
@@ -449,7 +475,9 @@ export function Agenda() {
               bloqueios={bloqueios}
               onClickSlot={abrirEditarSlot}
               onClickVazio={abrirNovoSlot}
+              onToggleDestaque={toggleDestaque}
               conflictsIdx={conflictsIdx}
+              conflictsMap={conflictsMap}
               onSugestaoAplicada={() => { recarregar(); recarregarMes() }}
               supaEventos={supaEventos}
               onClickEvento={(ev) => { setEventoModal(ev); setEventoModalAberto(true) }}
@@ -468,10 +496,12 @@ export function Agenda() {
                     bloqueios={bloqueios}
                     onClickSlot={abrirEditarSlot}
                     onClickVazio={abrirNovoSlot}
+                    onToggleDestaque={toggleDestaque}
                     semanaLabel={si + 1}
                     ocultarCabecalho={si > 0}
                     nomeEspaco={nomeEspacoFiltro}
                     conflictsIdx={conflictsIdx}
+                    conflictsMap={conflictsMap}
                     onSugestaoAplicada={() => { recarregar(); recarregarMes() }}
                     supaEventos={supaEventos}
                     onClickEvento={(ev) => { setEventoModal(ev); setEventoModalAberto(true) }}

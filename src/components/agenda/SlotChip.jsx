@@ -1,15 +1,15 @@
 import { clsx } from 'clsx'
 import { useDraggable } from '@dnd-kit/core'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Star } from 'lucide-react'
 
-export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, dimmed = false, dragId, dragData, conflito = false }) {
+export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onToggleDestaque, dimmed = false, dragId, dragData, conflito = false, motivoConflito = null }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: dragId ?? 'chip-empty',
     disabled: !dragId,
     data: dragData,
   })
 
-  // ── Célula vazia (sem slot criado) ──────────────────────────────────────────
+  // ── Célula vazia ───────────────────────────────────────────────────────────
   if (!slot) {
     return (
       <button
@@ -17,9 +17,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, dimme
         className={clsx(
           'w-full px-2 py-1 rounded border border-dashed min-h-[34px] flex items-center justify-center transition-colors',
           dimmed
-            // Dia não operacional — fundo muito escuro, + quase invisível
             ? 'border-surface-4/15 bg-black/[0.35] text-white/[0.07] hover:text-white/20 hover:border-surface-4/40'
-            // Dia operacional normal
             : 'border-surface-4 bg-surface-2 text-accent-subtle/40 hover:text-accent-subtle hover:border-border'
         )}
       >
@@ -29,12 +27,13 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, dimme
   }
 
   const temDJ      = !!slot.dj_nome
-  const isManual   = temDJ && !slot.dj_id        // DJ externo (sem registo na BD)
+  const isManual   = temDJ && !slot.dj_id
   const isProposta  = temDJ && slot.estado === 'proposta'
   const isSemEfeito = slot.estado === 'sem_efeito'
   const isAPedido   = slot.estado === 'a_pedido'
+  const isDestaque  = !!slot.marketing_destaque
 
-  // ── Slot com ou sem DJ ───────────────────────────────────────────────────────
+  // ── Slot com ou sem DJ ─────────────────────────────────────────────────────
   const chip = (
     <button
       ref={setNodeRef}
@@ -45,7 +44,9 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, dimme
         'w-full text-center px-2 py-1 rounded border transition-colors min-h-[34px] flex items-center justify-center',
         dragId && 'cursor-grab active:cursor-grabbing',
         isDragging && 'opacity-30',
-        // Extra right padding to leave room for the Sparkles button
+        // Padding esquerdo para estrela
+        onToggleDestaque && !isSemEfeito && !isLock && 'pl-5',
+        // Padding direito para Sparkles
         onSugerir && !isSemEfeito && !isLock && 'pr-5',
         conflito
           ? 'border-red-500/60 bg-red-500/15 hover:bg-red-500/25'
@@ -64,47 +65,65 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, dimme
                       : 'border-surface-4 bg-surface-3 hover:bg-surface-4 hover:border-border'
       )}
     >
-      {isSemEfeito ? (
-        <span className="text-xs text-accent-subtle/40 italic">
-          {temDJ ? <s>{slot.dj_nome}</s> : 'Sem Efeito'}
+      <span className={clsx(
+        'text-xs truncate flex flex-col items-center leading-tight w-full',
+        conflito       ? 'font-semibold text-red-400'         :
+        isAPedido      ? 'font-semibold text-violet-300'       :
+        isLock         ? 'font-semibold text-status-lock'      :
+        isProposta     ? 'font-semibold text-status-proposta'  :
+        isManual       ? 'font-semibold text-yellow-300'       :
+        temDJ          ? 'font-semibold text-status-confirmado':
+                         'italic text-accent-subtle'
+      )}>
+        <span className="truncate w-full text-center">
+          {isSemEfeito
+            ? (temDJ ? <s>{slot.dj_nome}</s> : 'Sem Efeito')
+            : (isLock ? 'LOCK' : temDJ ? slot.dj_nome : 'Sem DJ')
+          }
         </span>
-      ) : (
-        <span className={clsx(
-          'text-xs truncate',
-          conflito
-            ? 'font-semibold text-red-400'
-            : isAPedido
-              ? 'font-semibold text-violet-300'
-              : isLock
-                ? 'font-semibold text-status-lock'
-                : isProposta
-                  ? 'font-semibold text-status-proposta'
-                  : isManual
-                    ? 'font-semibold text-yellow-300'
-                    : temDJ
-                      ? 'font-semibold text-status-confirmado'
-                      : 'italic text-accent-subtle'
-        )}>
-          {isLock ? 'LOCK' : temDJ ? slot.dj_nome : 'Sem DJ'}
-        </span>
-      )}
+        {conflito && motivoConflito && (
+          <span className="text-[10px] font-normal text-red-400/80 truncate w-full text-center leading-none mt-0.5">
+            {motivoConflito}
+          </span>
+        )}
+      </span>
     </button>
   )
 
-  if (!onSugerir || isSemEfeito || isLock) return chip
+  const temAccoes = (onSugerir || onToggleDestaque) && !isSemEfeito && !isLock && temDJ
+
+  if (!temAccoes) return chip
 
   return (
     <div className="relative group/chip">
       {chip}
-      <button
-        onClick={(e) => { e.stopPropagation(); onSugerir() }}
-        title="Sugerir DJ"
-        className="absolute top-0.5 right-0.5 w-4 h-4 rounded flex items-center justify-center
-          opacity-0 group-hover/chip:opacity-100 transition-opacity
-          bg-black/30 hover:bg-black/60 text-accent-subtle hover:text-accent"
-      >
-        <Sparkles size={9} />
-      </button>
+      <div className="absolute top-0.5 left-0.5 flex items-center gap-0.5">
+        {/* Estrelinha marketing — sempre visível, activa/inactiva */}
+        {onToggleDestaque && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleDestaque() }}
+            title={isDestaque ? 'Remover destaque marketing' : 'Definir como destaque marketing'}
+            className="w-4 h-4 rounded flex items-center justify-center hover:bg-black/40 transition-colors"
+          >
+            <Star
+              size={11}
+              fill={isDestaque ? 'currentColor' : 'none'}
+              className={isDestaque ? 'text-yellow-400' : 'text-white/50 hover:text-yellow-400'}
+              strokeWidth={1.5}
+            />
+          </button>
+        )}
+      </div>
+      {/* Sugerir DJ — canto direito, só no hover */}
+      {onSugerir && !isSemEfeito && !isLock && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onSugerir() }}
+          title="Sugerir DJ"
+          className="absolute top-0.5 right-0.5 w-4 h-4 rounded flex items-center justify-center opacity-0 group-hover/chip:opacity-100 transition-opacity bg-black/30 hover:bg-black/60 text-accent-subtle hover:text-accent"
+        >
+          <Sparkles size={9} />
+        </button>
+      )}
     </div>
   )
 }

@@ -23,6 +23,7 @@ import { ContasColaboradores } from '@/pages/contas/ContasColaboradores'
 import { ContasMargens } from '@/pages/contas/ContasMargens'
 import { Eventos } from '@/pages/Eventos'
 import { ApoioTecnico } from '@/pages/ApoioTecnico'
+import { DJConvidados } from '@/pages/DJConvidados'
 import { Artistas } from '@/pages/Artistas'
 import { ArtistaPerfil } from '@/pages/ArtistaPerfil'
 import { ResetPassword } from '@/pages/ResetPassword'
@@ -71,6 +72,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="djs" element={<DJs />} />
           <Route path="djs/:id" element={<DJPerfil />} />
+          <Route path="convidados" element={<DJConvidados />} />
           <Route path="espacos" element={<Espacos />} />
           <Route path="espacos/:id" element={<EspacoPerfil />} />
           <Route path="bloqueios" element={<Bloqueios />} />

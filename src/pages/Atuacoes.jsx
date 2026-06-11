@@ -1,5 +1,6 @@
-﻿import { useState, useMemo, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+﻿import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import { ChevronLeft, ChevronRight, Search, Star, Lock, Pencil } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useAgenda } from '@/hooks/useAgenda'
@@ -120,6 +121,8 @@ export function Atuacoes() {
     if (periodo === 'mes')    setDataRef(format(addMonths(d, dir), 'yyyy-MM-dd'))
   }
 
+  const [avaliacoes, setAvaliacoes] = useState({}) // { agenda_id: avaliacao }
+
   const { agenda, loading, erro, recarregar } = useAgenda({
     dataInicio,
     dataFim,
@@ -134,18 +137,40 @@ export function Atuacoes() {
   const { djs } = useDJs()
   const { espacos } = useEspacos()
 
+  // Carregar avaliações do Operator para o período visível
+  useEffect(() => {
+    if (!agenda.length) return
+    const ids = agenda.map((s) => s.id)
+    supabase
+      .from('avaliacoes_djs')
+      .select('agenda_id, nota_artistica, nota_assiduidade, nota_profissionalismo, nota_adaptacao, interesse, gravado, notas_bloqueadas, comentario')
+      .in('agenda_id', ids)
+      .then(({ data }) => {
+        if (!data) return
+        const map = {}
+        data.forEach((a) => { map[a.agenda_id] = a })
+        setAvaliacoes(map)
+      })
+  }, [agenda])
+
   const djsActivos = useMemo(() => djs.filter((d) => d.estado !== 'banido'), [djs])
 
   const agendaFiltrada = useMemo(() => {
-    if (!pesquisa.trim()) return agenda
-    const q = pesquisa.toLowerCase()
-    return agenda.filter((s) =>
-      (s.dj_nome ?? '').toLowerCase().includes(q) ||
-      (s.espaco_nome ?? '').toLowerCase().includes(q) ||
-      (s.evento ?? '').toLowerCase().includes(q) ||
-      (s.notas ?? '').toLowerCase().includes(q)
-    )
-  }, [agenda, pesquisa])
+    let lista = agenda
+    if (pesquisa.trim()) {
+      const q = pesquisa.toLowerCase()
+      lista = lista.filter((s) =>
+        (s.dj_nome ?? '').toLowerCase().includes(q) ||
+        (s.espaco_nome ?? '').toLowerCase().includes(q) ||
+        (s.evento ?? '').toLowerCase().includes(q) ||
+        (s.notas ?? '').toLowerCase().includes(q)
+      )
+    }
+    // Ordenar: hoje + futuro primeiro (asc), passado ao fundo (asc)
+    const futuras = lista.filter((s) => s.data >= hoje).sort((a, b) => a.data.localeCompare(b.data) || a.hora_inicio.localeCompare(b.hora_inicio))
+    const passadas = lista.filter((s) => s.data < hoje).sort((a, b) => a.data.localeCompare(b.data) || a.hora_inicio.localeCompare(b.hora_inicio))
+    return [...futuras, ...passadas]
+  }, [agenda, pesquisa, hoje])
 
   const alterarEstado = useCallback(async (slotId, estado) => {
     setEstadoOverrides((prev) => ({ ...prev, [slotId]: estado }))
@@ -159,6 +184,12 @@ export function Atuacoes() {
       setActualizando(null)
     }
   }, [recarregar])
+
+  const [cardAberto, setCardAberto] = useState(false)
+  const [slotDetalhe, setSlotDetalhe] = useState(null)
+
+  const abrirCard = (slot) => { setSlotDetalhe(slot); setCardAberto(true) }
+  const fecharCard = () => { setCardAberto(false); setSlotDetalhe(null) }
 
   const abrirSlot = (slot) => { setSlotSeleccionado(slot); setModalAberto(true) }
   const fecharModal = () => { setModalAberto(false); setSlotSeleccionado(null) }
@@ -283,23 +314,39 @@ export function Atuacoes() {
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">Assiduidade</th>
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">Evento</th>
                   <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">Notas</th>
-                  <th className="px-4 py-2.5" />
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted" title="Avaliação do gestor (Operator)">Avaliação Gestor</th>
+                  <th className="sticky right-0 px-3 py-2.5 bg-surface-1" />
                 </tr>
               </thead>
               <tbody>
                 {agendaFiltrada.map((slot, i) => {
                   const eHoje = slot.data === hoje
+                  const ePassado = slot.data < hoje
                   const temConflito = conflictsIdx.has(slot.id)
+                  const anteriorEraFutura = i > 0 && agendaFiltrada[i - 1].data >= hoje
+                  const esteEPassado = slot.data < hoje
+                  const mostrarSeparador = esteEPassado && anteriorEraFutura
                   return (
+                    <React.Fragment key={slot.id}>
+                    {mostrarSeparador && (
+                      <tr>
+                        <td colSpan={11} className="px-4 py-2 bg-surface-0 border-y border-border/40">
+                          <span className="text-[10px] uppercase tracking-widest text-accent-subtle/50">Anteriores</span>
+                        </td>
+                      </tr>
+                    )}
                     <tr
-                      key={slot.id}
+                      onClick={() => abrirCard(slot)}
                       className={clsx(
+                        'cursor-pointer',
                         i < agendaFiltrada.length - 1 && 'border-b border-border/50',
                         temConflito
-                          ? 'bg-red-500/[0.06] border-l-2 border-l-red-500/70'
+                          ? 'bg-red-500/[0.06] border-l-2 border-l-red-500/70 hover:bg-red-500/10'
                           : eHoje
-                            ? 'bg-status-confirmado/5 border-l-2 border-l-status-confirmado'
-                            : 'hover:bg-surface-2/40 transition-colors'
+                            ? 'bg-status-confirmado/5 border-l-2 border-l-status-confirmado hover:bg-status-confirmado/10'
+                            : ePassado
+                              ? 'hover:bg-surface-2/50 transition-colors'
+                              : 'hover:bg-surface-2/40 transition-colors'
                       )}
                     >
                       <td className="px-4 py-3 text-accent-muted text-xs whitespace-nowrap">
@@ -323,7 +370,7 @@ export function Atuacoes() {
                       <td className="px-4 py-3 text-accent-muted tabular-nums text-right whitespace-nowrap">
                         {formatarEuro(slot.valor)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <AssidulidadeCell
                           slot={slot}
                           estadoActual={estadoOverrides[slot.id] ?? slot.estado}
@@ -338,15 +385,44 @@ export function Atuacoes() {
                       <td className="px-4 py-3 text-accent-subtle text-xs max-w-[180px] truncate" title={slot.notas}>
                         {slot.notas ?? '—'}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const av = avaliacoes[slot.id]
+                          if (!av) return <span className="text-xs text-accent-subtle">—</span>
+                          const total = (av.nota_artistica ?? 0) + (av.nota_assiduidade ?? 0) + (av.nota_profissionalismo ?? 0) + (av.nota_adaptacao ?? 0)
+                          const temNotas = !!av.comentario?.trim()
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-semibold text-accent tabular-nums">{total}/20</span>
+                                {av.interesse && (
+                                  <span className="flex items-center gap-0.5 text-[10px] text-yellow-400" title="Interesse do gestor">
+                                    <Star size={10} fill="currentColor" strokeWidth={0} />
+                                    {av.interesse}
+                                  </span>
+                                )}
+                                {av.gravado && <Lock size={10} className="text-status-confirmado" title="Avaliação gravada" />}
+                              </div>
+                              {temNotas && (
+                                <p className="text-[11px] text-accent-subtle truncate max-w-[140px]" title={av.comentario}>
+                                  {av.comentario}
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </td>
+                      <td className="sticky right-0 px-3 py-3 bg-surface-1" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => abrirSlot(slot)}
-                          className="text-xs text-accent-subtle hover:text-accent transition-colors"
+                          title="Editar atuação"
+                          className="flex items-center justify-center w-7 h-7 rounded-lg border border-border bg-surface-2 text-accent-muted hover:text-accent hover:border-white/20 transition-all"
                         >
-                          Editar →
+                          <Pencil size={13} />
                         </button>
                       </td>
                     </tr>
+                    </React.Fragment>
                   )
                 })}
               </tbody>
@@ -354,6 +430,121 @@ export function Atuacoes() {
           </div>
         )}
       </div>
+
+      {/* ── Card de detalhe ── */}
+      {cardAberto && slotDetalhe && (() => {
+        const av = avaliacoes[slotDetalhe.id]
+        const total = av ? (av.nota_artistica ?? 0) + (av.nota_assiduidade ?? 0) + (av.nota_profissionalismo ?? 0) + (av.nota_adaptacao ?? 0) : 0
+        const eHoje = slotDetalhe.data === hoje
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={fecharCard}>
+            <div
+              className="bg-surface-1 border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Cabeçalho */}
+              <div className={clsx('px-5 pt-4 pb-3 border-b border-border flex items-start justify-between gap-3',
+                eHoje ? 'border-l-4 border-l-status-confirmado' : conflictsIdx.has(slotDetalhe.id) ? 'border-l-4 border-l-red-500/70' : ''
+              )}>
+                <div>
+                  <p className="text-xs text-accent-muted mb-0.5">
+                    {capitalizar(diaSemana(slotDetalhe.data))} · {formatarData(slotDetalhe.data)}
+                    {eHoje && <span className="ml-2 text-[10px] font-bold text-status-confirmado uppercase tracking-wider">hoje</span>}
+                  </p>
+                  <h2 className="text-base font-semibold text-accent">{slotDetalhe.dj_nome ?? 'Sem DJ'}</h2>
+                  <p className="text-xs text-accent-muted mt-0.5">{slotDetalhe.espaco_nome} · {formatarHora(slotDetalhe.hora_inicio)}–{formatarHora(slotDetalhe.hora_fim)}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => { fecharCard(); abrirSlot(slotDetalhe) }}
+                    title="Editar atuação"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-all"
+                  >
+                    <Pencil size={11} /> Editar
+                  </button>
+                  <button onClick={fecharCard} className="p-1.5 rounded-lg border border-border bg-surface-2 text-accent-muted hover:text-accent transition-colors">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Corpo */}
+              <div className="px-5 py-4 flex flex-col gap-4">
+
+                {/* Valor */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-accent-muted uppercase tracking-wider">Valor total</span>
+                  <span className="text-lg font-bold text-accent tabular-nums">{formatarEuro(slotDetalhe.valor)}</span>
+                </div>
+
+                {/* Horas extras */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-accent-muted uppercase tracking-wider">Horas extras</span>
+                  <span className="text-sm text-accent tabular-nums">
+                    {slotDetalhe.valor_extra != null ? formatarEuro(slotDetalhe.valor_extra) : <span className="text-accent-subtle/40">—</span>}
+                  </span>
+                </div>
+
+                {/* Assiduidade com hora */}
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-xs font-medium text-accent-muted uppercase tracking-wider">Assiduidade</span>
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                    <AssidulidadeCell
+                      slot={slotDetalhe}
+                      estadoActual={estadoOverrides[slotDetalhe.id] ?? slotDetalhe.estado}
+                      hoje={hoje}
+                      actualizando={actualizando}
+                      onAlterar={alterarEstado}
+                    />
+                    <span className="text-xs text-accent-muted tabular-nums font-mono">{formatarHora(slotDetalhe.hora_inicio)}</span>
+                  </div>
+                </div>
+
+                {/* Evento */}
+                {slotDetalhe.evento && (
+                  <div className="flex items-start gap-3">
+                    <span className="text-xs font-medium text-accent-muted uppercase tracking-wider shrink-0 mt-0.5">Evento</span>
+                    <span className="text-sm text-accent-subtle text-right flex-1">{slotDetalhe.evento}</span>
+                  </div>
+                )}
+
+                {/* Notas DJ */}
+                {slotDetalhe.notas?.trim() && (
+                  <div className="bg-surface-0 rounded-lg p-3 border border-border/40">
+                    <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider mb-1.5">Notas DJ</p>
+                    <p className="text-sm text-accent-subtle leading-relaxed whitespace-pre-wrap">{slotDetalhe.notas}</p>
+                  </div>
+                )}
+
+                {/* Notas Gerente */}
+                {av?.comentario?.trim() && (
+                  <div className="bg-surface-0 rounded-lg p-3 border border-border/40">
+                    <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider mb-1.5">Notas Gerente</p>
+                    <p className="text-sm text-accent-subtle leading-relaxed whitespace-pre-wrap">{av.comentario}</p>
+                  </div>
+                )}
+
+                {/* Avaliação */}
+                {av && total > 0 && (
+                  <div className="border-t border-border/40 pt-3 flex items-center justify-between">
+                    <span className="text-xs font-medium text-accent-muted uppercase tracking-wider">Avaliação Gestor</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-accent tabular-nums">{total}/20</span>
+                      {av.interesse > 0 && (
+                        <span className="flex items-center gap-0.5 text-xs text-yellow-400">
+                          <Star size={12} fill="currentColor" strokeWidth={0} />
+                          {av.interesse}
+                        </span>
+                      )}
+                      {av.gravado && <Lock size={12} className="text-status-confirmado" title="Avaliação gravada" />}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       <FormSlot
         aberto={modalAberto}

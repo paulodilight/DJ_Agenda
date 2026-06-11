@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, Save, ChevronLeft, ChevronRight, ImageIcon, X } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, ChevronLeft, ChevronRight, ImageIcon, X, ExternalLink } from 'lucide-react'
 import { espacosApi, turnosApi, djsFixosApi, espacoDjPreferenciasApi, turnoValoresDiaApi, categoriasDjApi, turnoCategoriaApi } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { useDJs } from '@/hooks/useDJs'
@@ -61,10 +61,17 @@ export function EspacoPerfil() {
 
   // { [dj_id]: 'preferido' | 'excluido' | 'neutro' }
   const [djsPrefs, setDjsPrefs] = useState({})
+  // { [dj_id]: 1-5 } — interesse do gestor via Operator app
+  const [djsInteresse, setDjsInteresse] = useState({})
 
   const [categorias, setCategorias] = useState([])
   const [turnoCats, setTurnoCats] = useState({})        // { turnoKey: [categoria_id, ...] }
   const [turnoActivoIdx, setTurnoActivoIdx] = useState(0)
+  const [grupos, setGrupos] = useState([])              // lista da tabela grupos
+  const [novoGrupoNome, setNovoGrupoNome] = useState('')
+  const [novoGrupoSlug, setNovoGrupoSlug] = useState('')
+  const [mostrarFormGrupo, setMostrarFormGrupo] = useState(false)
+  const [criandoGrupo, setCriandoGrupo] = useState(false)
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro(null)
@@ -79,6 +86,9 @@ export function EspacoPerfil() {
         notas: data.notas ?? '',
         ordem_distribuicao: data.ordem_distribuicao ?? '',
         logo_url: data.logo_url ?? '',
+        grupo: data.grupo ?? '',
+        pin_gestor: data.pin_gestor ?? '',
+        codigo_marketing: data.codigo_marketing ?? '',
       })
 
       const turnosCarregados = data.turnos?.length > 0
@@ -132,10 +142,13 @@ export function EspacoPerfil() {
       // Carregar preferências de DJs para este Cliente
       const prefsData = await espacoDjPreferenciasApi.listar(id)
       const prefsMap = {}
-      prefsData
-        .filter((p) => p.tipo === 'preferido' || p.tipo === 'excluido')
-        .forEach((p) => { prefsMap[p.dj_id] = p.tipo })
+      const interesseMap = {}
+      prefsData.forEach((p) => {
+        if (p.tipo === 'preferido' || p.tipo === 'excluido') prefsMap[p.dj_id] = p.tipo
+        if (p.interesse != null) interesseMap[p.dj_id] = p.interesse
+      })
       setDjsPrefs(prefsMap)
+      setDjsInteresse(interesseMap)
     } catch (e) {
       setErro(e.message)
     } finally {
@@ -147,6 +160,8 @@ export function EspacoPerfil() {
 
   useEffect(() => {
     categoriasDjApi.listar().then(setCategorias).catch(() => {})
+    supabase.from('grupos').select('id, nome, slug').order('nome')
+      .then(({ data }) => setGrupos(data ?? [])).catch(() => {})
   }, [])
 
   const setField = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }))
@@ -670,6 +685,178 @@ export function EspacoPerfil() {
             </Card>
           )
         })()}
+        {/* ── Operator & Marketing ── */}
+        <Card>
+          <CardHeader>
+            <div>
+              <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Operator & Marketing</p>
+              <p className="text-xs text-accent-subtle mt-1">
+                Códigos de acesso para a app Operator (gestores) e app Marketing · grupo define qual deployment Vercel serve este espaço
+              </p>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {/* Links Vercel */}
+            {form.grupo ? (
+              <div className="mb-4 flex items-center gap-3 flex-wrap">
+                <span className="text-[11px] text-accent-subtle uppercase tracking-wider">Links Vercel:</span>
+                <a href={`https://xclusive-${form.grupo}.vercel.app`} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1.5 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
+                  <ExternalLink size={11} /> Operator
+                </a>
+                <a href={`https://xclusive-${form.grupo}.vercel.app/marketing`} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1.5 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
+                  <ExternalLink size={11} /> Marketing
+                </a>
+              </div>
+            ) : (
+              <div className="mb-4 flex items-center gap-3 flex-wrap">
+                <span className="text-[11px] text-accent-subtle uppercase tracking-wider">Links Vercel (LMD):</span>
+                <a href="https://xclusive-manager.vercel.app" target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1.5 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
+                  <ExternalLink size={11} /> Operator
+                </a>
+                <a href="https://xclusive-manager.vercel.app/marketing" target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1.5 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
+                  <ExternalLink size={11} /> Marketing
+                </a>
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">Grupo</label>
+                <p className="text-[10px] text-accent-subtle mb-1">deployment Vercel associado</p>
+                <select
+                  value={form.grupo}
+                  onChange={(e) => {
+                    if (e.target.value === '__novo__') { setMostrarFormGrupo(true); return }
+                    setForm((f) => ({ ...f, grupo: e.target.value }))
+                  }}
+                  className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-accent focus:outline-none focus:border-white/20"
+                >
+                  <option value="">— sem grupo —</option>
+                  {grupos.map((g) => (
+                    <option key={g.id} value={g.slug}>{g.nome}</option>
+                  ))}
+                  <option value="__novo__">＋ Novo grupo…</option>
+                </select>
+
+                {/* Form inline para criar novo grupo */}
+                {mostrarFormGrupo && (
+                  <div className="mt-2 flex flex-col gap-1.5 rounded border border-border bg-surface-2 p-3">
+                    <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-wider">Novo grupo</p>
+                    <input
+                      type="text"
+                      value={novoGrupoNome}
+                      onChange={(e) => {
+                        setNovoGrupoNome(e.target.value)
+                        setNovoGrupoSlug(e.target.value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, ''))
+                      }}
+                      placeholder="Nome (ex: Golf D'Água)"
+                      className="w-full rounded border border-border bg-surface-0 px-2 py-1.5 text-sm text-accent focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={novoGrupoSlug}
+                      onChange={(e) => setNovoGrupoSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                      placeholder="slug (ex: golfdagua)"
+                      className="w-full rounded border border-border bg-surface-0 px-2 py-1.5 text-sm text-accent font-mono focus:outline-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={criandoGrupo || !novoGrupoNome.trim() || !novoGrupoSlug.trim()}
+                        onClick={async () => {
+                          setCriandoGrupo(true)
+                          try {
+                            const { data, error } = await supabase.from('grupos')
+                              .insert({ nome: novoGrupoNome.trim(), slug: novoGrupoSlug.trim() })
+                              .select().single()
+                            if (error) throw error
+                            setGrupos((g) => [...g, data].sort((a, b) => a.nome.localeCompare(b.nome)))
+                            setForm((f) => ({ ...f, grupo: data.slug }))
+                            setMostrarFormGrupo(false)
+                            setNovoGrupoNome(''); setNovoGrupoSlug('')
+                          } catch (e) { alert('Erro: ' + e.message) }
+                          finally { setCriandoGrupo(false) }
+                        }}
+                        className="flex-1 rounded border border-status-confirmado/40 bg-status-confirmado/15 text-status-confirmado text-xs py-1.5 hover:bg-status-confirmado/25 transition-colors disabled:opacity-40"
+                      >
+                        {criandoGrupo ? 'A criar…' : 'Criar grupo'}
+                      </button>
+                      <button type="button" onClick={() => { setMostrarFormGrupo(false); setNovoGrupoNome(''); setNovoGrupoSlug('') }}
+                        className="rounded border border-border bg-surface-0 text-accent-muted text-xs px-3 py-1.5 hover:text-accent transition-colors">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">PIN Operator</label>
+                <p className="text-[10px] text-accent-subtle mb-1">código do gestor do espaço</p>
+                <input
+                  type="text"
+                  value={form.pin_gestor}
+                  onChange={(e) => setForm((f) => ({ ...f, pin_gestor: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                  placeholder="1234"
+                  maxLength={6}
+                  className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-accent font-mono placeholder:text-accent-subtle focus:outline-none focus:border-white/20"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">Código Marketing</label>
+                <p className="text-[10px] text-accent-subtle mb-1">acesso à app Marketing</p>
+                <input
+                  type="text"
+                  value={form.codigo_marketing}
+                  onChange={(e) => setForm((f) => ({ ...f, codigo_marketing: e.target.value.toUpperCase().replace(/\s+/g, '') }))}
+                  placeholder="LMDXXX26"
+                  className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-accent font-mono placeholder:text-accent-subtle focus:outline-none focus:border-white/20"
+                />
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* ── Interesse dos Gestores (via Operator app) ── */}
+        {Object.keys(djsInteresse).length > 0 && (
+          <Card>
+            <CardHeader>
+              <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Interesse dos Gestores</p>
+              <p className="text-xs text-accent-subtle mt-1">
+                Avaliação do gestor do espaço sobre o interesse em ter cada DJ novamente · via Operator
+              </p>
+            </CardHeader>
+            <CardBody>
+              <div className="flex flex-col gap-0">
+                {djsActivos
+                  .filter((dj) => djsInteresse[dj.id] != null)
+                  .sort((a, b) => (djsInteresse[b.id] ?? 0) - (djsInteresse[a.id] ?? 0))
+                  .map((dj) => {
+                    const val = djsInteresse[dj.id] ?? 0
+                    return (
+                      <div key={dj.id} className="flex items-center justify-between gap-3 py-2 border-b border-border/30 last:border-0">
+                        <span className="text-xs text-accent-muted truncate min-w-[120px]">
+                          {dj.nome_artistico || dj.nome}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex gap-0.5">
+                            {[1,2,3,4,5].map((n) => (
+                              <span key={n} className={n <= val ? 'text-yellow-400' : 'text-accent-subtle'} style={{fontSize:14}}>★</span>
+                            ))}
+                          </div>
+                          <span className="text-[11px] text-accent-subtle tabular-nums">{val}/5</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            </CardBody>
+          </Card>
+        )}
+
         {/* ── Preferências de DJs ── */}
         <Card>
           <CardHeader>
@@ -712,9 +899,23 @@ export function EspacoPerfil() {
                     const pref = djsPrefs[dj.id] ?? 'neutro'
                     return (
                       <div key={dj.id} className="flex items-center justify-between gap-3 py-2 border-b border-border/30 last:border-0">
-                        <span className="text-xs text-accent-muted truncate min-w-[120px]">
-                          {dj.nome_artistico || dj.nome}
-                        </span>
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span className="text-xs text-accent-muted truncate min-w-[120px]">
+                            {dj.nome_artistico || dj.nome}
+                          </span>
+                          {/* Interesse do gestor via Operator */}
+                          {djsInteresse[dj.id] != null && (
+                            <div className="flex items-center gap-0.5 shrink-0" title={`Interesse do gestor: ${djsInteresse[dj.id]}/5`}>
+                              {[1,2,3,4,5].map(n => (
+                                <span key={n} style={{ fontSize: 12 }}
+                                  className={n <= djsInteresse[dj.id] ? 'text-yellow-400' : 'text-accent-subtle/30'}>
+                                  {'★'}
+                                </span>
+                              ))}
+                              <span className="ml-1 text-[10px] text-accent-subtle">{djsInteresse[dj.id]}/5</span>
+                            </div>
+                          )}
+                        </div>
                         <div className="flex gap-1 shrink-0">
                           {[
                             { value: 'preferido', label: 'Preferido', cor: 'bg-status-confirmado/20 text-status-confirmado border-status-confirmado/40' },

@@ -1,0 +1,173 @@
+/**
+ * DJCombobox — selector de DJ com pesquisa e criação rápida.
+ *
+ * Props:
+ *   value       — dj_id actualmente seleccionado
+ *   onChange    — (dj_id) => void
+ *   djs         — lista de DJs disponíveis
+ *   label       — label do campo
+ *   placeholder — placeholder
+ *   onCriado    — (novoDJ) => void — chamado quando um DJ é criado
+ *   onlyConvidados — bool — se true, filtra categorias 3,4,5 (convidados)
+ */
+import { useState, useRef, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import { ExternalLink, Plus, User } from 'lucide-react'
+import { clsx } from 'clsx'
+
+const CAT_CONVIDADO_EXT = 4  // DJ Convidado EXT
+
+export function DJCombobox({
+  value, onChange, djs = [], label, placeholder = 'Pesquisar DJ…',
+  onCriado, onlyConvidados = false,
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [criando, setCriando] = useState(false)
+  const inputRef = useRef(null)
+  const containerRef = useRef(null)
+
+  // Nome do DJ seleccionado
+  const djSel = djs.find((d) => d.id === value)
+  const nomeSel = djSel ? (djSel.nome_artistico || djSel.nome) : ''
+
+  // Sincronizar query com o DJ seleccionado quando fecha
+  useEffect(() => {
+    if (!open) setQuery(nomeSel)
+  }, [open, nomeSel])
+
+  useEffect(() => {
+    if (open) setQuery('')
+  }, [open])
+
+  // Fechar ao clicar fora
+  useEffect(() => {
+    function handle(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  const djsFiltrados = djs.filter((d) => {
+    const nome = (d.nome_artistico || d.nome || '').toLowerCase()
+    return nome.includes(query.toLowerCase())
+  })
+
+  const mostraCriar = query.trim().length >= 2 &&
+    !djsFiltrados.some((d) => (d.nome_artistico || d.nome || '').toLowerCase() === query.trim().toLowerCase())
+
+  async function criarDJ() {
+    if (criando) return
+    setCriando(true)
+    try {
+      const nome = query.trim()
+      // 1. Criar DJ
+      const { data: novoDJ, error } = await supabase
+        .from('djs')
+        .insert({
+          nome,
+          estado: 'activo',
+          qualidade_artistica: 0, assiduidade: 0, profissionalismo: 0, adaptacao_espaco: 0,
+          prioridade_admin: 0, excluido_admin: false,
+        })
+        .select()
+        .single()
+      if (error) throw error
+
+      // 2. Associar categoria
+      const categoriaId = onlyConvidados ? CAT_CONVIDADO_EXT : null
+      if (categoriaId) {
+        await supabase.from('dj_categorias').insert({ dj_id: novoDJ.id, categoria_id: categoriaId })
+        // Nota: categoria INT (3) nunca usada aqui — convidados criados são sempre EXT (4)
+      }
+
+      onChange(novoDJ.id)
+      setOpen(false)
+      onCriado?.(novoDJ)
+    } catch (e) {
+      console.error('Erro ao criar DJ:', e.message)
+    } finally {
+      setCriando(false)
+    }
+  }
+
+  return (
+    <div ref={containerRef} className="relative flex flex-col gap-1">
+      {label && <label className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">{label}</label>}
+
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={open ? query : nomeSel}
+          placeholder={placeholder}
+          onFocus={() => { setOpen(true); setQuery('') }}
+          onChange={(e) => { setQuery(e.target.value); if (!open) setOpen(true) }}
+          className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-accent placeholder:text-accent-subtle focus:outline-none focus:border-white/20 transition-colors"
+        />
+        {value && !open && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => { onChange(''); setQuery('') }}
+            title="Limpar"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-accent-subtle hover:text-accent text-xs px-1"
+          >✕</button>
+        )}
+      </div>
+
+      {open && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded border border-border bg-surface-0 shadow-xl">
+          {djsFiltrados.length === 0 && !mostraCriar && (
+            <div className="px-3 py-2 text-xs text-accent-subtle italic">Sem resultados</div>
+          )}
+
+          {djsFiltrados.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => { onChange(d.id); setOpen(false) }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2 transition-colors"
+            >
+              <User size={12} className="text-accent-subtle shrink-0" />
+              <span className="text-accent">{d.nome_artistico || d.nome}</span>
+              {d.nome_artistico && <span className="text-xs text-accent-subtle">({d.nome})</span>}
+            </button>
+          ))}
+
+          {mostraCriar && (
+            <button
+              type="button"
+              onClick={criarDJ}
+              disabled={criando}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-status-confirmado hover:bg-status-confirmado/10 transition-colors border-t border-border"
+            >
+              <Plus size={13} className="shrink-0" />
+              {criando ? 'A criar…' : `Criar "${query.trim()}"${onlyConvidados ? ' como DJ Convidado EXT' : ''}`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Badge que aparece após criar um DJ novo — link para o perfil */
+export function NovoDJLink({ dj, onDismiss }) {
+  if (!dj) return null
+  return (
+    <div className="flex items-center gap-2 rounded border border-status-confirmado/30 bg-status-confirmado/10 px-3 py-1.5 text-xs text-status-confirmado">
+      <span>DJ criado:</span>
+      <a
+        href={`/djs/${dj.id}`}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-1 font-semibold underline hover:opacity-80"
+      >
+        Completar perfil <ExternalLink size={10} />
+      </a>
+      <button type="button" onClick={onDismiss} className="ml-auto text-status-confirmado/60 hover:text-status-confirmado">✕</button>
+    </div>
+  )
+}

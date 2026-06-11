@@ -1111,10 +1111,11 @@ export function ApoioTecnico() {
                 const row = (
                   <tr key={dataStr} className={clsx(
                     'border-b border-border/20 hover:bg-surface-2/20 transition-colors align-middle',
-                    isHoje ? 'bg-amber-400/[0.07] outline outline-1 outline-amber-400/25 outline-offset-[-1px]' : zebraCls
+                    isHoje ? 'bg-zinc-100 [&_td]:!text-gray-700' : zebraCls
                   )}>
                     <td colSpan={2} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
-                      className="px-3 py-2 font-medium whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors text-accent-muted">
+                      className={clsx('px-3 py-2 font-medium whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors',
+                        isHoje ? 'text-gray-800 font-bold' : 'text-accent-muted')}>
                       {diaSemanaData(dataStr)}
                     </td>
                     {Array.from({ length: maxGrupos }, (_, i) => {
@@ -1277,13 +1278,13 @@ export function ApoioTecnico() {
                     className={clsx(
                       'hover:bg-surface-2/20 transition-colors',
                       li < rowsToRender.length - 1 ? 'border-b border-border/10' : 'border-b border-border/20',
-                      isHojeLinhas ? 'bg-amber-400/[0.07]' : zebraCls
+                      isHojeLinhas ? 'bg-zinc-100 [&_td]:!text-gray-700' : zebraCls
                     )}
                   >
                     {li === 0 && (
                       <td rowSpan={rowSpan} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
                         className={clsx('px-3 py-2 font-medium whitespace-nowrap align-top border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors',
-                          isHojeLinhas ? 'text-amber-400 font-bold' : 'text-accent-muted')}>
+                          isHojeLinhas ? 'text-gray-800 font-bold' : 'text-accent-muted')}>
                         {diaSemanaData(dataStr)}
                       </td>
                     )}

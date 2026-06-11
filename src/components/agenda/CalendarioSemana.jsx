@@ -10,6 +10,13 @@ import { pt } from 'date-fns/locale'
 
 const fds = (d) => d.getDay() === 5 || d.getDay() === 6  // Sexta ou Sábado
 
+const RAZAO_LABEL = { duplo: 'DJ duplo', indisponivel: 'Indisponível', recusa: 'Recusa' }
+const motivoConflito = (conflictsMap, id) => {
+  const razoes = conflictsMap.get(id)
+  if (!razoes) return null
+  return [...razoes].map(r => RAZAO_LABEL[r] ?? r).join(' · ')
+}
+
 const NOMES_DIA = { 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado', 0: 'Domingo' }
 const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s
 const nomeDiaCompleto = (d) => NOMES_DIA[d.getDay()] ?? nomeDiaSemana(d)
@@ -131,10 +138,11 @@ export function SlotChipOverlay({ slot }) {
  */
 export function CalendarioSemana({
   dias, espacos, agenda, bloqueios,
-  onClickSlot, onClickVazio,
+  onClickSlot, onClickVazio, onToggleDestaque,
   semanaLabel, ocultarCabecalho = false,
   nomeEspaco = 'TODOS',
   conflictsIdx = new Set(),
+  conflictsMap = new Map(),
   onSugestaoAplicada,
   supaEventos = [],
   onClickEvento,
@@ -204,31 +212,47 @@ export function CalendarioSemana({
             </tr>
           )}
 
-          {/* ── Separador de semana: número + dias ── */}
-          {semanaLabel && (
-            <tr className="border-b border-t-2 border-border bg-surface-2/90">
-              <td className="px-4 py-2 text-[10px] font-black text-accent-subtle uppercase tracking-widest sticky left-0 bg-surface-2/90 z-10">
-                {semanaLabel}ª SEMANA
-              </td>
-              {dias.map(dia => {
-                const hoje   = isToday(dia)
-                const passado = isPast(dia) && !hoje
-                return (
-                  <td key={isoData(dia)} className={clsx(
-                    'px-2 py-2 text-[13px] font-normal text-center border-l border-border/30',
-                    hoje ? 'bg-white text-black font-semibold rounded-md'
-                      : fds(dia) ? 'text-blue-200/70'
-                      : passado ? 'text-accent-subtle/50'
-                      : 'text-accent/70'
-                  )}>
-                    <span className="whitespace-nowrap">
+          {/* ── Separador de semana: número + dias + ações por dia ── */}
+          <tr className="border-b border-t-2 border-border bg-surface-2/90">
+            <td className="px-4 py-2 text-[10px] font-black text-accent-subtle uppercase tracking-widest sticky left-0 bg-surface-2/90 z-10">
+              {semanaLabel ? `${semanaLabel}ª SEMANA` : ''}
+            </td>
+            {dias.map(dia => {
+              const dataStr = isoData(dia)
+              const hoje    = isToday(dia)
+              const passado = isPast(dia) && !hoje
+              return (
+                <td key={dataStr} className={clsx(
+                  'px-1 py-1.5 text-[13px] font-normal text-center border-l border-border/30',
+                  hoje ? 'bg-white text-black font-semibold' : fds(dia) ? 'text-blue-200/70' : passado ? 'text-accent-subtle/50' : 'text-accent/70'
+                )}>
+                  <div className="flex items-center justify-center gap-2.5">
+                    {onClickEventoVazio && (
+                      <button
+                        onClick={() => onClickEventoVazio(dataStr, espacos.length === 1 ? espacos[0].id : null)}
+                        title="Adicionar evento"
+                        className={clsx('shrink-0 transition-colors', hoje ? 'text-blue-500/50 hover:text-blue-600' : 'text-blue-400/40 hover:text-blue-400')}
+                      >
+                        <Plus size={11} />
+                      </button>
+                    )}
+                    <span className="whitespace-nowrap text-[12px]">
                       {nomeDiaCompleto(dia)}, {fmtDiaCurto(dia)}
                     </span>
-                  </td>
-                )
-              })}
-            </tr>
-          )}
+                    {onClickVazio && (
+                      <button
+                        onClick={() => onClickVazio(dataStr, espacos.length === 1 ? espacos[0].id : null, null)}
+                        title="Adicionar atuação DJ"
+                        className={clsx('shrink-0 transition-colors', hoje ? 'text-green-600/60 hover:text-green-700' : 'text-status-confirmado/40 hover:text-status-confirmado')}
+                      >
+                        <Plus size={11} />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              )
+            })}
+          </tr>
 
           {/* ── Por Cliente → cabeçalho + linhas de turnos ── */}
           {espacos.map((espaco) => {
@@ -294,9 +318,11 @@ export function CalendarioSemana({
                                   isLock={isLock}
                                   onClick={() => onClickSlot(slot)}
                                   onSugerir={() => setSugestaoCtx({ slot, espaco, turno: turno.id ? turno : null })}
+                                  onToggleDestaque={onToggleDestaque ? () => onToggleDestaque(slot) : undefined}
                                   dragId={`chip-${slot.id}`}
                                   dragData={{ slot }}
                                   conflito={conflictsIdx.has(slot.id)}
+                                  motivoConflito={motivoConflito(conflictsMap, slot.id)}
                                 />
                               ))
                             : <SlotChip
@@ -336,15 +362,6 @@ export function CalendarioSemana({
                             onClick={() => onClickEvento?.(ev)}
                           />
                         ))}
-                        {onClickEventoVazio && (
-                          <button
-                            onClick={() => onClickEventoVazio(dataStr, espaco.id)}
-                            className="w-full flex items-center justify-center py-1 rounded text-blue-400/30 hover:text-blue-400 hover:bg-blue-400/10 border border-dashed border-transparent hover:border-blue-400/30 transition-colors"
-                            title="Adicionar evento"
-                          >
-                            <Plus size={10} />
-                          </button>
-                        )}
                       </div>
                     </td>
                   )
