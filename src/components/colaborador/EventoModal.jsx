@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, ThumbsUp } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
 import { colaboradorApi } from '@/lib/colaboradorApi'
@@ -10,8 +10,12 @@ import { labelEstado } from '@/utils/formatacao'
 import { corTecnico } from '@/utils/tecnicoColor'
 import { hhmm, dataLonga, dataCompleta } from './format'
 
-const statusVar = (s) =>
-  ({ confirmado: 'confirmado', proposta: 'proposta', cancelado: 'cancelado', realizado: 'confirmado', 'em curso': 'proposta' }[s?.toLowerCase()] ?? 'default')
+const STATUS_KNOWN = ['proposta','aceitação','validação','pré-confirmado','confirmado','trocado','cancelado','a_pedido']
+const statusVar = (s) => {
+  if (!s) return 'default'
+  if (STATUS_KNOWN.includes(s)) return s
+  return { realizado: 'confirmado', 'em curso': 'proposta' }[s.toLowerCase()] ?? 'default'
+}
 
 const mapaUrl = (v) => /^https?:\/\//i.test(v)
   ? v
@@ -55,12 +59,29 @@ function Campo({ rotulo, valor, negrito, isLink, full, size = 14 }) {
 
 export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [aba, setAba]             = useState('detalhes')
-  const [dir, setDir]             = useState('right')   // animação de entrada
+  const [dir, setDir]             = useState('right')
   const [notas, setNotas]         = useState('')
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado]   = useState(false)
   const [erro, setErro]           = useState(null)
+  const [aceitando, setAceitando] = useState(false)
+  const [statusLocal, setStatusLocal] = useState(null)
   const touchX = useRef(null)
+
+  const statusEfetivo = statusLocal ?? evento.status
+
+  const aceitar = async () => {
+    setAceitando(true)
+    try {
+      const { error } = await supabase
+        .from('supa_eventos')
+        .update({ status: 'validação' })
+        .eq('id', evento.id)
+      if (error) throw error
+      setStatusLocal('validação')
+    } catch (e) { setErro(e.message) }
+    finally { setAceitando(false) }
+  }
 
   // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
@@ -142,7 +163,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
             {cliente && <p className="font-medium text-accent-muted mt-0.5 truncate" style={{ fontSize: 14 }}>{cliente}</p>}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {evento.status && <Badge variante={statusVar(evento.status)}>{labelEstado(evento.status) || evento.status}</Badge>}
+            {statusEfetivo && <Badge variante={statusVar(statusEfetivo)}>{labelEstado(statusEfetivo) || statusEfetivo}</Badge>}
           </div>
         </div>
 
@@ -232,7 +253,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
                 {/* Tipo | Status */}
                 <Campo rotulo="Tipo"   valor={evento.tipo} />
-                <Campo rotulo="Status" valor={labelEstado(evento.status) || evento.status} />
+                <Campo rotulo="Status" valor={labelEstado(statusEfetivo) || statusEfetivo} />
 
                 {/* LOCAL | Contacto */}
                 <Campo rotulo="Local"    valor={cliente} />
@@ -287,9 +308,22 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
           )}
         </div>
 
-        {/* Rodapé — assinatura de presença (só responsável) + fechar */}
+        {/* Rodapé — aceitar / assinatura de presença + fechar */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 shrink-0">
           <div>
+            {/* Botão Aceitar — só quando proposta e atribuído */}
+            {isAtribuido && statusEfetivo === 'proposta' && (
+              <button onClick={aceitar} disabled={aceitando}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/15 border border-orange-500/40 text-orange-400 text-xs font-medium hover:bg-orange-500/25 disabled:opacity-40 transition-colors">
+                {aceitando ? <Loader2 size={13} className="animate-spin" /> : <ThumbsUp size={13} />}
+                {aceitando ? 'A aceitar…' : 'Aceitar'}
+              </button>
+            )}
+            {isAtribuido && statusEfetivo === 'validação' && statusLocal === 'validação' && (
+              <span className="inline-flex items-center gap-1.5 text-violet-400 text-xs font-medium">
+                <Check size={14} /> Aceite — aguarda validação
+              </span>
+            )}
             {isResponsavel && pres.status === 'signed' && pres.presenca ? (
               <span
                 title={`Presente · ${new Date(pres.presenca.signed_at).toLocaleString('pt-PT')}${pres.presenca.latitude != null ? ` · ${Number(pres.presenca.latitude).toFixed(5)}, ${Number(pres.presenca.longitude).toFixed(5)}${pres.presenca.accuracy_m != null ? ` (±${pres.presenca.accuracy_m}m)` : ''}` : ' · sem GPS'}`}

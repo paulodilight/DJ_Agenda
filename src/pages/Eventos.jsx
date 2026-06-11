@@ -15,9 +15,14 @@ import { clsx } from 'clsx'
 const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
 
 const COR_STATUS = {
-  confirmado: { bg: 'bg-status-confirmado/15', text: 'text-status-confirmado', borda: 'border-status-confirmado/30' },
-  proposta:   { bg: 'bg-status-proposta/15',   text: 'text-status-proposta',   borda: 'border-status-proposta/30' },
-  cancelado:  { bg: 'bg-status-cancelado/15',  text: 'text-status-cancelado',  borda: 'border-status-cancelado/30' },
+  proposta:           { bg: 'bg-status-proposta/15',  text: 'text-status-proposta',  borda: 'border-status-proposta/30' },
+  'aceitação':        { bg: 'bg-orange-500/15',        text: 'text-orange-400',        borda: 'border-orange-500/30' },
+  'validação':        { bg: 'bg-violet-500/15',        text: 'text-violet-400',        borda: 'border-violet-500/30' },
+  'pré-confirmado':   { bg: 'bg-sky-500/15',           text: 'text-sky-400',           borda: 'border-sky-500/30' },
+  confirmado:         { bg: 'bg-status-confirmado/15', text: 'text-status-confirmado', borda: 'border-status-confirmado/30' },
+  trocado:            { bg: 'bg-zinc-500/15',          text: 'text-zinc-400',          borda: 'border-zinc-500/30' },
+  cancelado:          { bg: 'bg-status-cancelado/15',  text: 'text-status-cancelado',  borda: 'border-status-cancelado/30' },
+  a_pedido:           { bg: 'bg-amber-600/15',         text: 'text-amber-600',         borda: 'border-amber-600/30' },
 }
 
 function BadgeStatus({ status }) {

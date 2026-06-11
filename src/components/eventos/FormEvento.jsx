@@ -10,9 +10,14 @@ import { supabase } from '@/lib/supabase'
 import { clsx } from 'clsx'
 
 const STATUS_OPTS = [
-  { value: 'proposta',   label: 'Proposta' },
-  { value: 'confirmado', label: 'Confirmado' },
-  { value: 'cancelado',  label: 'Cancelado' },
+  { value: 'proposta',         label: 'Proposta' },
+  { value: 'aceitação',        label: 'Aceitação' },
+  { value: 'validação',        label: 'Validação' },
+  { value: 'pré-confirmado',   label: 'Pré-confirmado' },
+  { value: 'confirmado',       label: 'Confirmado' },
+  { value: 'trocado',          label: 'Trocado' },
+  { value: 'cancelado',        label: 'Cancelado' },
+  { value: 'a_pedido',         label: 'A pedido' },
 ]
 
 const VAZIO = {

@@ -15,8 +15,8 @@ const hojeISO = () => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 }
 
-const statusVar = (s) =>
-  ({ confirmado: 'confirmado', proposta: 'proposta', cancelado: 'cancelado', realizado: 'confirmado', 'em curso': 'proposta' }[s?.toLowerCase()] ?? 'default')
+const STATUS_KNOWN = ['proposta','aceitação','validação','pré-confirmado','confirmado','trocado','cancelado','a_pedido']
+const statusVar = (s) => STATUS_KNOWN.includes(s) ? s : ({ realizado: 'confirmado', 'em curso': 'proposta' }[s?.toLowerCase()] ?? 'default')
 
 function LogoCliente({ logo, nome, size = 48 }) {
   const inicial = (nome || '?').charAt(0).toUpperCase()

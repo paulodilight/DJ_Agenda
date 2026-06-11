@@ -9,8 +9,8 @@ import { labelEstado } from '@/utils/formatacao'
 import { colaboradorApi } from '@/lib/colaboradorApi'
 import { hhmm, dataLonga } from './format'
 
-const statusVar = (s) =>
-  ({ confirmado: 'confirmado', proposta: 'proposta', cancelado: 'cancelado' }[s] ?? 'default')
+const STATUS_KNOWN = ['proposta','aceitação','validação','pré-confirmado','confirmado','trocado','cancelado','a_pedido']
+const statusVar = (s) => STATUS_KNOWN.includes(s) ? s : ({ realizado: 'confirmado', 'em curso': 'proposta' }[s?.toLowerCase()] ?? 'default')
 
 const mapaUrl = (v) => /^https?:\/\//i.test(v)
   ? v
