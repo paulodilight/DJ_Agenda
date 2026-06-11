@@ -4,7 +4,7 @@ import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
 import { colaboradorApi } from '@/lib/colaboradorApi'
 import { supabase } from '@/lib/supabase'
-import { usePresenca, podeAssinar, presencaAtrasada } from '@/hooks/usePresenca'
+import { usePresenca, podeAssinar, presencaAtrasada, TOLERANCIA_MIN } from '@/hooks/usePresenca'
 import { useColaboradorStore } from '@/store'
 import { labelEstado } from '@/utils/formatacao'
 import { corTecnico } from '@/utils/tecnicoColor'
@@ -322,7 +322,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 <MapPin size={14} /> Marcar presença
               </button>
             ) : isResponsavel ? (
-              <span className="text-accent-subtle/60 text-xs">Disponível 5 min antes do início</span>
+              <span className="text-accent-subtle/60 text-xs">Disponível {TOLERANCIA_MIN} min antes do início</span>
             ) : null}
           </div>
           <button onClick={onFechar}
