@@ -16,8 +16,10 @@ import { useAgenda } from '@/hooks/useAgenda'
 import { formatarEuro } from '@/utils/formatacao'
 import { formatarData, formatarHora } from '@/utils/datas'
 import { FormEvento } from '@/components/eventos/FormEvento'
+import { DJCombobox, NovoDJLink } from './DJCombobox'
+import { supaEventosApi } from '@/lib/supaEventosApi'
 import { clsx } from 'clsx'
-import { CalendarPlus } from 'lucide-react'
+import { CalendarPlus, Link2, Star } from 'lucide-react'
 
 const ESTADO_OPCOES = [
   { value: 'proposta',    label: 'Proposta' },
@@ -31,7 +33,7 @@ const ESTADO_OPCOES = [
 
 const vazio = {
   dj_id: '', dj_externo: '', espaco_id: '', data: '', hora_inicio: '22:00', hora_fim: '02:00',
-  valor: '', margem: '', estado: 'confirmado', evento: '', notas: '',
+  valor: '', margem: '', estado: 'proposta', evento: '', notas: '',
 }
 
 export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = false, conflito = false }) {
@@ -41,11 +43,15 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const [conflitos, setConflitos] = useState([])
   const [eventoFormAberto, setEventoFormAberto] = useState(false)
   const { pushUndo } = useUndo()
-  const [conflitoCrossEspaco, setConflitoCrossEspaco] = useState(null) // bloqueia guardar
-  const [avisoMeta, setAvisoMeta] = useState(null)                      // avisa mas permite
-  const [bloqueioIndisponivel, setBloqueioIndisponivel] = useState(null) // bloqueia guardar
-  const [avisoOptIn, setAvisoOptIn] = useState(null)                     // avisa mas permite
-  const [verificacaoFeita, setVerificacaoFeita] = useState(false)        // async já correu
+  const [conflitoCrossEspaco, setConflitoCrossEspaco] = useState(null)
+  const [avisoMeta, setAvisoMeta] = useState(null)
+  const [bloqueioIndisponivel, setBloqueioIndisponivel] = useState(null)
+  const [avisoOptIn, setAvisoOptIn] = useState(null)
+  const [verificacaoFeita, setVerificacaoFeita] = useState(false)
+  const [novoDJCriado, setNovoDJCriado] = useState(null)
+  const [eventoAutoLink, setEventoAutoLink] = useState(false)
+  const [aba, setAba] = useState(0)
+  const [avaliacao, setAvaliacao] = useState(null)
 
   const { djs } = useDJs()
   const { espacos } = useEspacos()
@@ -76,8 +82,42 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       setBloqueioIndisponivel(null)
       setAvisoOptIn(null)
       setVerificacaoFeita(false)
+      setNovoDJCriado(null)
+      setEventoAutoLink(false)
+      setAba(0)
+    }
+    if (aberto && !slot) {
+      setForm((f) => ({ ...vazio, ...f, estado: 'proposta' }))
+      setNovoDJCriado(null)
+      setEventoAutoLink(false)
+      setAba(0)
     }
   }, [aberto, slot, simplificado])
+
+  // Carregar avaliação do gestor quando o modal abre com um slot existente
+  useEffect(() => {
+    if (!aberto || !slot?.id) { setAvaliacao(null); return }
+    supabase
+      .from('avaliacoes_djs')
+      .select('*')
+      .eq('agenda_id', slot.id)
+      .maybeSingle()
+      .then(({ data }) => setAvaliacao(data ?? null))
+  }, [aberto, slot?.id])
+
+  // Auto-fill evento quando data + espaco_id mudam
+  useEffect(() => {
+    if (!form.data || !form.espaco_id || form.evento) return
+    supaEventosApi.listar({ dataInicio: form.data, dataFim: form.data })
+      .then((eventos) => {
+        const match = eventos.find((e) => e.espaco_id === form.espaco_id)
+        if (match?.evento) {
+          setForm((f) => ({ ...f, evento: match.evento }))
+          setEventoAutoLink(true)
+        }
+      })
+      .catch(() => {})
+  }, [form.data, form.espaco_id])
 
   const set = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }))
 
@@ -344,7 +384,29 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
             </div>
           )}
 
-          {simplificado ? (
+          {/* ── Abas — só quando existe slot ── */}
+          {slot && (
+            <div className="flex gap-0 border-b border-border -mx-6 px-6">
+              {['Atuação', 'Notas & Avaliação', 'Contas'].map((label, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setAba(i)}
+                  className={clsx(
+                    'px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px',
+                    aba === i
+                      ? 'border-white/60 text-accent'
+                      : 'border-transparent text-accent-subtle hover:text-accent-muted'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── Aba 1: Atuação (formulário existente) ── */}
+          {(!slot || aba === 0) && (simplificado ? (
             /* ── MODO SIMPLIFICADO ── */
             <>
               {/* Horário (editável, vem predefinido) + Valor */}
@@ -363,22 +425,28 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Select label="DJ da base" value={form.dj_id} onChange={setDjId}>
-                  <option value="">— seleccionar —</option>
-                  {djsActivos.map((d) => (
-                    <option key={d.id} value={d.id}>{d.nome_artistico || d.nome}</option>
-                  ))}
-                </Select>
+                <DJCombobox
+                  label="DJ da base"
+                  value={form.dj_id}
+                  onChange={(id) => { setForm((f) => ({ ...f, dj_id: id, dj_externo: '' })); setNovoDJCriado(null) }}
+                  djs={djsActivos}
+                  onCriado={(dj) => setNovoDJCriado(dj)}
+                  placeholder="Pesquisar DJ…"
+                />
+                {novoDJCriado && <NovoDJLink dj={novoDJCriado} onDismiss={() => setNovoDJCriado(null)} />}
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-px bg-border/40" />
                   <span className="text-[10px] text-accent-subtle uppercase tracking-wider">ou</span>
                   <div className="flex-1 h-px bg-border/40" />
                 </div>
-                <Input
+                <DJCombobox
                   label="DJ convidado / externo"
-                  value={form.dj_externo}
-                  onChange={setDjExterno}
-                  placeholder="Nome do DJ fora da base..."
+                  value={form.dj_id}
+                  onChange={(id) => { setForm((f) => ({ ...f, dj_id: id, dj_externo: '' })); setNovoDJCriado(null) }}
+                  djs={djsActivos.filter((d) => (d.categorias ?? []).some((c) => [3,4,5].includes(c)) || true)}
+                  onCriado={(dj) => setNovoDJCriado(dj)}
+                  onlyConvidados
+                  placeholder="Pesquisar ou criar DJ convidado…"
                 />
               </div>
 
@@ -389,9 +457,9 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   <Input
-                    label="Evento (opcional)"
+                    label={eventoAutoLink ? 'Evento (preenchido automaticamente 🔗)' : 'Evento (opcional)'}
                     value={form.evento}
-                    onChange={set('evento')}
+                    onChange={(e) => { setEventoAutoLink(false); set('evento')(e) }}
                     placeholder="Ex: Halloween Party, Aniversário do clube..."
                   />
                 </div>
@@ -417,17 +485,23 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <Select label="DJ da base" value={form.dj_id} onChange={setDjId}>
-                    <option value="">— seleccionar —</option>
-                    {djsActivos.map((d) => (
-                      <option key={d.id} value={d.id}>{d.nome_artistico || d.nome}</option>
-                    ))}
-                  </Select>
-                  <Input
-                    label="ou DJ externo"
-                    value={form.dj_externo}
-                    onChange={setDjExterno}
-                    placeholder="Nome livre..."
+                  <DJCombobox
+                    label="DJ da base"
+                    value={form.dj_id}
+                    onChange={(id) => { setForm((f) => ({ ...f, dj_id: id, dj_externo: '' })); setNovoDJCriado(null) }}
+                    djs={djsActivos}
+                    onCriado={(dj) => setNovoDJCriado(dj)}
+                    placeholder="Pesquisar DJ…"
+                  />
+                  {novoDJCriado && <NovoDJLink dj={novoDJCriado} onDismiss={() => setNovoDJCriado(null)} />}
+                  <DJCombobox
+                    label="ou DJ convidado"
+                    value={form.dj_id}
+                    onChange={(id) => { setForm((f) => ({ ...f, dj_id: id, dj_externo: '' })); setNovoDJCriado(null) }}
+                    djs={djsActivos}
+                    onCriado={(dj) => setNovoDJCriado(dj)}
+                    onlyConvidados
+                    placeholder="Pesquisar ou criar DJ convidado…"
                   />
                 </div>
                 <Select label="Cliente" value={form.espaco_id} onChange={set('espaco_id')}>
@@ -500,6 +574,123 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 placeholder="Notas sobre a atuação, rider, condições especiais..."
               />
             </>
+          ))}
+
+          {/* ── Aba 2: Notas & Avaliação ── */}
+          {slot && aba === 1 && (
+            <div className="flex flex-col gap-4">
+              {/* Nota do gestor */}
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-accent-subtle">Nota do gestor</p>
+                <p className="text-sm text-accent min-h-[40px] rounded-lg bg-surface-2 border border-border px-3 py-2 whitespace-pre-wrap">
+                  {avaliacao?.comentario?.trim() ? avaliacao.comentario : <span className="text-accent-subtle italic">—</span>}
+                </p>
+              </div>
+
+              {/* Nota do DJ */}
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-accent-subtle">Nota do DJ</p>
+                <p className="text-sm text-accent min-h-[40px] rounded-lg bg-surface-2 border border-border px-3 py-2 whitespace-pre-wrap">
+                  {avaliacao?.notas_dj?.trim() ? avaliacao.notas_dj : <span className="text-accent-subtle italic">—</span>}
+                </p>
+              </div>
+
+              {/* Observações */}
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-accent-subtle">Observações</p>
+                <p className="text-sm text-accent min-h-[40px] rounded-lg bg-surface-2 border border-border px-3 py-2 whitespace-pre-wrap">
+                  {form.notas?.trim() ? form.notas : <span className="text-accent-subtle italic">—</span>}
+                </p>
+              </div>
+
+              {/* Avaliação */}
+              {avaliacao ? (
+                <div className="flex flex-col gap-2 rounded-lg bg-surface-2 border border-border px-3 py-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-accent-subtle mb-1">Avaliação gestor</p>
+                  {[
+                    { label: 'Artística', val: avaliacao.nota_artistica },
+                    { label: 'Assiduidade', val: avaliacao.nota_assiduidade },
+                    { label: 'Profissionalismo', val: avaliacao.nota_profissionalismo },
+                    { label: 'Adaptação', val: avaliacao.nota_adaptacao },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="flex items-center justify-between">
+                      <span className="text-xs text-accent-subtle">{label}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star key={i} size={10} className={i < (val ?? 0) ? 'fill-yellow-400 text-yellow-400' : 'text-white/15'} />
+                          ))}
+                        </div>
+                        <span className="text-xs text-accent-subtle w-4 text-right">{val ?? '—'}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="mt-1 flex items-center justify-between border-t border-border pt-2">
+                    <span className="text-xs font-medium text-accent-muted">Total</span>
+                    <span className="text-sm font-bold text-accent">
+                      {[avaliacao.nota_artistica, avaliacao.nota_assiduidade, avaliacao.nota_profissionalismo, avaliacao.nota_adaptacao]
+                        .filter(v => v != null).reduce((a, b) => a + b, 0)} / 20
+                    </span>
+                  </div>
+                  {avaliacao.interesse != null && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-accent-subtle">Interesse</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star key={i} size={10} className={i < (avaliacao.interesse ?? 0) ? 'fill-yellow-400 text-yellow-400' : 'text-white/15'} />
+                          ))}
+                        </div>
+                        <span className="text-xs text-accent-subtle w-4 text-right">{avaliacao.interesse}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-accent-subtle italic text-center py-2">Sem avaliação registada</p>
+              )}
+
+              {/* Auto-avaliação do DJ */}
+              {avaliacao && [avaliacao.auto_nota_artistica, avaliacao.auto_nota_assiduidade, avaliacao.auto_nota_profissionalismo, avaliacao.auto_nota_adaptacao].some(v => v != null) && (
+                <div className="flex flex-col gap-2 rounded-lg bg-surface-2 border border-border px-3 py-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-accent-subtle mb-1">Auto-avaliação DJ</p>
+                  {[
+                    { label: 'Artística', val: avaliacao.auto_nota_artistica },
+                    { label: 'Assiduidade', val: avaliacao.auto_nota_assiduidade },
+                    { label: 'Profissionalismo', val: avaliacao.auto_nota_profissionalismo },
+                    { label: 'Adaptação', val: avaliacao.auto_nota_adaptacao },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="flex items-center justify-between">
+                      <span className="text-xs text-accent-subtle">{label}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star key={i} size={10} className={i < (val ?? 0) ? 'fill-blue-400 text-blue-400' : 'text-white/15'} />
+                          ))}
+                        </div>
+                        <span className="text-xs text-accent-subtle w-4 text-right">{val ?? '—'}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="mt-1 flex items-center justify-between border-t border-border pt-2">
+                    <span className="text-xs font-medium text-accent-muted">Total</span>
+                    <span className="text-sm font-bold text-accent">
+                      {[avaliacao.auto_nota_artistica, avaliacao.auto_nota_assiduidade, avaliacao.auto_nota_profissionalismo, avaliacao.auto_nota_adaptacao]
+                        .filter(v => v != null).reduce((a, b) => a + b, 0)} / 20
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Aba 3: Contas ── */}
+          {slot && aba === 2 && (
+            <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+              <span className="text-3xl text-accent-subtle">€</span>
+              <p className="text-sm font-semibold text-accent">Contas</p>
+              <p className="text-xs text-accent-subtle">Em breve</p>
+            </div>
           )}
         </div>
 
