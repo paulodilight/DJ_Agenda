@@ -1073,7 +1073,7 @@ export function DJPerfil() {
             {espacos.length > 0 && (
               <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-border/50">
-                  <p className="text-xs font-semibold text-accent uppercase tracking-wider">Preferências de locais</p>
+                  <p className="text-xs font-semibold text-accent uppercase tracking-wider">Preferências Espaços Admin</p>
                   <p className="text-[11px] text-accent-subtle mt-0.5">Espaços que este DJ pode ver e avaliar preferências na sua app.</p>
                 </div>
                 <div className="px-5 py-4 flex flex-col gap-3">
