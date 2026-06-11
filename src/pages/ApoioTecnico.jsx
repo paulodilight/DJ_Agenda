@@ -700,12 +700,12 @@ export function ApoioTecnico() {
         linhas = linhas.filter(l => l.ev !== null || (l.tecIds ?? []).length > 0)
       }
 
-      const temFolgaDoTecnico = tecFiltroId && (grupo.folgas ?? []).includes(tecFiltroId)
       const temEventos = linhas.some(l => l.ev !== null)
       const hasActiveFilter = !!(filtroEspaco || tecFiltroId || q)
       // Só ocultar dias inteiros quando há um filtro activo (espaço, técnico ou pesquisa)
-      if (!temEventos && !temFolgaDoTecnico && ocultarVazios && hasActiveFilter) return null
-      if (linhas.length === 0 && !temFolgaDoTecnico && ocultarVazios && hasActiveFilter) return null
+      // Folgas não contam para manter o dia visível — filtrar só onde o técnico trabalha
+      if (!temEventos && ocultarVazios && hasActiveFilter) return null
+      if (linhas.length === 0 && ocultarVazios && hasActiveFilter) return null
 
       return { ...grupo, linhas }
     }).filter(Boolean)
