@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ArrowUp, ArrowDown, Printer,
   CalendarCheck, CalendarX, Plus, Trash2,
-  Camera, Save, Check, Maximize2,
+  Camera, Save, Check, Maximize2, Star,
 } from 'lucide-react'
 import { useDJ } from '@/hooks/useDJs'
 import { useAgenda } from '@/hooks/useAgenda'
@@ -160,7 +160,10 @@ export function DJPerfil() {
   const navigate = useNavigate()
   const { dj, loading: loadingDJ, erro: erroDJ, recarregar: recarregarDJ } = useDJ(id)
   const { agenda, loading: loadingAgenda, erro: erroAgenda, recarregar } = useAgenda({ djId: id })
-  const { espacos } = useEspacos()
+  // Preferências podem existir para qualquer cliente activo (mesmo sem calendário semanal),
+  // por isso usamos todos os espaços e filtramos apenas os inactivos.
+  const { espacos: todosEspacos } = useEspacos({ todos: true })
+  const espacos = todosEspacos.filter(e => e.activo !== false)
 
   // ── tabs ──
   const [aba, setAba] = useState('perfil')
@@ -195,9 +198,12 @@ export function DJPerfil() {
   const [perfilErro, setPerfilErro]     = useState(null)
   const [perfilSucesso, setPerfilSucesso] = useState(false)
   const [prefsEspaco, setPrefsEspaco]   = useState({})
-  const [prefsClienteDj, setPrefsClienteDj] = useState({}) // { [espaco_id]: 'preferido'|'excluido' } — o que os espaços marcaram sobre este DJ
+  const [prefsClienteDj, setPrefsClienteDj] = useState({}) // { [espaco_id]: 'preferido'|'excluido' }
+  const [interesseCliente, setInteresseCliente] = useState({}) // { [espaco_id]: 1-5 } — estrelas do gestor via Operator
+  const [avalManagers, setAvalManagers] = useState(null) // médias das avaliações dos gestores
   const [catsSel, setCatsSel]           = useState(['', '', ''])
   const [categorias, setCategorias]     = useState([])
+  const [espacosAtribuidos, setEspacosAtribuidos] = useState(new Set())
   const [fotoFile, setFotoFile]         = useState(null)
   const [fotoPreview, setFotoPreview]   = useState(null)
   const fotoInputRef                    = useRef(null)
@@ -300,14 +306,43 @@ export function DJPerfil() {
         rows.forEach(r => { map[r.espaco_id] = r.preferencia })
         setPrefsEspaco(map)
       }).catch(() => {})
-    // Sentido inverso: o que os espaços marcaram sobre este DJ (preferido/excluido)
+    // Sentido inverso: o que os espaços marcaram sobre este DJ + interesse do gestor
     espacoDjPreferenciasApi.listarPorDj(id)
       .then(rows => {
-        const map = {}
+        const mapPrefs = {}; const mapInteresse = {}
         ;(rows ?? []).forEach(r => {
-          if (r.tipo === 'preferido' || r.tipo === 'excluido') map[r.espaco_id] = r.tipo
+          if (r.tipo === 'preferido' || r.tipo === 'excluido') mapPrefs[r.espaco_id] = r.tipo
+          if (r.interesse != null) mapInteresse[r.espaco_id] = r.interesse
         })
-        setPrefsClienteDj(map)
+        setPrefsClienteDj(mapPrefs)
+        setInteresseCliente(mapInteresse)
+      }).catch(() => {})
+
+    supabase.from('dj_espacos_atribuidos').select('espaco_id').eq('dj_id', id)
+      .then(({ data }) => setEspacosAtribuidos(new Set((data ?? []).map(r => r.espaco_id))))
+      .catch(() => {})
+    // Avaliações dos gestores via Operator (médias por dimensão, só gravadas)
+    supabase.from('avaliacoes_djs').select(`
+      nota_artistica, nota_assiduidade, nota_profissionalismo, nota_adaptacao,
+      agenda!inner(dj_id)
+    `).eq('agenda.dj_id', id).eq('gravado', true)
+      .then(({ data }) => {
+        const rows = (data ?? []).filter(r =>
+          r.nota_artistica != null || r.nota_assiduidade != null ||
+          r.nota_profissionalismo != null || r.nota_adaptacao != null
+        )
+        if (!rows.length) { setAvalManagers(null); return }
+        const avg = (campo) => {
+          const vals = rows.map(r => r[campo]).filter(v => v != null)
+          return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null
+        }
+        setAvalManagers({
+          artistica: avg('nota_artistica'),
+          assiduidade: avg('nota_assiduidade'),
+          profissionalismo: avg('nota_profissionalismo'),
+          adaptacao: avg('nota_adaptacao'),
+          total: rows.length,
+        })
       }).catch(() => {})
   }, [aba, dj, id])
 
@@ -432,16 +467,19 @@ export function DJPerfil() {
       const catsIds = catsSel.map(v => v === '' ? null : Number(v))
       await djCategoriasApi.guardar(id, catsIds)
 
-      const prefs = Object.entries(prefsEspaco)
-        .filter(([, v]) => v && v !== 'neutro')
-        .map(([espaco_id, preferencia]) => ({ espaco_id, preferencia }))
-      await djPreferenciasEspacoApi.guardar(id, prefs)
+      // As "Preferências do DJ" (dj_preferencias_espaco) são definidas pelo próprio DJ
+      // e aqui apenas refletidas (read-only) — não são gravadas a partir do admin.
 
       // Sentido inverso: o que os espaços marcam sobre este DJ (preferido/excluido)
       const prefsClientes = Object.entries(prefsClienteDj)
         .filter(([, v]) => v === 'preferido' || v === 'excluido')
         .map(([espaco_id, tipo]) => ({ espaco_id, tipo }))
       await espacoDjPreferenciasApi.guardarPorDj(id, prefsClientes)
+
+      // Espaços atribuídos para preferências do DJ
+      await supabase.from('dj_espacos_atribuidos').delete().eq('dj_id', id)
+      const atribRows = [...espacosAtribuidos].map(espaco_id => ({ dj_id: id, espaco_id }))
+      if (atribRows.length) await supabase.from('dj_espacos_atribuidos').insert(atribRows)
 
       setFotoFile(null)
       recarregarDJ()
@@ -527,16 +565,23 @@ export function DJPerfil() {
       </div>
 
       {/* ── Tabs ── */}
-      <div className="no-print flex border-b border-border px-6 shrink-0">
-        <button className={tabCls('perfil')} onClick={() => setAba('perfil')}>Dados</button>
-        <button className={tabCls('agenda')} onClick={() => setAba('agenda')}>Agenda</button>
-        <button className={tabCls('disponibilidade')} onClick={() => setAba('disponibilidade')}>
-          Disponibilidades
-          {disponibilidades.length > 0 && (
-            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-accent-subtle">{disponibilidades.length}</span>
-          )}
-        </button>
-      </div>
+      {(() => {
+        const isConvidadoINT = catsSel.some(v => v === '3')
+        return (
+          <div className="no-print flex border-b border-border px-6 shrink-0">
+            <button className={tabCls('perfil')} onClick={() => setAba('perfil')}>Dados</button>
+            <button className={tabCls('agenda')} onClick={() => setAba('agenda')}>Agenda</button>
+            {isConvidadoINT && (
+              <button className={tabCls('disponibilidade')} onClick={() => setAba('disponibilidade')}>
+                Disponibilidades
+                {disponibilidades.length > 0 && (
+                  <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-accent-subtle">{disponibilidades.length}</span>
+                )}
+              </button>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ════ TAB PERFIL ════ */}
       {aba === 'perfil' && (
@@ -794,24 +839,129 @@ export function DJPerfil() {
             )}
 
             {/* ── Scoring ── */}
-            <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-border/50">
-                <p className="text-xs font-semibold text-accent uppercase tracking-wider">Scoring</p>
-              </div>
-              <div className="px-5 py-4">
-                <div className="grid grid-cols-2 gap-5">
-                  {RATINGS.map(({ campo, label, sub }) => (
-                    <RatingSelector
-                      key={campo}
-                      label={label}
-                      sub={sub}
-                      value={perfilForm[campo] ?? 0}
-                      onChange={val => setPerfilForm(f => ({ ...f, [campo]: val }))}
-                    />
-                  ))}
+            {(() => {
+              // Admin: 4 × (val directo 0-5) = 0-20 (1 estrela = 1 ponto)
+              const adminCampos = [
+                { campo: 'qualidade_artistica',  label: 'Qualidade Artística' },
+                { campo: 'assiduidade',           label: 'Assiduidade' },
+                { campo: 'profissionalismo',      label: 'Profissionalismo' },
+                { campo: 'adaptacao_espaco',      label: 'Adaptação ao Espaço' },
+              ]
+              const adminTotal = adminCampos.reduce((s, { campo }) =>
+                s + (perfilForm[campo] ?? 0), 0) // 0–20
+
+              // Manager: 4 × (avg/5 × 15) = 0–60
+              const managerDims = avalManagers
+                ? [
+                    { key: 'artistica',       label: 'Qualidade Artística',  val: avalManagers.artistica },
+                    { key: 'assiduidade',     label: 'Assiduidade',          val: avalManagers.assiduidade },
+                    { key: 'profissionalismo', label: 'Profissionalismo',    val: avalManagers.profissionalismo },
+                    { key: 'adaptacao',       label: 'Adaptação ao Espaço',  val: avalManagers.adaptacao },
+                  ]
+                : []
+              const managerTotal = managerDims.reduce((s, { val }) =>
+                s + ((val ?? 0) / 5) * 15, 0)
+
+              const finalScore = Math.round(adminTotal + managerTotal)
+              const pct = Math.min(100, finalScore)
+
+              const scoreColor = finalScore >= 80 ? 'text-status-confirmado' :
+                                 finalScore >= 60 ? 'text-yellow-400' :
+                                 finalScore >= 40 ? 'text-orange-400' : 'text-status-cancelado'
+              const barColor   = finalScore >= 80 ? 'bg-status-confirmado' :
+                                 finalScore >= 60 ? 'bg-yellow-400' :
+                                 finalScore >= 40 ? 'bg-orange-400' : 'bg-status-cancelado'
+
+              return (
+                <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-border/50 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-accent uppercase tracking-wider">Scoring</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-2xl font-black tabular-nums ${scoreColor}`}>{finalScore}</span>
+                      <span className="text-sm text-accent-subtle">/ 100</span>
+                    </div>
+                  </div>
+
+                  {/* Barra total */}
+                  <div className="mx-5 mt-4 mb-2 h-2 rounded-full bg-surface-3 overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                  </div>
+
+                  {/* Admin — editável */}
+                  <div className="px-5 pt-3 pb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">Minha avaliação · 40%</p>
+                      <span className="text-xs font-bold text-accent tabular-nums">{adminTotal.toFixed(1)} / 40</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {adminCampos.map(({ campo, label }) => (
+                        <div key={campo}>
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-[11px] text-accent-muted">{label}</p>
+                            <span className="text-[10px] text-accent-subtle tabular-nums">
+                              {((perfilForm[campo] ?? 0) / 5 * 10).toFixed(0)} / 10
+                            </span>
+                          </div>
+                          <div className="flex gap-1">
+                            {[1,2,3,4,5].map(n => (
+                              <button key={n} type="button"
+                                onClick={() => setPerfilForm(f => ({ ...f, [campo]: n }))}
+                                className="p-0.5 transition-transform active:scale-90"
+                              >
+                                <Star size={16}
+                                  fill={n <= (perfilForm[campo] ?? 0) ? 'currentColor' : 'none'}
+                                  className={n <= (perfilForm[campo] ?? 0) ? 'text-white' : 'text-accent-subtle/40'}
+                                  strokeWidth={1.5}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Manager — read-only */}
+                  <div className="border-t border-border/50 px-5 pt-3 pb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">
+                        Gestores · 60%
+                        {avalManagers && <span className="ml-1.5 font-normal normal-case">· {avalManagers.total} aval.</span>}
+                      </p>
+                      <span className="text-xs font-bold text-accent tabular-nums">{managerTotal.toFixed(1)} / 60</span>
+                    </div>
+                    {!avalManagers ? (
+                      <p className="text-[11px] text-accent-subtle italic">Sem avaliações gravadas pelos gestores.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        {managerDims.map(({ key, label, val }) => {
+                          const avg = val != null ? Math.round(val * 10) / 10 : null
+                          return (
+                            <div key={key}>
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-[11px] text-accent-muted">{label}</p>
+                                <span className="text-[10px] text-accent-subtle tabular-nums">
+                                  {avg != null ? `${avg} / 5` : '—'}
+                                </span>
+                              </div>
+                              <div className="flex gap-0.5">
+                                {[1,2,3,4,5].map(n => (
+                                  <Star key={n} size={14}
+                                    fill={avg != null && n <= Math.round(avg) ? 'currentColor' : 'none'}
+                                    className={avg != null && n <= Math.round(avg) ? 'text-yellow-400' : 'text-accent-subtle/30'}
+                                    strokeWidth={1.5}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
+              )
+            })()}
 
             {/* ── Distribuição automática ── */}
             <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
@@ -873,10 +1023,25 @@ export function DJPerfil() {
                 <div className="px-5 py-4 flex flex-col gap-3">
                   {espacos.map(esp => {
                     const pref = prefsClienteDj[esp.id] ?? 'neutro'
+                    const interesse = interesseCliente[esp.id] ?? null
                     return (
                       <div key={esp.id} className="flex items-center justify-between gap-3">
-                        <span className="text-xs text-accent-muted w-36 truncate">{esp.nome}</span>
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-xs text-accent-muted w-36 truncate shrink-0">{esp.nome}</span>
+                          {/* Estrelas interesse do gestor */}
+                          {interesse != null && (
+                            <div className="flex items-center gap-0.5" title={`Interesse: ${interesse}/5`}>
+                              {[1,2,3,4,5].map(n => (
+                                <Star key={n} size={11}
+                                  fill={n <= interesse ? 'currentColor' : 'none'}
+                                  className={n <= interesse ? 'text-yellow-400' : 'text-accent-subtle/25'}
+                                  strokeWidth={1.5}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-1 shrink-0">
                           {[
                             { value: 'preferido', label: 'Preferido', cor: 'bg-status-confirmado/20 text-status-confirmado border-status-confirmado/40' },
                             { value: 'neutro',    label: 'Neutro',    cor: 'bg-surface-2 text-accent-muted border-border' },
@@ -904,35 +1069,60 @@ export function DJPerfil() {
               </div>
             )}
 
-            {/* ── Preferências por Cliente ── */}
+            {/* ── Espaços visíveis para preferências (gestor define) ── */}
             {espacos.length > 0 && (
               <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-border/50">
-                  <p className="text-xs font-semibold text-accent uppercase tracking-wider">Preferências por Cliente</p>
+                  <p className="text-xs font-semibold text-accent uppercase tracking-wider">Preferências de locais</p>
+                  <p className="text-[11px] text-accent-subtle mt-0.5">Espaços que este DJ pode ver e avaliar preferências na sua app.</p>
+                </div>
+                <div className="px-5 py-4 flex flex-col gap-3">
+                  {espacos.map(esp => {
+                    const ativo = espacosAtribuidos.has(esp.id)
+                    return (
+                      <div key={esp.id} className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-accent-muted">{esp.nome}</span>
+                        <button
+                          type="button"
+                          onClick={() => setEspacosAtribuidos(prev => {
+                            const next = new Set(prev)
+                            if (next.has(esp.id)) next.delete(esp.id)
+                            else next.add(esp.id)
+                            return next
+                          })}
+                          className={clsx(
+                            'px-3 py-1 rounded border text-[11px] font-semibold transition-colors',
+                            ativo
+                              ? 'bg-status-confirmado/20 text-status-confirmado border-status-confirmado/40'
+                              : 'bg-surface-2 text-accent-subtle border-border hover:border-white/20 hover:text-accent-muted'
+                          )}
+                        >
+                          {ativo ? 'Visível' : 'Oculto'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Preferências do DJ (sentido DJ → espaço, read-only — definidas pelo próprio DJ) ── */}
+            {espacos.length > 0 && (
+              <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-border/50">
+                  <p className="text-xs font-semibold text-accent uppercase tracking-wider">Preferências do DJ</p>
+                  <p className="text-[11px] text-accent-subtle mt-0.5">As opções escolhidas pelo próprio DJ (só leitura).</p>
                 </div>
                 <div className="px-5 py-4 flex flex-col gap-3">
                   {espacos.map(esp => {
                     const pref = prefsEspaco[esp.id] ?? 'neutro'
+                    const op = PREFS_OPCOES.find(o => o.value === pref) ?? PREFS_OPCOES[1]
                     return (
                       <div key={esp.id} className="flex items-center justify-between gap-3">
                         <span className="text-xs text-accent-muted w-36 truncate">{esp.nome}</span>
-                        <div className="flex gap-1">
-                          {PREFS_OPCOES.map(op => (
-                            <button
-                              key={op.value}
-                              type="button"
-                              onClick={() => setPrefsEspaco(p => ({ ...p, [esp.id]: op.value }))}
-                              className={clsx(
-                                'px-2.5 py-1 rounded border text-[11px] font-medium transition-colors',
-                                pref === op.value
-                                  ? op.cor
-                                  : 'bg-surface-2 text-accent-subtle border-border hover:text-accent-muted'
-                              )}
-                            >
-                              {op.label}
-                            </button>
-                          ))}
-                        </div>
+                        <span className={clsx('px-2.5 py-1 rounded border text-[11px] font-medium', op.cor)}>
+                          {op.label}
+                        </span>
                       </div>
                     )
                   })}
