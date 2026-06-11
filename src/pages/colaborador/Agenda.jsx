@@ -12,6 +12,7 @@ import { corTecnico } from '@/utils/tecnicoColor'
 const isoData  = (d) => format(d, 'yyyy-MM-dd')
 const hhmm     = (t) => t?.slice(0, 5) ?? null
 const cap      = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
+const hojeStr  = isoData(new Date())
 
 const NOMES_DIA = { 1:'Seg', 2:'Ter', 3:'Qua', 4:'Qui', 5:'Sex', 6:'Sáb', 0:'Dom' }
 const nomeDia = (d) => {
@@ -51,7 +52,7 @@ export function ColaboradorAgenda() {
   const [slots, setSlots]         = useState([])
   const [espacos, setEspacos]     = useState([])
   const [filtroEspaco, setFiltro]   = useState('')
-  const [filtroMeu, setFiltroMeu]   = useState(true)
+  const [filtroMeu, setFiltroMeu]   = useState(false)
   const [ocultarVazios, setOcultar] = useState(true)
   const [pesquisa, setPesquisa]     = useState('')
   const [eventoAberto, setAberto]   = useState(null)
@@ -275,20 +276,13 @@ export function ColaboradorAgenda() {
         </div>
 
         {espacosActivos.length > 0 && (
-          <div className="px-4 py-2 flex items-center gap-1 flex-wrap">
-            <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-1">Cliente</span>
-            <button onClick={() => setFiltro('')}
-              className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
-                filtroEspaco === '' ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
-              Todos
-            </button>
-            {espacosActivos.map(e => (
-              <button key={e.id} onClick={() => setFiltro(filtroEspaco === e.id ? '' : e.id)}
-                className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
-                  filtroEspaco === e.id ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
-                {e.nome.trim()}
-              </button>
-            ))}
+          <div className="px-4 py-2 flex items-center gap-2">
+            <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest">Cliente</span>
+            <select value={filtroEspaco} onChange={e => setFiltro(e.target.value)}
+              className="bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-white/20">
+              <option value="">Todos</option>
+              {espacosActivos.map(e => <option key={e.id} value={e.id}>{e.nome.trim()}</option>)}
+            </select>
           </div>
         )}
       </div>
@@ -341,6 +335,7 @@ export function ColaboradorAgenda() {
                 const rowSpan   = Math.max(evs.length, 1)
                 const linhas    = evs.length > 0 ? evs : [null]
 
+                const isHoje = dataStr === hojeStr
                 return linhas.map((ev, li) => {
                   const espaco  = ev ? espacos.find(e => e.id === ev.espaco_id) : null
                   const tecIds  = ev ? (evTecIdx[ev.id] ?? (ev.tecnico_id ? [ev.tecnico_id] : [])) : []
@@ -348,11 +343,14 @@ export function ColaboradorAgenda() {
 
                   return (
                     <tr key={ev ? ev.id : `${dataStr}-empty`}
+                      onClick={() => ev && setAberto(ev)}
                       className={clsx(
-                        'hover:bg-surface-2/20 transition-colors align-middle',
+                        'hover:bg-surface-2/20 align-middle',
+                        ev && 'cursor-pointer',
                         li < linhas.length - 1 ? 'border-b border-border/10' : 'border-b border-border/20',
-                        zebraCls,
-                        isWeekend && 'bg-amber-400/[0.03]',
+                        isHoje
+                          ? 'bg-zinc-100 [&_td]:!text-gray-700'
+                          : clsx(zebraCls, isWeekend && 'bg-amber-400/[0.03]'),
                       )}>
 
                       {li === 0 && (
@@ -453,7 +451,11 @@ export function ColaboradorAgenda() {
       {/* Modal do evento */}
       {eventoAberto && (
         <EventoModal
-          evento={{ ...eventoAberto, espacos: espacos.find(e => e.id === eventoAberto.espaco_id) ? { nome: espacos.find(e => e.id === eventoAberto.espaco_id)?.nome } : null }}
+          evento={{
+            ...eventoAberto,
+            _tecnicosIds: evTecIdx[eventoAberto.id] ?? (eventoAberto.tecnico_id ? [eventoAberto.tecnico_id] : []),
+            espacos: espacos.find(e => e.id === eventoAberto.espaco_id) ? { nome: espacos.find(e => e.id === eventoAberto.espaco_id)?.nome } : null,
+          }}
           mapaTecnicos={Object.fromEntries(tecnicos.map(t => [t.id, t.nome]))}
           onFechar={() => setAberto(null)}
         />

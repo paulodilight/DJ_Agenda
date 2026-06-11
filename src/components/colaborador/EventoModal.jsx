@@ -3,6 +3,7 @@ import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle } from 
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
 import { colaboradorApi } from '@/lib/colaboradorApi'
+import { supabase } from '@/lib/supabase'
 import { usePresenca, podeAssinar, presencaAtrasada } from '@/hooks/usePresenca'
 import { useColaboradorStore } from '@/store'
 import { labelEstado } from '@/utils/formatacao'
@@ -55,22 +56,37 @@ function Campo({ rotulo, valor, negrito, isLink, full, size = 14 }) {
 export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [aba, setAba]             = useState('detalhes')
   const [dir, setDir]             = useState('right')   // animação de entrada
-  const [notas, setNotas]         = useState(evento?.notas_colaborador ?? '')
+  const [notas, setNotas]         = useState('')
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado]   = useState(false)
   const [erro, setErro]           = useState(null)
   const touchX = useRef(null)
 
-  // ── Assinatura de presença do técnico (GPS) ──
+  // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
+
+  // Só pode ver/editar as suas próprias notas se estiver atribuído ao evento
+  const isAtribuido = colaborador && (
+    (evento._tecnicosIds ?? []).includes(colaborador.id) ||
+    evento.tecnico_id === colaborador.id
+  )
+  // Só o responsável principal pode assinar presença
+  const isResponsavel = colaborador?.id === evento.tecnico_id
+
+  // ── Assinatura de presença do técnico (GPS) ──
   const pres = usePresenca({ kind: 'tecnico', refId: evento.id, ownerId: colaborador?.id ?? null, signedBy: 'tecnico' })
   const [aConfirmarPres, setConfirmarPres] = useState(false)
   const presDisponivel = podeAssinar(evento.data_evento, evento.hora_inicio)
   const presAtrasada = presencaAtrasada(pres.presenca, evento.data_evento, evento.hora_inicio)
 
   useEffect(() => {
-    if (evento) setNotas(evento.notas_colaborador ?? '')
-  }, [evento?.id])
+    if (!evento?.id || !colaborador?.id || !isAtribuido) { setNotas(''); return }
+    let activo = true
+    supabase.from('evento_tecnicos')
+      .select('notas').eq('evento_id', evento.id).eq('tecnico_id', colaborador.id).maybeSingle()
+      .then(({ data }) => { if (activo) setNotas(data?.notas ?? '') })
+    return () => { activo = false }
+  }, [evento?.id, colaborador?.id, isAtribuido])
 
   const logo    = evento.espacos?.logo_url
   const cliente = evento.espacos?.nome || evento.cliente || null
@@ -82,9 +98,13 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     .filter(Boolean)
 
   const guardar = async () => {
+    if (!colaborador?.id) return
     setGuardando(true); setErro(null)
     try {
-      await colaboradorApi.guardarNotasColaborador(evento.id, notas)
+      await supabase.from('evento_tecnicos')
+        .update({ notas })
+        .eq('evento_id', evento.id)
+        .eq('tecnico_id', colaborador.id)
       setGuardado(true); setTimeout(() => setGuardado(false), 2000)
     } catch (e) { setErro(e.message) }
     finally { setGuardando(false) }
@@ -245,45 +265,47 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   {evento.Equipamentos || 'Sem equipamentos definidos.'}
                 </div>
               </div>
-              <div>
-                <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>As minhas notas</p>
-                <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={4}
-                  placeholder="Adiciona notas antes ou depois do evento…"
-                  style={{ fontSize: 14 }}
-                  className="w-full bg-surface-2 border border-white/30 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/60 resize-none" />
-                {erro && <p className="text-xs text-status-cancelado mt-1">{erro}</p>}
-                <div className="flex justify-end mt-2">
-                  <button onClick={guardar} disabled={guardando}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 disabled:opacity-40 transition-colors"
-                    style={{ fontSize: 12 }}>
-                    <Save size={13} />
-                    {guardando ? 'A guardar…' : guardado ? 'Guardado ✓' : 'Guardar notas'}
-                  </button>
+              {isAtribuido && (
+                <div>
+                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>As minhas notas</p>
+                  <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={4}
+                    placeholder="Notas pessoais sobre este evento…"
+                    style={{ fontSize: 14 }}
+                    className="w-full bg-surface-2 border border-white/30 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/60 resize-none" />
+                  {erro && <p className="text-xs text-status-cancelado mt-1">{erro}</p>}
+                  <div className="flex justify-end mt-2">
+                    <button onClick={guardar} disabled={guardando}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 disabled:opacity-40 transition-colors"
+                      style={{ fontSize: 12 }}>
+                      <Save size={13} />
+                      {guardando ? 'A guardar…' : guardado ? 'Guardado ✓' : 'Guardar notas'}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Rodapé — assinatura de presença + fechar */}
+        {/* Rodapé — assinatura de presença (só responsável) + fechar */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 shrink-0">
           <div>
-            {pres.status === 'signed' && pres.presenca ? (
+            {isResponsavel && pres.status === 'signed' && pres.presenca ? (
               <span
                 title={`Presente · ${new Date(pres.presenca.signed_at).toLocaleString('pt-PT')}${pres.presenca.latitude != null ? ` · ${Number(pres.presenca.latitude).toFixed(5)}, ${Number(pres.presenca.longitude).toFixed(5)}${pres.presenca.accuracy_m != null ? ` (±${pres.presenca.accuracy_m}m)` : ''}` : ' · sem GPS'}`}
                 className={clsx('inline-flex items-center gap-1.5 text-sm font-medium', presAtrasada ? 'text-status-cancelado' : 'text-status-confirmado')}>
                 <Check size={16} /> Presente · {new Date(pres.presenca.signed_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
               </span>
-            ) : pres.status === 'loading' ? (
+            ) : isResponsavel && pres.status === 'loading' ? (
               <span className="inline-flex items-center gap-1.5 text-accent-subtle text-sm">
                 <Loader2 size={15} className="animate-spin" /> A localizar…
               </span>
-            ) : pres.status === 'error' ? (
+            ) : isResponsavel && pres.status === 'error' ? (
               <button onClick={() => pres.assinar()} title={pres.erro || ''}
                 className="inline-flex items-center gap-1.5 text-status-cancelado text-sm hover:opacity-80">
                 <AlertCircle size={15} /> Erro — repetir
               </button>
-            ) : aConfirmarPres ? (
+            ) : isResponsavel && aConfirmarPres ? (
               <span className="inline-flex items-center gap-2">
                 <button onClick={() => { setConfirmarPres(false); pres.assinar() }}
                   className="px-3 py-1.5 rounded-lg bg-status-confirmado/15 border border-status-confirmado/40 text-status-confirmado text-xs font-medium hover:bg-status-confirmado/25 transition-colors">
@@ -294,14 +316,14 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   Cancelar
                 </button>
               </span>
-            ) : presDisponivel ? (
+            ) : isResponsavel && presDisponivel ? (
               <button onClick={() => setConfirmarPres(true)} disabled={!colaborador}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-accent-muted text-xs font-medium hover:text-accent hover:border-white/25 transition-colors disabled:opacity-40">
                 <MapPin size={14} /> Marcar presença
               </button>
-            ) : (
+            ) : isResponsavel ? (
               <span className="text-accent-subtle/60 text-xs">Disponível 5 min antes do início</span>
-            )}
+            ) : null}
           </div>
           <button onClick={onFechar}
             className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
