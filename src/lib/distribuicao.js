@@ -124,7 +124,12 @@ export async function calcularPreAlocacoes(anoMes) {
   return preAlocacoes
 }
 
-export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }) {
+/**
+ * @param {{ anoMes: string, espacoId: string, preAlocacoes?: object, modo?: 'completo'|'ajustes' }} opts
+ *   modo 'completo' — distribuição de raiz: apaga e recria todos os slots automáticos não protegidos
+ *   modo 'ajustes'  — só redistribui slots em estado 'alterar'; tudo o resto fica intocado
+ */
+export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {}, modo = 'completo' }) {
   const [ano, mes] = anoMes.split('-').map(Number)
   const mesInicio  = startOfMonth(new Date(ano, mes - 1, 1))
   const mesFim     = endOfMonth(mesInicio)
@@ -155,6 +160,7 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
     bloqueiosRes,
     adminPrefsRes,
     metaEspacoRes,
+    catsNomesRes,
   ] = await Promise.all([
     // Configurações do Cliente
     supabase
@@ -250,6 +256,11 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
       .from('dj_meta_espaco')
       .select('dj_id, max_datas_mes')
       .eq('espaco_id', espacoId),
+
+    // Nomes das categorias (para identificar categorias protegidas)
+    supabase
+      .from('categorias_dj')
+      .select('id, nome'),
   ])
 
   for (const r of [espacoRes, djsRes, turnosRes, fixosRes, agendaRes]) {
@@ -347,22 +358,56 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
   // ── Agenda deste Cliente ────────────────────────────────────────────────
   const agendaExistente = agendaRes.data ?? []
 
-  // ── 2. Apagar slots automáticos e proteger os manuais ─────────────────
+  // ── 2. Apagar slots a redistribuir e proteger os restantes ─────────────
   //
-  //   origem = 'automatico' → apagados e redistribuídos de raiz
-  //   origem = 'manual' / 'excel' / outro → protegidos, nunca tocados
+  //   Protegidos (nunca tocados, em qualquer modo):
+  //   • origem = 'manual' / 'excel' / outro
+  //   • estado = 'a_pedido' ou 'validação'
+  //   • DJ do slot com categoria protegida (DJ Convidado EXT / DJ Premium)
   //
-  const idsAutomaticos = agendaExistente
-    .filter(s => s.origem === 'automatico' && s.estado !== 'a_pedido')
-    .map(s => s.id)
+  //   modo 'completo' → apaga todos os automáticos não protegidos
+  //   modo 'ajustes'  → apaga apenas slots em estado 'alterar' (não protegidos)
+  //
+  const catsProtegidasIds = new Set(
+    (catsNomesRes.data ?? [])
+      .filter(c => ['dj convidado ext', 'dj premium'].includes((c.nome ?? '').trim().toLowerCase()))
+      .map(c => c.id)
+  )
+  const djProtegido = (djId) => {
+    const cats = djId ? djCatsMap[djId] : null
+    if (!cats) return false
+    for (const c of cats) if (catsProtegidasIds.has(c)) return true
+    return false
+  }
+
+  const ESTADOS_PROTEGIDOS = new Set(['a_pedido', 'validação'])
+
+  const aApagar = agendaExistente.filter(s => {
+    if (ESTADOS_PROTEGIDOS.has(s.estado)) return false
+    if (djProtegido(s.dj_id))             return false
+    if (modo === 'ajustes') return s.estado === 'alterar'
+    return s.origem === 'automatico'
+  })
+  const idsAutomaticos = aApagar.map(s => s.id)
+  const idsApagarSet   = new Set(idsAutomaticos)
+
+  // Em modo ajustes, só se preenchem as posições libertadas pelos slots 'alterar'
+  const posicoesLivres = modo === 'ajustes'
+    ? new Set(aApagar.map(s => `${s.data}|${s.turno_id ?? ''}`))
+    : null
+
+  // DJ que recusou uma data não volta a ser proposto para essa mesma data
+  const rejeitadosSet = new Set(
+    aApagar.filter(s => s.estado === 'alterar' && s.dj_id).map(s => `${s.dj_id}|${s.data}`)
+  )
 
   if (idsAutomaticos.length > 0) {
     const { error } = await supabase.from('agenda').delete().in('id', idsAutomaticos)
     if (error) throw error
   }
 
-  // Apenas slots não-automáticos ficam como referência
-  const slotsManuais = agendaExistente.filter(s => s.origem !== 'automatico')
+  // Todos os slots não apagados ficam como referência (posições ocupadas)
+  const slotsManuais = agendaExistente.filter(s => !idsApagarSet.has(s.id))
 
   const confirmados = new Set()
   slotsManuais.forEach(s => {
@@ -370,7 +415,7 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
     if (!s.turno_id) confirmados.add(`${s.data}|*`)
   })
 
-  // Contagem de slots manuais com DJ (para efeito de espaçamento e score)
+  // Contagem de slots protegidos com DJ (para efeito de espaçamento e score)
   const contagemConf = {}
   slotsManuais
     .filter(s => s.dj_id)
@@ -422,8 +467,11 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
       if (!turno.dias_semana?.length || !turno.dias_semana.includes(diaSem)) continue
 
       const chave = `${iso}|${turno.id ?? turno.hora_inicio ?? ''}`
-      // Não tocar: slot confirmado, manual ou excel já ocupa esta data/turno
+      // Não tocar: slot protegido já ocupa esta data/turno
       if (confirmados.has(chave) || confirmados.has(`${iso}|*`)) continue
+
+      // Modo ajustes: só preencher posições libertadas por slots em 'alterar'
+      if (posicoesLivres && !posicoesLivres.has(`${iso}|${turno.id ?? ''}`)) continue
 
       let djId = null
 
@@ -498,6 +546,9 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {} }
 
           // Indisponibilidade explícita no dia
           if (indisponiveis.has(`${dj.id}|${iso}`)) return false
+
+          // DJ recusou ('Não aceito') esta data — não voltar a propor o mesmo DJ
+          if (rejeitadosSet.has(`${dj.id}|${iso}`)) return false
 
           // Opt-in: DJ registou disponibilidades para este mês → só pode actuar nos dias marcados
           if (optInDias[dj.id]?.size > 0 && !optInDias[dj.id].has(iso)) return false
@@ -584,7 +635,7 @@ function construirSlot(espacoId, turno, iso, djId, djs = [], valoresDiaMap = {},
     hora_fim:    horaFim,
     valor,
     dj_id:       djId ?? null,
-    estado:      'confirmado',
+    estado:      'proposta',
     origem:      'automatico',
   }
 }

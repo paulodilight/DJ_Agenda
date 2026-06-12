@@ -1,6 +1,6 @@
 ﻿import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Printer, Trophy } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2 } from 'lucide-react'
 import { startOfWeek, addDays, addWeeks, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import {
@@ -21,6 +21,7 @@ import { useConflitos } from '@/hooks/useConflitos'
 import { useSupaEventos } from '@/hooks/useSupaEventos'
 import { useMesStore } from '@/store'
 import { agendaApi, disponibilidadesApi, turnoValoresDiaApi } from '@/lib/api'
+import { correrDistribuicao, calcularPreAlocacoes } from '@/lib/distribuicao'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { Modal } from '@/components/ui/Modal'
 import { formatarEuro } from '@/utils/formatacao'
@@ -46,6 +47,7 @@ export function Agenda() {
   const [rankingAberto, setRankingAberto] = useState(false)
   const [eventoModal, setEventoModal] = useState(null)
   const [eventoModalAberto, setEventoModalAberto] = useState(false)
+  const [distribuindo, setDistribuindo] = useState(false)
 
   // Quando o mês global muda (pelo header), actualizar a referência da agenda
   useEffect(() => {
@@ -131,6 +133,74 @@ export function Agenda() {
   const comDJAgenda  = filtroEspaco ? agenda.filter(s => s.dj_id || s.dj_nome).length : 0
   const semDJAgenda  = totalAgenda - comDJAgenda
   const datasOk      = filtroEspaco && totalAgenda > 0 && semDJAgenda === 0
+
+  // ── Distribuição: scope segue o tab seleccionado (Todos = global; Cliente = só esse) ──
+  const anoMesAlvo = format(referencia, 'yyyy-MM')
+  // Já houve distribuição neste mês/scope? (existe ≥1 slot automático)
+  const jaDistribuido = filtroEspaco
+    ? agendaMes.some(s => s.espaco_id === filtroEspaco && s.origem === 'automatico')
+    : agendaMes.some(s => s.origem === 'automatico')
+  // Em modo ajustes só há trabalho se existirem slots em estado 'alterar'
+  const temAlterar = filtroEspaco
+    ? agendaMes.some(s => s.espaco_id === filtroEspaco && s.estado === 'alterar')
+    : agendaMes.some(s => s.estado === 'alterar')
+  const modoDistribuir = jaDistribuido ? 'ajustes' : 'completo'
+
+  const distribuir = async () => {
+    if (espacos.length === 0 || distribuindo) return
+    if (modoDistribuir === 'completo') {
+      const alvo = filtroEspaco ? nomeEspacoFiltro : 'TODOS os clientes'
+      if (!window.confirm(
+        `Distribuir ${alvo} para ${anoMesAlvo}?\n\nOs slots automáticos não protegidos serão recriados em estado Proposta. ` +
+        `Slots em Validação, A pedido, e DJs Convidado EXT / Premium são preservados.`
+      )) return
+    }
+    setDistribuindo(true)
+    try {
+      const preAlocacoes = await calcularPreAlocacoes(anoMesAlvo)
+
+      // Ordenar Clientes (só relevante em modo global)
+      let alvos = filtroEspaco ? espacos.filter(e => e.id === filtroEspaco) : [...espacos]
+      if (!filtroEspaco) {
+        const [prefsRes, turnosRes, djsComRegRes] = await Promise.all([
+          supabase.from('espaco_dj_preferencias').select('espaco_id, dj_id').eq('tipo', 'preferido'),
+          supabase.from('turnos_espaco').select('espaco_id, dias_semana'),
+          supabase.from('disponibilidades').select('dj_id').gte('data', mesInicio).lte('data', mesFim),
+        ])
+        const djsActivos = new Set((djsComRegRes.data ?? []).map(r => r.dj_id))
+        const prefCount = {}
+        ;(prefsRes.data ?? []).forEach(p => {
+          if (djsActivos.has(p.dj_id)) prefCount[p.espaco_id] = (prefCount[p.espaco_id] ?? 0) + 1
+        })
+        const opDias = {}
+        ;(turnosRes.data ?? []).forEach(t => {
+          if (!opDias[t.espaco_id]) opDias[t.espaco_id] = new Set()
+          ;(t.dias_semana ?? []).forEach(d => opDias[t.espaco_id].add(d))
+        })
+        alvos.sort((a, b) => {
+          const aO = a.ordem_distribuicao ?? Infinity, bO = b.ordem_distribuicao ?? Infinity
+          if (aO !== bO) return aO - bO
+          const dd = (opDias[a.id]?.size ?? 7) - (opDias[b.id]?.size ?? 7)
+          if (dd !== 0) return dd
+          return (prefCount[b.id] ?? 0) - (prefCount[a.id] ?? 0)
+        })
+      }
+
+      let total = 0
+      for (const espaco of alvos) {
+        const { inseridos } = await correrDistribuicao({
+          anoMes: anoMesAlvo, espacoId: espaco.id, preAlocacoes, modo: modoDistribuir,
+        })
+        total += inseridos
+      }
+      await Promise.all([recarregar(), recarregarMes()])
+      console.info(`Distribuição (${modoDistribuir}) concluída: ${total} slots em ${alvos.length} Cliente(s).`)
+    } catch (e) {
+      alert('Erro na distribuição: ' + e.message)
+    } finally {
+      setDistribuindo(false)
+    }
+  }
 
   // ── Drag-and-drop ────────────────────────────────────────────────────────────
   const sensors = useSensors(
@@ -403,6 +473,30 @@ export function Agenda() {
           >
             <Printer size={13} />
             Imprimir
+          </button>
+
+          {/* Distribuir / Ajustes */}
+          <button
+            onClick={distribuir}
+            disabled={distribuindo || espacos.length === 0 || (modoDistribuir === 'ajustes' && !temAlterar)}
+            title={
+              modoDistribuir === 'completo'
+                ? `Distribuir ${filtroEspaco ? nomeEspacoFiltro : 'todos os clientes'} para ${anoMesAlvo}`
+                : temAlterar
+                  ? `Reajustar apenas as datas em estado Alterar${filtroEspaco ? ` em ${nomeEspacoFiltro}` : ''}`
+                  : 'Sem datas em estado Alterar para reajustar'
+            }
+            className={clsx(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold tracking-wide uppercase transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+              modoDistribuir === 'completo'
+                ? 'bg-accent text-black border-accent hover:bg-accent/80'
+                : 'bg-surface-2 text-accent border-white/20 hover:border-white/40'
+            )}
+          >
+            {distribuindo
+              ? <Loader2 size={13} className="animate-spin" />
+              : modoDistribuir === 'completo' ? <Shuffle size={13} /> : <SlidersHorizontal size={13} />}
+            {distribuindo ? 'A processar…' : modoDistribuir === 'completo' ? 'Distribuir' : 'Ajustes'}
           </button>
 
         </div>
