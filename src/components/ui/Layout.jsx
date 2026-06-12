@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, MapPin, CalendarDays, Zap, Ban,
+  LayoutDashboard, Users, MapPin, CalendarDays, Ban,
   Settings, LogOut, Mic2, Bell, Music2, Scale, Send, Wallet,
   ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar,
 } from 'lucide-react'
@@ -13,7 +13,6 @@ import { pt } from 'date-fns/locale'
 
 const ROTAS = [
   { path: '/',              label: 'Dashboard' },
-  { path: '/distribuicao',  label: 'Distribuição' },
   { path: '/equilibrio',    label: 'Equilíbrio' },
   { path: '/agenda',        label: 'Agenda' },
   { path: '/eventos',       label: 'Eventos' },
@@ -50,7 +49,6 @@ function labelContexto(anoMes) {
 
 const navPrincipal = [
   { para: '/',              icone: LayoutDashboard, label: 'Dashboard' },
-  { para: '/distribuicao',  icone: Zap,             label: 'Distribuição' },
   { para: '/equilibrio',    icone: Scale,           label: 'Equilíbrio' },
   { para: '/agenda',        icone: CalendarDays,    label: 'Agenda' },
   { para: '/eventos',       icone: Star,            label: 'Eventos' },
@@ -233,7 +231,7 @@ export function Layout() {
           <h1 className="text-base font-bold text-accent uppercase tracking-widest">{paginaLabel}</h1>
 
           {/* Seletor de mês — apenas nas páginas que trabalham com mês */}
-          {['/', '/distribuicao', '/equilibrio', '/agenda', '/eventos', '/comunicacao', '/contas', '/apoio-tecnico'].some(p =>
+          {['/', '/equilibrio', '/agenda', '/eventos', '/comunicacao', '/contas', '/apoio-tecnico'].some(p =>
             p === '/' ? location.pathname === '/' : location.pathname.startsWith(p)
           ) && (
             <div className={clsx(

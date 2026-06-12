@@ -129,10 +129,24 @@ export function Agenda() {
     : 'TODOS'
 
   // Indicador de preenchimento — só quando um Cliente está seleccionado
-  const totalAgenda  = filtroEspaco ? agenda.length : 0
-  const comDJAgenda  = filtroEspaco ? agenda.filter(s => s.dj_id || s.dj_nome).length : 0
-  const semDJAgenda  = totalAgenda - comDJAgenda
-  const datasOk      = filtroEspaco && totalAgenda > 0 && semDJAgenda === 0
+  // Máximo teórico de datas no mês = soma, por turno, dos dias do mês cujo
+  // dia-da-semana está em turno.dias_semana (ex.: Golf d'Água só Sex+Sáb → 9 em Julho)
+  const espacoSel = filtroEspaco ? espacos.find(e => e.id === filtroEspaco) : null
+  const esperadosMes = useMemo(() => {
+    if (!espacoSel) return 0
+    const dias = eachDayOfInterval({ start: startOfMonth(referencia), end: endOfMonth(referencia) })
+    return (espacoSel.turnos_espaco ?? []).reduce((tot, t) => {
+      if (!t.dias_semana?.length) return tot
+      return tot + dias.filter(d => t.dias_semana.includes(d.getDay())).length
+    }, 0)
+  }, [espacoSel, referencia])
+
+  // Datas do mês deste Cliente que já têm DJ atribuído
+  const comDJMes      = filtroEspaco
+    ? agendaMes.filter(s => s.espaco_id === filtroEspaco && (s.dj_id || s.dj_nome)).length
+    : 0
+  const faltamPreencher = Math.max(0, esperadosMes - comDJMes)
+  const datasOk         = filtroEspaco && esperadosMes > 0 && faltamPreencher === 0
 
   // ── Distribuição: scope segue o tab seleccionado (Todos = global; Cliente = só esse) ──
   const anoMesAlvo = format(referencia, 'yyyy-MM')
@@ -424,16 +438,16 @@ export function Agenda() {
           </div>
         </div>
 
-        {/* Indicador de preenchimento — centro */}
+        {/* Indicador de preenchimento — centro (máximo teórico = turnos × dias do mês) */}
         <div className="flex-1 flex justify-center">
-          {filtroEspaco && totalAgenda > 0 && (
+          {filtroEspaco && esperadosMes > 0 && (
             datasOk ? (
               <span className="text-sm font-bold tracking-widest uppercase text-status-confirmado">
-                ✓ Datas Completas · {comDJAgenda} / {totalAgenda}
+                ✓ Datas Completas · {comDJMes} / {esperadosMes}
               </span>
             ) : (
               <span className="text-sm font-bold tracking-widest uppercase text-orange-400">
-                Faltam {semDJAgenda} {semDJAgenda === 1 ? 'data' : 'datas'} · {comDJAgenda} / {totalAgenda}
+                Faltam {faltamPreencher} {faltamPreencher === 1 ? 'DJ' : 'DJs'} · {comDJMes} / {esperadosMes}
               </span>
             )
           )}

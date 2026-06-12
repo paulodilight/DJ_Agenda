@@ -9,7 +9,6 @@ import { DJPerfil } from '@/pages/DJPerfil'
 import { Espacos } from '@/pages/Espacos'
 import { Agenda } from '@/pages/Agenda'
 import { Bloqueios } from '@/pages/Bloqueios'
-import { Distribuicao } from '@/pages/Distribuicao'
 import { Configuracoes } from '@/pages/Configuracoes'
 import { EspacoPerfil } from '@/pages/EspacoPerfil'
 import { Atuacoes } from '@/pages/Atuacoes'
@@ -78,7 +77,6 @@ export default function App() {
           <Route path="bloqueios" element={<Bloqueios />} />
           <Route path="agenda" element={<Agenda />} />
           <Route path="atuacoes" element={<Atuacoes />} />
-          <Route path="distribuicao" element={<Distribuicao />} />
           <Route path="equilibrio" element={<Equilibrio />} />
           <Route path="eventos" element={<Eventos />} />
           <Route path="apoio-tecnico" element={<ApoioTecnico />} />
