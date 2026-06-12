@@ -47,7 +47,10 @@ export function EspacoPerfil() {
   const [form, setForm] = useState({
     nome: '', tipo: 'club', budget_max: '',
     dias_sem_repeticao: 14, dias_espacamento: 7, notas: '', notas_gerais: '',
-    ordem_distribuicao: '', logo_url: '',
+    ordem_distribuicao: '', logo_url: '', grupo: '',
+    pin_operator_admin: '', pin_operator_user: '',
+    pin_manager_admin: '', pin_manager_user: '',
+    pin_marketing_admin: '', pin_marketing_user: '',
   })
   const [logoUploading, setLogoUploading] = useState(false)
 
@@ -88,8 +91,12 @@ export function EspacoPerfil() {
         ordem_distribuicao: data.ordem_distribuicao ?? '',
         logo_url: data.logo_url ?? '',
         grupo: data.grupo ?? '',
-        pin_gestor: data.pin_gestor ?? '',
-        codigo_marketing: data.codigo_marketing ?? '',
+        pin_operator_admin: data.pin_operator_admin ?? '',
+        pin_operator_user: data.pin_operator_user ?? '',
+        pin_manager_admin: data.pin_manager_admin ?? '',
+        pin_manager_user: data.pin_manager_user ?? '',
+        pin_marketing_admin: data.pin_marketing_admin ?? '',
+        pin_marketing_user: data.pin_marketing_user ?? '',
       })
 
       const turnosCarregados = data.turnos?.length > 0
@@ -687,45 +694,41 @@ export function EspacoPerfil() {
             </Card>
           )
         })()}
-        {/* ── Operator & Marketing ── */}
+        {/* ── Gest Login ── */}
         <Card>
           <CardHeader>
             <div>
-              <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Operator & Marketing</p>
+              <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Gest Login</p>
               <p className="text-xs text-accent-subtle mt-1">
-                Códigos de acesso para a app Operator (gestores) e app Marketing · grupo define qual deployment Vercel serve este espaço
+                PIN de acesso (admin e user) por área — Operator, Manager e Marketing · o grupo define o link Vercel deste espaço
               </p>
             </div>
           </CardHeader>
           <CardBody>
             {/* Links Vercel */}
-            {form.grupo ? (
-              <div className="mb-4 flex items-center gap-3 flex-wrap">
-                <span className="text-[11px] text-accent-subtle uppercase tracking-wider">Links Vercel:</span>
-                <a href={`https://xclusive-${form.grupo}.vercel.app`} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1.5 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
-                  <ExternalLink size={11} /> Operator
-                </a>
-                <a href={`https://xclusive-${form.grupo}.vercel.app/marketing`} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1.5 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
-                  <ExternalLink size={11} /> Marketing
-                </a>
-              </div>
-            ) : (
-              <div className="mb-4 flex items-center gap-3 flex-wrap">
-                <span className="text-[11px] text-accent-subtle uppercase tracking-wider">Links Vercel (LMD):</span>
-                <a href="https://xclusive-manager.vercel.app" target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1.5 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
-                  <ExternalLink size={11} /> Operator
-                </a>
-                <a href="https://xclusive-manager.vercel.app/marketing" target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1.5 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
-                  <ExternalLink size={11} /> Marketing
-                </a>
-              </div>
-            )}
+            {(() => {
+              const baseUrl = 'https://xclusive-manager.vercel.app'
+              const prefixo = form.grupo ? `/${form.grupo}` : ''
+              return (
+                <div className="mb-4 flex items-center gap-3 flex-wrap">
+                  <span className="text-[11px] text-accent-subtle uppercase tracking-wider">
+                    Links Vercel{form.grupo ? '' : ' (LMD)'}:
+                  </span>
+                  {[
+                    { label: 'Operator', path: '' },
+                    { label: 'Manager', path: '/manager' },
+                    { label: 'Marketing', path: '/marketing' },
+                  ].map((l) => (
+                    <a key={l.label} href={`${baseUrl}${prefixo}${l.path}`} target="_blank" rel="noreferrer"
+                      className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1.5 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
+                      <ExternalLink size={11} /> {l.label}
+                    </a>
+                  ))}
+                </div>
+              )
+            })()}
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="mb-5 max-w-sm">
               <div>
                 <label className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">Grupo</label>
                 <p className="text-[10px] text-accent-subtle mb-1">deployment Vercel associado</p>
@@ -795,29 +798,33 @@ export function EspacoPerfil() {
                   </div>
                 )}
               </div>
-              <div>
-                <label className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">PIN Operator</label>
-                <p className="text-[10px] text-accent-subtle mb-1">código do gestor do espaço</p>
-                <input
-                  type="text"
-                  value={form.pin_gestor}
-                  onChange={(e) => setForm((f) => ({ ...f, pin_gestor: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
-                  placeholder="1234"
-                  maxLength={6}
-                  className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-accent font-mono placeholder:text-accent-subtle focus:outline-none focus:border-white/20"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">Código Marketing</label>
-                <p className="text-[10px] text-accent-subtle mb-1">acesso à app Marketing</p>
-                <input
-                  type="text"
-                  value={form.codigo_marketing}
-                  onChange={(e) => setForm((f) => ({ ...f, codigo_marketing: e.target.value.toUpperCase().replace(/\s+/g, '') }))}
-                  placeholder="LMDXXX26"
-                  className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-accent font-mono placeholder:text-accent-subtle focus:outline-none focus:border-white/20"
-                />
-              </div>
+            </div>
+
+            {/* PIN admin + user por área */}
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { area: 'operator', label: 'Operator' },
+                { area: 'manager', label: 'Manager' },
+                { area: 'marketing', label: 'Marketing' },
+              ].map(({ area, label }) => (
+                <div key={area} className="rounded border border-border/60 bg-surface-2/40 p-3">
+                  <p className="text-[11px] font-bold text-accent uppercase tracking-wider mb-2.5">{label}</p>
+                  <label className="text-[10px] font-semibold text-accent-subtle uppercase tracking-wider">PIN Admin</label>
+                  <input
+                    type="text" inputMode="numeric" maxLength={4} placeholder="••••"
+                    value={form[`pin_${area}_admin`] ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, [`pin_${area}_admin`]: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                    className="mb-2 w-full rounded border border-border bg-surface-0 px-3 py-2 text-sm text-accent font-mono tracking-[0.3em] placeholder:text-accent-subtle focus:outline-none focus:border-white/20"
+                  />
+                  <label className="text-[10px] font-semibold text-accent-subtle uppercase tracking-wider">PIN User</label>
+                  <input
+                    type="text" inputMode="numeric" maxLength={4} placeholder="••••"
+                    value={form[`pin_${area}_user`] ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, [`pin_${area}_user`]: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                    className="w-full rounded border border-border bg-surface-0 px-3 py-2 text-sm text-accent font-mono tracking-[0.3em] placeholder:text-accent-subtle focus:outline-none focus:border-white/20"
+                  />
+                </div>
+              ))}
             </div>
           </CardBody>
         </Card>
