@@ -18,17 +18,23 @@ import { formatarData, formatarHora } from '@/utils/datas'
 import { FormEvento } from '@/components/eventos/FormEvento'
 import { DJCombobox, NovoDJLink } from './DJCombobox'
 import { supaEventosApi } from '@/lib/supaEventosApi'
+import { trocarDJ } from '@/lib/trocas'
 import { clsx } from 'clsx'
-import { CalendarPlus, Link2, Star } from 'lucide-react'
+import { CalendarPlus, Link2, Star, ArrowLeftRight } from 'lucide-react'
 
 const ESTADO_OPCOES = [
-  { value: 'proposta',    label: 'Proposta' },
-  { value: 'confirmado',  label: 'Confirmado' },
-  { value: 'a_pedido',    label: 'A pedido' },
-  { value: 'presente',    label: 'Presente' },
-  { value: 'faltou',      label: 'Faltou' },
-  { value: 'cancelado',   label: 'Cancelado' },
-  { value: 'sem_efeito',  label: 'Sem Efeito' },
+  { value: 'proposta',        label: 'Proposta' },
+  { value: 'aceitação',       label: 'Aceitação' },
+  { value: 'validação',       label: 'Validação' },
+  { value: 'pré-confirmado',  label: 'Pré-confirmado' },
+  { value: 'confirmado',      label: 'Confirmado' },
+  { value: 'alterar',         label: 'Alterar' },
+  { value: 'trocado',         label: 'Trocado' },
+  { value: 'a_pedido',        label: 'A pedido' },
+  { value: 'presente',        label: 'Presente' },
+  { value: 'faltou',          label: 'Faltou' },
+  { value: 'cancelado',       label: 'Cancelado' },
+  { value: 'sem_efeito',      label: 'Sem Efeito' },
 ]
 
 const vazio = {
@@ -52,6 +58,13 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const [eventoAutoLink, setEventoAutoLink] = useState(false)
   const [aba, setAba] = useState(0)
   const [avaliacao, setAvaliacao] = useState(null)
+
+  // ── Troca de DJ ──
+  const [trocaAberta, setTrocaAberta] = useState(false)
+  const [trocaDjId, setTrocaDjId]     = useState('')
+  const [trocaMotivo, setTrocaMotivo] = useState('')
+  const [trocaLoading, setTrocaLoading] = useState(false)
+  const [trocaErro, setTrocaErro]     = useState(null)
 
   const { djs } = useDJs()
   const { espacos } = useEspacos()
@@ -317,6 +330,38 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       setLoading(false)
     }
   }
+
+  const abrirTroca = () => {
+    setTrocaDjId(''); setTrocaMotivo(''); setTrocaErro(null); setTrocaAberta(true)
+  }
+
+  const executarTroca = async () => {
+    if (!trocaDjId) { setTrocaErro('Escolhe o novo DJ.'); return }
+    setTrocaLoading(true); setTrocaErro(null)
+    try {
+      const djEntra = djs.find(d => d.id === trocaDjId)
+      const djSai   = djs.find(d => d.id === form.dj_id) ?? null
+      const espacoNome = slot.espaco_nome
+        ?? espacos.find(e => e.id === slot.espaco_id)?.nome?.trim()
+        ?? ''
+      await trocarDJ({
+        slot, espacoNome, djSai, djEntra,
+        motivo: trocaMotivo.trim() || null, origem: 'admin',
+      })
+      setTrocaAberta(false)
+      onGuardado()
+      onFechar()
+    } catch (e) {
+      setTrocaErro(e.message)
+    } finally {
+      setTrocaLoading(false)
+    }
+  }
+
+  // Candidatos à troca: DJs activos, excluindo o actual
+  const candidatosTroca = djs
+    .filter(d => ['activo', 'activo_ext'].includes(d.estado) && d.id !== form.dj_id)
+    .sort((a, b) => (a.nome_artistico || a.nome || '').localeCompare(b.nome_artistico || b.nome || ''))
 
   const djActual = djs.find((d) => d.id === form.dj_id)
   const espacoActual = espacos.find((e) => e.id === form.espaco_id)
@@ -722,6 +767,14 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 {form.estado === 'sem_efeito' ? '↩ Repor' : 'Sem Efeito'}
               </Button>
             )}
+            {slot?.id && form.dj_id && (
+              <Button
+                type="button" variante="ghost" tamanho="sm" onClick={abrirTroca}
+                className="border border-border/50 text-accent-subtle hover:text-accent hover:border-white/20 transition-colors inline-flex items-center gap-1"
+              >
+                <ArrowLeftRight size={13} /> Alterar
+              </Button>
+            )}
           </div>
           <div className="flex gap-2">
             <Button type="button" variante="ghost" tamanho="sm" onClick={onFechar}>Cancelar</Button>
@@ -751,6 +804,41 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       onFechar={() => setEventoFormAberto(false)}
       onGuardado={() => setEventoFormAberto(false)}
     />
+
+    {/* Modal de troca de DJ */}
+    <Modal aberto={trocaAberta} onFechar={() => setTrocaAberta(false)} titulo="Alterar DJ" largura="max-w-sm">
+      <div className="p-5 flex flex-col gap-4">
+        <p className="text-xs text-accent-subtle">
+          O DJ atual sai desta data e o novo DJ é escalado em estado <b>Proposta</b>.
+          Ambos recebem WhatsApp automaticamente.
+        </p>
+
+        <div>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-accent-subtle mb-1">Novo DJ</label>
+          <Select value={trocaDjId} onChange={(e) => setTrocaDjId(e.target.value)}>
+            <option value="">— escolher —</option>
+            {candidatosTroca.map(d => (
+              <option key={d.id} value={d.id}>{d.nome_artistico || d.nome}</option>
+            ))}
+          </Select>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-accent-subtle mb-1">Motivo (opcional)</label>
+          <Textarea rows={2} value={trocaMotivo} onChange={(e) => setTrocaMotivo(e.target.value)}
+            placeholder="Motivo da alteração…" />
+        </div>
+
+        {trocaErro && <Alerta tipo="erro" mensagem={trocaErro} />}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button type="button" variante="ghost" tamanho="sm" onClick={() => setTrocaAberta(false)}>Cancelar</Button>
+          <Button type="button" variante="primary" tamanho="sm" onClick={executarTroca} loading={trocaLoading} disabled={!trocaDjId}>
+            Confirmar troca
+          </Button>
+        </div>
+      </div>
+    </Modal>
     </>
   )
 }
