@@ -191,7 +191,7 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {}, 
     // Disponibilidades no mês (disponivel=true → opt-in; disponivel=false → excluído)
     supabase
       .from('disponibilidades')
-      .select('dj_id, data, disponivel')
+      .select('dj_id, data, disponivel, criado_em')
       .gte('data', dataInicio)
       .lte('data', dataFim),
 
@@ -308,14 +308,22 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {}, 
   const indisponiveis  = new Set()   // "dj_id|data" → excluído
   const optInDias      = {}          // dj_id → Set<data> → restringe a esses dias
   const djsComRegistos = new Set()   // dj_ids com pelo menos um registo no mês
+  const entregaDJ      = {}          // dj_id → timestamp (ms) da entrega mais cedo das disponibilidades
 
-  ;(indispRes.data ?? []).forEach(({ dj_id, data, disponivel }) => {
+  ;(indispRes.data ?? []).forEach(({ dj_id, data, disponivel, criado_em }) => {
     djsComRegistos.add(dj_id)
     if (!disponivel) {
       indisponiveis.add(`${dj_id}|${data}`)
     } else {
       if (!optInDias[dj_id]) optInDias[dj_id] = new Set()
       optInDias[dj_id].add(data)
+    }
+    // Quem entregou primeiro as disponibilidades (menor criado_em do mês)
+    if (criado_em) {
+      const t = new Date(criado_em).getTime()
+      if (!Number.isNaN(t) && (entregaDJ[dj_id] === undefined || t < entregaDJ[dj_id])) {
+        entregaDJ[dj_id] = t
+      }
     }
   })
 
@@ -597,7 +605,14 @@ export async function correrDistribuicao({ anoMes, espacoId, preAlocacoes = {}, 
             Math.floor((dj.valor_sessao ?? 0) / 20),
         }))
 
-        scored.sort((a, b) => b.score - a.score)
+        // Ordena por score; em empate, prioriza quem entregou as disponibilidades
+        // mais cedo (incentiva os DJs a responder rapidamente). Sem entrega → último.
+        scored.sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score
+          const ea = entregaDJ[a.dj.id] ?? Infinity
+          const eb = entregaDJ[b.dj.id] ?? Infinity
+          return ea - eb
+        })
         djId = scored[0].dj.id
       }
 
