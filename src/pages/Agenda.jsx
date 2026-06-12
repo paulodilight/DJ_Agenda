@@ -1,6 +1,6 @@
 ﻿import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2 } from 'lucide-react'
 import { startOfWeek, addDays, addWeeks, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import {
@@ -22,6 +22,7 @@ import { useSupaEventos } from '@/hooks/useSupaEventos'
 import { useMesStore } from '@/store'
 import { agendaApi, disponibilidadesApi, turnoValoresDiaApi } from '@/lib/api'
 import { correrDistribuicao, calcularPreAlocacoes } from '@/lib/distribuicao'
+import { gravarSnapshot, listarSnapshots, restaurarSnapshot, apagarSnapshot } from '@/lib/snapshots'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { Modal } from '@/components/ui/Modal'
 import { formatarEuro } from '@/utils/formatacao'
@@ -214,6 +215,57 @@ export function Agenda() {
     } finally {
       setDistribuindo(false)
     }
+  }
+
+  // ── Checkpoints (Gravar / Restaurar estado do mês) ───────────────────────────
+  const [checkpointsAberto, setCheckpointsAberto] = useState(false)
+  const [snaps, setSnaps]           = useState([])
+  const [snapLabel, setSnapLabel]   = useState('')
+  const [snapBusy, setSnapBusy]     = useState(false)
+  const [snapMsg, setSnapMsg]       = useState(null)
+
+  const carregarSnaps = async () => {
+    try { setSnaps(await listarSnapshots(anoMesAlvo)) }
+    catch (e) { setSnapMsg('Erro a carregar: ' + e.message) }
+  }
+
+  const abrirCheckpoints = async () => {
+    setSnapMsg(null); setSnapLabel(''); setCheckpointsAberto(true)
+    await carregarSnaps()
+  }
+
+  const gravarCheckpoint = async () => {
+    setSnapBusy(true); setSnapMsg(null)
+    try {
+      await gravarSnapshot({ anoMes: anoMesAlvo, label: snapLabel.trim() || null, tipo: 'manual' })
+      setSnapLabel('')
+      await carregarSnaps()
+      setSnapMsg('Checkpoint gravado ✓')
+    } catch (e) { setSnapMsg('Erro ao gravar: ' + e.message) }
+    finally { setSnapBusy(false) }
+  }
+
+  const restaurarCheckpoint = async (snap) => {
+    const quando = new Date(snap.criado_em).toLocaleString('pt-PT')
+    if (!window.confirm(
+      `Restaurar o checkpoint de ${quando}?\n\nA agenda e disponibilidades de ${anoMesAlvo} ` +
+      `voltam exactamente a esse momento. As alterações posteriores serão perdidas.`
+    )) return
+    setSnapBusy(true); setSnapMsg(null)
+    try {
+      await restaurarSnapshot(snap.id)
+      await Promise.all([recarregar(), recarregarMes()])
+      setSnapMsg('Estado restaurado ✓')
+    } catch (e) { setSnapMsg('Erro ao restaurar: ' + e.message) }
+    finally { setSnapBusy(false) }
+  }
+
+  const apagarCheckpoint = async (snap) => {
+    if (!window.confirm('Apagar este checkpoint?')) return
+    setSnapBusy(true)
+    try { await apagarSnapshot(snap.id); await carregarSnaps() }
+    catch (e) { setSnapMsg('Erro ao apagar: ' + e.message) }
+    finally { setSnapBusy(false) }
   }
 
   // ── Drag-and-drop ────────────────────────────────────────────────────────────
@@ -489,6 +541,16 @@ export function Agenda() {
             Imprimir
           </button>
 
+          {/* Gravar / Checkpoints */}
+          <button
+            onClick={abrirCheckpoints}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
+            title="Gravar / restaurar estado do mês"
+          >
+            <Save size={13} />
+            Gravar
+          </button>
+
           {/* Distribuir / Ajustes */}
           <button
             onClick={distribuir}
@@ -635,6 +697,64 @@ export function Agenda() {
         simplificado
         conflito={slotActual ? conflictsIdx.has(slotActual.id) : false}
       />
+
+      {/* ── Modal Checkpoints ── */}
+      <Modal aberto={checkpointsAberto} onFechar={() => setCheckpointsAberto(false)} largura="max-w-md">
+        <div className="px-6 pt-5 pb-3 border-b border-border flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-sky-400/10 flex items-center justify-center shrink-0">
+            <History size={15} className="text-sky-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-accent">Checkpoints — {anoMesAlvo}</p>
+            <p className="text-[11px] text-accent-subtle mt-0.5">Agenda + disponibilidades deste mês</p>
+          </div>
+        </div>
+
+        <div className="p-5 flex flex-col gap-4">
+          {/* Gravar novo */}
+          <div className="flex gap-2">
+            <input
+              type="text" value={snapLabel} onChange={e => setSnapLabel(e.target.value)}
+              placeholder="Nome do checkpoint (opcional)…"
+              className="flex-1 bg-surface-2 border border-border rounded px-3 py-2 text-xs text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/20"
+            />
+            <button onClick={gravarCheckpoint} disabled={snapBusy}
+              className="flex items-center gap-1.5 px-3 py-2 rounded bg-accent text-black text-xs font-semibold hover:bg-accent/80 disabled:opacity-40 transition-colors">
+              {snapBusy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              Gravar agora
+            </button>
+          </div>
+
+          {snapMsg && <p className="text-xs text-accent-muted">{snapMsg}</p>}
+
+          {/* Lista */}
+          <div className="flex flex-col gap-1.5 max-h-72 overflow-y-auto">
+            {snaps.length === 0 ? (
+              <p className="text-xs text-accent-subtle/50 text-center py-6">Sem checkpoints para este mês.</p>
+            ) : snaps.map(s => (
+              <div key={s.id} className="flex items-center gap-2 px-3 py-2 rounded border border-border/50 bg-surface-1">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-accent truncate">
+                    {s.label || 'Checkpoint'}
+                    {s.tipo === 'auto' && <span className="ml-1.5 text-[9px] text-accent-subtle uppercase">auto</span>}
+                  </p>
+                  <p className="text-[10px] text-accent-subtle">{new Date(s.criado_em).toLocaleString('pt-PT')}</p>
+                </div>
+                <button onClick={() => restaurarCheckpoint(s)} disabled={snapBusy}
+                  title="Restaurar este momento"
+                  className="flex items-center gap-1 px-2 py-1 rounded border border-border text-[11px] text-accent-muted hover:text-accent hover:border-white/20 disabled:opacity-40 transition-colors">
+                  <RotateCcw size={12} /> Restaurar
+                </button>
+                <button onClick={() => apagarCheckpoint(s)} disabled={snapBusy}
+                  title="Apagar checkpoint"
+                  className="p-1 rounded text-accent-subtle hover:text-status-cancelado transition-colors disabled:opacity-40">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
 
       {/* ── Modal Top DJs ── */}
       <Modal
