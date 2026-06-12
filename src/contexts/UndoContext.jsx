@@ -1,69 +1,78 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
 
 /**
- * UndoContext — sistema global de desfazer.
+ * UndoContext — pilha global de desfazer (stack).
  *
- * Uso numa página / modal:
+ * Cada ação que altera dados regista o seu inverso:
  *   const { pushUndo } = useUndo()
- *
- *   // antes de apagar:
  *   const backup = { ...registo }
  *   await api.apagar(registo.id)
- *   pushUndo({
- *     label: `"${registo.nome}" apagado`,
- *     undo:  () => api.criar(backup),
- *   })
+ *   pushUndo({ label: `"${registo.nome}" apagado`, undo: async () => { await api.criar(backup); recarregar() } })
  *
- * Depois de `undo()` ser chamado, é boa prática chamar `recarregar()` na página.
- * Para isso, passa `onUndo` opcional:
- *   pushUndo({ label, undo: async () => { await api.criar(backup); recarregar() } })
+ * - `pushUndo` empurra para a pilha e mostra um toast transitório (5s).
+ * - `executarUndo` desfaz a ÚLTIMA ação (toast OU botão Undo), mesmo após o toast desaparecer.
+ * - `podeDesfazer` indica se há algo na pilha.
  */
 
 const UndoContext = createContext(null)
+const MAX = 50
 
 export function UndoProvider({ children }) {
-  // entrada: { id, label, undo, duracao, addedAt } | null
-  const [entrada, setEntrada] = useState(null)
+  const [pilha, setPilhaState] = useState([])
+  const pilhaRef = useRef([])
+  const setPilha = (updater) => {
+    pilhaRef.current = typeof updater === 'function' ? updater(pilhaRef.current) : updater
+    setPilhaState(pilhaRef.current)
+  }
+
+  const [toast, setToast]           = useState(null)   // entrada visível (transitória)
   const [executando, setExecutando] = useState(false)
   const timerRef = useRef(null)
 
   const pushUndo = useCallback(({ label, undo, duracao = 5000 }) => {
-    // Cancela o timer anterior (se existir)
+    const entrada = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      label, undo, duracao,
+    }
+    setPilha(prev => [...prev, entrada].slice(-MAX))
+    setToast(entrada)
     if (timerRef.current) clearTimeout(timerRef.current)
-
-    const novaEntrada = { id: Date.now(), label, undo, duracao, addedAt: Date.now() }
-    setEntrada(novaEntrada)
-    setExecutando(false)
-
     timerRef.current = setTimeout(() => {
-      setEntrada(prev => prev?.id === novaEntrada.id ? null : prev)
+      setToast(prev => (prev?.id === entrada.id ? null : prev))
     }, duracao)
   }, [])
 
   const executarUndo = useCallback(async () => {
-    if (!entrada || executando) return
-    if (timerRef.current) clearTimeout(timerRef.current)
-
-    const fn = entrada.undo
+    if (executando) return
+    const lista = pilhaRef.current
+    if (lista.length === 0) return
+    const alvo = lista[lista.length - 1]
+    setPilha(prev => prev.slice(0, -1))
+    setToast(prev => (prev?.id === alvo.id ? null : prev))
     setExecutando(true)
-    setEntrada(null)
-
     try {
-      await fn()
+      await alvo.undo()
     } catch (e) {
       console.error('[Undo] falhou:', e)
     } finally {
       setExecutando(false)
     }
-  }, [entrada, executando])
+  }, [executando])
 
-  const descartar = useCallback(() => {
+  // Esconde só o toast — a entrada permanece na pilha (continua desfazível pelo botão Undo)
+  const descartar = useCallback(() => setToast(null), [])
+
+  const limpar = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
-    setEntrada(null)
+    setPilha([]); setToast(null)
   }, [])
 
   return (
-    <UndoContext.Provider value={{ pushUndo, entrada, executando, executarUndo, descartar }}>
+    <UndoContext.Provider value={{
+      pushUndo, executarUndo, descartar, limpar,
+      entrada: toast, executando,
+      pilha, podeDesfazer: pilha.length > 0,
+    }}>
       {children}
     </UndoContext.Provider>
   )

@@ -344,9 +344,20 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       const espacoNome = slot.espaco_nome
         ?? espacos.find(e => e.id === slot.espaco_id)?.nome?.trim()
         ?? ''
+      // Valores anteriores para o inverso/undo
+      const djAntes     = slot.dj_id ?? null
+      const estadoAntes = slot.estado ?? null
       await trocarDJ({
         slot, espacoNome, djSai, djEntra,
         motivo: trocaMotivo.trim() || null, origem: 'admin',
+      })
+      pushUndo({
+        label: 'Troca de DJ',
+        undo: async () => {
+          await agendaApi.atribuirDJ(slot.id, djAntes)
+          if (estadoAntes) await agendaApi.mudarEstado(slot.id, estadoAntes)
+          onGuardado()
+        },
       })
       setTrocaAberta(false)
       onGuardado()

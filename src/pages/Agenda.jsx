@@ -23,6 +23,7 @@ import { useMesStore } from '@/store'
 import { agendaApi, disponibilidadesApi, turnoValoresDiaApi } from '@/lib/api'
 import { correrDistribuicao, calcularPreAlocacoes } from '@/lib/distribuicao'
 import { gravarSnapshot, listarSnapshots, restaurarSnapshot, apagarSnapshot } from '@/lib/snapshots'
+import { useUndo } from '@/contexts/UndoContext'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { Modal } from '@/components/ui/Modal'
 import { formatarEuro } from '@/utils/formatacao'
@@ -49,6 +50,7 @@ export function Agenda() {
   const [eventoModal, setEventoModal] = useState(null)
   const [eventoModalAberto, setEventoModalAberto] = useState(false)
   const [distribuindo, setDistribuindo] = useState(false)
+  const { pushUndo, executarUndo, podeDesfazer, executando: undoExec } = useUndo()
 
   // Quando o mês global muda (pelo header), actualizar a referência da agenda
   useEffect(() => {
@@ -172,6 +174,16 @@ export function Agenda() {
     }
     setDistribuindo(true)
     try {
+      // Checkpoint automático antes de distribuir → permite Undo desta operação
+      let snapAuto = null
+      try {
+        snapAuto = await gravarSnapshot({
+          anoMes: anoMesAlvo,
+          label: `Antes de ${modoDistribuir === 'completo' ? 'distribuir' : 'ajustar'}`,
+          tipo: 'auto',
+        })
+      } catch { /* se falhar o snapshot, prossegue na mesma */ }
+
       const preAlocacoes = await calcularPreAlocacoes(anoMesAlvo)
 
       // Ordenar Clientes (só relevante em modo global)
@@ -210,6 +222,17 @@ export function Agenda() {
       }
       await Promise.all([recarregar(), recarregarMes()])
       console.info(`Distribuição (${modoDistribuir}) concluída: ${total} slots em ${alvos.length} Cliente(s).`)
+
+      if (snapAuto) {
+        pushUndo({
+          label: modoDistribuir === 'completo' ? 'Distribuição' : 'Ajustes',
+          undo: async () => {
+            await restaurarSnapshot(snapAuto.id)
+            await Promise.all([recarregar(), recarregarMes()])
+            await apagarSnapshot(snapAuto.id).catch(() => {})
+          },
+        })
+      }
     } catch (e) {
       alert('Erro na distribuição: ' + e.message)
     } finally {
@@ -276,6 +299,9 @@ export function Agenda() {
 
   // Executa o movimento/troca na BD e refresca
   const executarMover = async ({ draggedSlot, targetData, targetEspacoId, targetTurnoId, targetSlot }) => {
+    // Posições originais (para o inverso/undo)
+    const origDrag   = { data: draggedSlot.data, turno_id: draggedSlot.turno_id ?? null, espaco_id: draggedSlot.espaco_id }
+    const origTarget = targetSlot ? { data: targetSlot.data, turno_id: targetSlot.turno_id ?? null, espaco_id: targetSlot.espaco_id } : null
     try {
       if (targetSlot) {
         await Promise.all([
@@ -292,6 +318,20 @@ export function Agenda() {
         })
       }
       recarregarSilencioso()
+      pushUndo({
+        label: 'Atuação movida',
+        undo: async () => {
+          if (origTarget) {
+            await Promise.all([
+              agendaApi.moverSlot(draggedSlot.id, origDrag),
+              agendaApi.moverSlot(targetSlot.id, origTarget),
+            ])
+          } else {
+            await agendaApi.moverSlot(draggedSlot.id, origDrag)
+          }
+          recarregarSilencioso()
+        },
+      })
     } catch (e) {
       alert('Erro ao mover atuação: ' + e.message)
     }
@@ -539,6 +579,17 @@ export function Agenda() {
           >
             <Printer size={13} />
             Imprimir
+          </button>
+
+          {/* Undo — desfaz a última ação */}
+          <button
+            onClick={async () => { await executarUndo(); recarregar(); recarregarMes() }}
+            disabled={!podeDesfazer || undoExec}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Desfazer a última ação"
+          >
+            <RotateCcw size={13} />
+            {undoExec ? 'A desfazer…' : 'Undo'}
           </button>
 
           {/* Gravar / Checkpoints */}
