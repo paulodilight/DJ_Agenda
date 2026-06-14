@@ -26,7 +26,7 @@ export const labelTipoEspaco = (tipo) => ({
 export const labelEstado = (estado) => ({
   proposta:         'Proposta',
   'aceitação':      'Aceitação',
-  aceite:           'Validação',
+  aceite:           'Aguarda confirmação',
   'validação':      'Validação',
   'pré-confirmado': 'Pré-confirmado',
   confirmado:       'Confirmado',
