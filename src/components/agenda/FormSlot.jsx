@@ -25,6 +25,7 @@ import { CalendarPlus, Link2, Star, ArrowLeftRight } from 'lucide-react'
 const ESTADO_OPCOES = [
   { value: 'proposta',        label: 'Proposta' },
   { value: 'aceitação',       label: 'Aceitação' },
+  { value: 'aceite',          label: 'Aguarda confirmação' },
   { value: 'validação',       label: 'Validação' },
   { value: 'pré-confirmado',  label: 'Pré-confirmado' },
   { value: 'confirmado',      label: 'Confirmado' },
