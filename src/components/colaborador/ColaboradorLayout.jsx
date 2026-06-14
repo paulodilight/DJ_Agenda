@@ -85,22 +85,25 @@ export function ColaboradorLayout() {
             <LogoXclusive />
           </NavLink>
 
-          <div className="flex items-center gap-5">
-            <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 mr-1">
               <Avatar nome={colaborador?.nome} foto={colaborador?.foto_url} tamanho="sm" />
               <span className="text-xs text-accent-muted">{colaborador?.nome}</span>
             </div>
             <button onClick={toggleTheme} title={lightMode ? 'Modo escuro' : 'Modo claro'}
-              className="text-accent-subtle hover:text-amber-400 transition-colors p-1.5 rounded hover:bg-surface-2">
-              {lightMode ? <Moon size={17} /> : <Sun size={17} />}
+              className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent-subtle hover:text-amber-400 hover:border-amber-400/40 transition-colors">
+              {lightMode ? <Moon size={13} /> : <Sun size={13} />}
+              <span>{lightMode ? 'Noite' : 'Dia'}</span>
             </button>
             <button onClick={() => setModalPin(true)} title="Alterar PIN"
-              className="text-accent-subtle hover:text-amber-400 transition-colors p-1.5 rounded hover:bg-surface-2">
-              <KeyRound size={17} />
+              className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent-subtle hover:text-amber-400 hover:border-amber-400/40 transition-colors">
+              <KeyRound size={13} />
+              <span>PIN</span>
             </button>
             <button onClick={logout} title="Sair"
-              className="text-accent-subtle hover:text-accent transition-colors p-1.5 rounded hover:bg-surface-2">
-              <LogOut size={17} />
+              className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent-subtle hover:text-red-400 hover:border-red-400/40 transition-colors">
+              <LogOut size={13} />
+              <span>Sair</span>
             </button>
           </div>
         </div>
