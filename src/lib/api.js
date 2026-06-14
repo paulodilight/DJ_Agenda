@@ -213,7 +213,7 @@ export const agendaApi = {
       .from('agenda')
       .select(`
         *,
-        djs!agenda_dj_id_fkey ( nome_artistico, tier_id, presskit_url, instagram_url ),
+        djs!agenda_dj_id_fkey ( nome_artistico, tier_id, presskit_url, instagram_url, dj_categorias(categoria_id) ),
         espacos!agenda_espaco_id_fkey ( nome, tipo )
       `)
       .order('data')
@@ -234,6 +234,7 @@ export const agendaApi = {
       dj_tier: s.djs?.tier_id ?? null,
       dj_presskit: s.djs?.presskit_url ?? null,
       dj_instagram: s.djs?.instagram_url ?? null,
+      is_premium: s.djs?.dj_categorias?.some(c => [4, 5].includes(c.categoria_id)) ?? false,
       espaco_nome: s.espacos?.nome ?? null,
       espaco_tipo: s.espacos?.tipo ?? null,
     }))
@@ -242,7 +243,7 @@ export const agendaApi = {
   async criar(slot) {
     // eslint-disable-next-line no-unused-vars
     const { djs, espacos, dj_nome: _djNomeDisplay, dj_tier, dj_presskit, dj_instagram,
-            espaco_nome, espaco_tipo, dj_externo,
+            espaco_nome, espaco_tipo, dj_externo, is_premium,
             id: _id, criado_em, actualizado_em, ...dados } = slot
     // Converte strings vazias para null em campos UUID
     dados.dj_id     = dados.dj_id     || null
@@ -261,7 +262,7 @@ export const agendaApi = {
   async actualizar(id, alteracoes) {
     // eslint-disable-next-line no-unused-vars
     const { djs, espacos, dj_nome: _djNomeDisplay, dj_tier, dj_presskit, dj_instagram,
-            espaco_nome, espaco_tipo, dj_externo,
+            espaco_nome, espaco_tipo, dj_externo, is_premium,
             id: _id, criado_em, actualizado_em, ...dados } = alteracoes
     // Converte strings vazias para null em campos UUID
     dados.dj_id     = dados.dj_id     || null
@@ -500,7 +501,7 @@ export const turnoValoresDiaApi = {
     // Busca todos os valores de todos os turnos do Cliente de uma vez
     const { data, error } = await supabase
       .from('turno_valores_dia')
-      .select('turno_id, dia_semana, valor, hora_inicio, hora_fim')
+      .select('turno_id, dia_semana, valor, hora_inicio, hora_fim, subtipo_key')
       .in('turno_id',
         (await supabase.from('turnos_espaco').select('id').eq('espaco_id', espacoId))
           .data?.map(t => t.id) ?? []
@@ -510,10 +511,10 @@ export const turnoValoresDiaApi = {
   },
 
   async buscarConfigDia(turnoId, diaSemana) {
-    // Retorna { hora_inicio, hora_fim, valor } para turno+dia, ou null se não existir
+    // Retorna { hora_inicio, hora_fim, valor, subtipo_key } para turno+dia, ou null se não existir
     const { data } = await supabase
       .from('turno_valores_dia')
-      .select('hora_inicio, hora_fim, valor')
+      .select('hora_inicio, hora_fim, valor, subtipo_key')
       .eq('turno_id', turnoId)
       .eq('dia_semana', diaSemana)
       .maybeSingle()
@@ -521,7 +522,7 @@ export const turnoValoresDiaApi = {
   },
 
   async guardar(turnoId, configDia) {
-    // configDia = { [diaIdx]: { valor: string, hora_inicio: string, hora_fim: string } }
+    // configDia = { [diaIdx]: { valor, hora_inicio, hora_fim, subtipo_key } }
     const { error: delErr } = await supabase
       .from('turno_valores_dia')
       .delete()
@@ -529,13 +530,14 @@ export const turnoValoresDiaApi = {
     if (delErr) throw delErr
 
     const linhas = Object.entries(configDia)
-      .filter(([, cfg]) => cfg && (cfg.valor !== '' || cfg.hora_inicio || cfg.hora_fim))
+      .filter(([, cfg]) => cfg && (cfg.valor !== '' || cfg.hora_inicio || cfg.hora_fim || cfg.subtipo_key))
       .map(([dia, cfg]) => ({
         turno_id:    turnoId,
         dia_semana:  Number(dia),
         valor:       cfg.valor !== '' && cfg.valor != null ? Number(cfg.valor) : null,
         hora_inicio: cfg.hora_inicio || null,
         hora_fim:    cfg.hora_fim    || null,
+        subtipo_key: cfg.subtipo_key || null,
       }))
 
     if (!linhas.length) return []
@@ -610,8 +612,7 @@ export const configuracoesApi = {
   async actualizar(chave, valor) {
     const { error } = await supabase
       .from('configuracoes')
-      .update({ valor: String(valor) })
-      .eq('chave', chave)
+      .upsert({ chave, valor: String(valor) }, { onConflict: 'chave' })
     if (error) throw error
   },
 }

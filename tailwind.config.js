@@ -23,9 +23,14 @@ export default {
           muted:   'rgb(var(--accent-muted) / <alpha-value>)',
           subtle:  'rgb(var(--accent-subtle) / <alpha-value>)',
         },
+        gold: {
+          300: '#e8b430',
+          400: '#c48b08',
+          500: '#9c6c05',
+        },
         status: {
           confirmado: '#22c55e',
-          proposta:   '#16eef9',
+          proposta:   '#facc15',
           cancelado:  '#ef4444',
           lock:       '#3b82f6',
           vazio:      '#3f3f3f',

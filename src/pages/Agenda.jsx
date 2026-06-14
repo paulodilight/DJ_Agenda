@@ -1,6 +1,6 @@
 ﻿import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2, Send, UserCheck } from 'lucide-react'
 import { startOfWeek, addDays, addWeeks, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import {
@@ -19,7 +19,7 @@ import { useEspacos } from '@/hooks/useEspacos'
 import { useBloqueios } from '@/hooks/useBloqueios'
 import { useConflitos } from '@/hooks/useConflitos'
 import { useSupaEventos } from '@/hooks/useSupaEventos'
-import { useMesStore } from '@/store'
+import { useMesStore, useAppStore } from '@/store'
 import { agendaApi, disponibilidadesApi, turnoValoresDiaApi } from '@/lib/api'
 import { correrDistribuicao, calcularPreAlocacoes } from '@/lib/distribuicao'
 import { gravarSnapshot, listarSnapshots, restaurarSnapshot, apagarSnapshot } from '@/lib/snapshots'
@@ -34,6 +34,7 @@ const VISTAS = ['Dia', 'Semana', 'Mês']
 
 export function Agenda() {
   const { anoMes, setAnoMes } = useMesStore()
+  const config = useAppStore((s) => s.config)
 
   const [vista, setVista] = useState('Semana')
   // Inicializar referência a partir do mês global
@@ -162,6 +163,50 @@ export function Agenda() {
     ? agendaMes.some(s => s.espaco_id === filtroEspaco && s.estado === 'alterar')
     : agendaMes.some(s => s.estado === 'alterar')
   const modoDistribuir = jaDistribuido ? 'ajustes' : 'completo'
+
+  // ── Contadores para botões de envio em bulk ──────────────────────────────────
+  const { nProposta, nAceitacao, nAlterar, nPreConf } = useMemo(() => {
+    const fonte = filtroEspaco
+      ? agendaMes.filter(s => s.espaco_id === filtroEspaco)
+      : agendaMes
+    return {
+      nProposta:  fonte.filter(s => s.estado === 'proposta').length,
+      nAceitacao: fonte.filter(s => s.estado === 'aceitação').length,
+      nAlterar:   fonte.filter(s => s.estado === 'alterar').length,
+      nPreConf:   fonte.filter(s => s.estado === 'pré-confirmado').length,
+    }
+  }, [agendaMes, filtroEspaco])
+
+  const [enviandoDatas, setEnviandoDatas] = useState(false)
+  const [enviandoManager, setEnviandoManager] = useState(false)
+
+  const enviarDatas = async () => {
+    setEnviandoDatas(true)
+    try {
+      let q = supabase.from('agenda').update({ estado: 'aceitação' })
+        .in('estado', ['proposta', 'alterar'])
+        .gte('data', mesInicio).lte('data', mesFim)
+      if (filtroEspaco) q = q.eq('espaco_id', filtroEspaco)
+      const { error } = await q
+      if (error) throw error
+      await Promise.all([recarregar(), recarregarMes()])
+    } catch (e) { alert('Erro ao enviar datas: ' + e.message) }
+    finally { setEnviandoDatas(false) }
+  }
+
+  const enviarManager = async () => {
+    setEnviandoManager(true)
+    try {
+      let q = supabase.from('agenda').update({ estado: 'validação' })
+        .eq('estado', 'pré-confirmado')
+        .gte('data', mesInicio).lte('data', mesFim)
+      if (filtroEspaco) q = q.eq('espaco_id', filtroEspaco)
+      const { error } = await q
+      if (error) throw error
+      await Promise.all([recarregar(), recarregarMes()])
+    } catch (e) { alert('Erro ao enviar ao manager: ' + e.message) }
+    finally { setEnviandoManager(false) }
+  }
 
   const distribuir = async () => {
     if (espacos.length === 0 || distribuindo) return
@@ -423,19 +468,45 @@ export function Agenda() {
       ? espacos.flatMap(e => e.turnos_espaco ?? []).find(t => t.id === turnoId)
       : null
 
-    let horaInicio = turno?.hora_inicio?.slice(0, 5) ?? null
-    let horaFim    = turno?.hora_fim?.slice(0, 5)    ?? null
-    let valor      = turno?.valor ?? null
+    let horaInicio  = turno?.hora_inicio?.slice(0, 5) ?? null
+    let horaFim     = turno?.hora_fim?.slice(0, 5)    ?? null
+    let valor       = turno?.valor ?? null
+    let subtipoKey  = null
 
-    // Se o turno não tem hora base, consultar turno_valores_dia para o dia da semana
-    if (turnoId && data && (!horaInicio || !horaFim)) {
+    // Consultar sempre turno_valores_dia para o dia da semana (horas + valor + subtipo)
+    if (turnoId && data) {
       try {
-        const diaSem = new Date(data).getDay()
+        const diaSem = new Date(data + 'T12:00:00').getDay()
         const cfg = await turnoValoresDiaApi.buscarConfigDia(turnoId, diaSem)
         if (cfg) {
           horaInicio = cfg.hora_inicio?.slice(0, 5) ?? horaInicio
           horaFim    = cfg.hora_fim?.slice(0, 5)    ?? horaFim
           valor      = cfg.valor ?? valor
+          subtipoKey = cfg.subtipo_key ?? null
+        }
+        // Auto-detectar subtipo pelo valor + dia quando não está configurado em turno_valores_dia
+        if (!subtipoKey && valor != null) {
+          try {
+            const subs = JSON.parse(config?.contas_subtipos ?? '[]')
+            // 1. Tentar inferir o tipo do mesmo turno (noutros dias já configurados)
+            const { data: outrosDias } = await supabase
+              .from('turno_valores_dia')
+              .select('subtipo_key')
+              .eq('turno_id', turnoId)
+              .not('subtipo_key', 'is', null)
+              .limit(1)
+            const tipoReferencia = outrosDias?.length
+              ? subs.find(s => s.key === outrosDias[0].subtipo_key)?.tipo
+              : null
+            // 2. Encontrar o subtipo que corresponde: tipo inferred + valor + dia + variante 1
+            const match = subs.find(s =>
+              s.custo === Number(valor) &&
+              (s.dias ?? []).includes(diaSem) &&
+              s.variante === 1 &&
+              (!tipoReferencia || s.tipo === tipoReferencia)
+            )
+            if (match) subtipoKey = match.key
+          } catch { /* ignora */ }
         }
       } catch { /* ignora erros — usa defaults */ }
     }
@@ -447,6 +518,7 @@ export function Agenda() {
       ...(horaInicio ? { hora_inicio: horaInicio } : {}),
       ...(horaFim    ? { hora_fim:    horaFim    } : {}),
       ...(valor != null ? { valor }               : {}),
+      ...(subtipoKey    ? { subtipo_key: subtipoKey } : {}),
     })
     setModalAberto(true)
   }
@@ -602,6 +674,42 @@ export function Agenda() {
             Gravar
           </button>
 
+          {/* Enviar Datas / Re-enviar ajustes */}
+          {(nProposta > 0 || nAlterar > 0) && (
+            <button
+              onClick={enviarDatas}
+              disabled={enviandoDatas}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 border-yellow-500/40 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20"
+              title={nAlterar > 0 && nProposta === 0 ? 'Reenviar slots em Alterar para Aceitação' : 'Mover todos os slots em Proposta para Aceitação'}
+            >
+              {enviandoDatas ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+              {nAlterar > 0 && nProposta === 0 ? 'Re-enviar ajustes' : 'Enviar datas'}
+              <span className="px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 text-[10px] font-bold">
+                {nProposta + nAlterar}
+              </span>
+            </button>
+          )}
+
+          {/* Enviar ao Manager */}
+          {nPreConf > 0 && (
+            <button
+              onClick={enviarManager}
+              disabled={enviandoManager || nProposta > 0 || nAceitacao > 0 || nAlterar > 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20"
+              title={
+                nProposta > 0 || nAceitacao > 0 || nAlterar > 0
+                  ? 'Aguarda que todos os DJs respondam primeiro'
+                  : 'Mover pré-confirmados para Validação (manager aprova)'
+              }
+            >
+              {enviandoManager ? <Loader2 size={13} className="animate-spin" /> : <UserCheck size={13} />}
+              Enviar ao manager
+              <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">
+                {nPreConf}
+              </span>
+            </button>
+          )}
+
           {/* Distribuir / Ajustes */}
           <button
             onClick={distribuir}
@@ -661,14 +769,18 @@ export function Agenda() {
       {/* Legenda */}
       <div className="flex items-center gap-4 px-6 py-2 border-b border-border shrink-0">
         {[
-          { cor: 'bg-status-confirmado/70', label: 'Confirmado' },
-          { cor: 'bg-status-proposta/70', label: 'Proposta' },
-          { cor: 'bg-status-cancelado/60', label: 'Cancelado' },
-          { cor: 'bg-status-lock/70', label: 'LOCK' },
-          { cor: 'bg-yellow-400/20 border border-yellow-400/30', label: 'Externo' },
-          { cor: 'bg-violet-400/[0.13] border border-violet-400/35', label: 'A pedido' },
+          { cor: 'bg-yellow-400/70',   label: 'Proposta' },
+          { cor: 'bg-orange-400/60',   label: 'Aceitação' },
+          { cor: 'bg-rose-400/60',     label: 'Alteração' },
+          { cor: 'bg-amber-400/60',    label: 'Validação' },
+          { cor: 'bg-sky-400/60',      label: 'Pré-conf.' },
+          { cor: 'bg-emerald-400/70',  label: 'Confirmado' },
+          { cor: 'bg-status-cancelado/60',     label: 'Cancelado' },
+          { cor: 'bg-status-lock/70',          label: 'LOCK' },
+          { cor: 'bg-yellow-400/20 border border-yellow-400/30',        label: 'Externo' },
+          { cor: 'bg-zinc-400/[0.13] border border-zinc-400/35',        label: 'A pedido' },
           { cor: 'bg-surface-1/50 border border-dashed border-white/10', label: 'Sem Efeito' },
-          { cor: 'bg-surface-3 border border-dashed border-border', label: 'Vazio' },
+          { cor: 'bg-surface-3 border border-dashed border-border',      label: 'Vazio' },
         ].map(({ cor, label }) => (
           <div key={label} className="flex items-center gap-1.5">
             <div className={clsx('w-2.5 h-2.5 rounded-sm', cor)} />

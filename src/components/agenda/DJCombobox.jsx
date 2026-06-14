@@ -68,6 +68,7 @@ export function DJCombobox({
         .insert({
           nome,
           estado: 'activo',
+          app_abas: onlyConvidados ? ['agenda', 'dados', 'club'] : null,
           qualidade_artistica: 0, assiduidade: 0, profissionalismo: 0, adaptacao_espaco: 0,
           prioridade_admin: 0, excluido_admin: false,
         })
@@ -153,21 +154,22 @@ export function DJCombobox({
   )
 }
 
-/** Badge que aparece após criar um DJ novo — link para o perfil */
+/** Link discreto após criar um DJ — não bloqueia o fluxo */
 export function NovoDJLink({ dj, onDismiss }) {
   if (!dj) return null
   return (
-    <div className="flex items-center gap-2 rounded border border-status-confirmado/30 bg-status-confirmado/10 px-3 py-1.5 text-xs text-status-confirmado">
-      <span>DJ criado:</span>
+    <div className="flex items-center gap-1.5 text-[11px] text-accent-subtle/70 px-1">
+      <span>✓ DJ criado</span>
+      <span className="text-white/20">·</span>
       <a
         href={`/djs/${dj.id}`}
         target="_blank"
         rel="noreferrer"
-        className="flex items-center gap-1 font-semibold underline hover:opacity-80"
+        className="flex items-center gap-0.5 text-accent-subtle hover:text-accent underline underline-offset-2 transition-colors"
       >
-        Completar perfil <ExternalLink size={10} />
+        Completar perfil <ExternalLink size={9} />
       </a>
-      <button type="button" onClick={onDismiss} className="ml-auto text-status-confirmado/60 hover:text-status-confirmado">✕</button>
+      <button type="button" onClick={onDismiss} className="ml-auto text-white/20 hover:text-white/50 transition-colors">✕</button>
     </div>
   )
 }
