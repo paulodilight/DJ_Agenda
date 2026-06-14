@@ -693,17 +693,24 @@ export function Agenda() {
           {/* Enviar ao Manager */}
           {nPreConf > 0 && (
             <button
-              onClick={enviarManager}
-              disabled={enviandoManager || nProposta > 0 || nAceitacao > 0 || nAlterar > 0}
+              onClick={() => {
+                const pendentes = nProposta + nAceitacao + nAlterar
+                if (pendentes > 0 && !window.confirm(
+                  `Ainda há ${pendentes} DJ${pendentes > 1 ? 's' : ''} sem resposta (proposta/aceitação/alterar).\n\nEnviar só os ${nPreConf} pré-confirmados ao manager na mesma?`
+                )) return
+                enviarManager()
+              }}
+              disabled={enviandoManager}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20"
-              title={
-                nProposta > 0 || nAceitacao > 0 || nAlterar > 0
-                  ? 'Aguarda que todos os DJs respondam primeiro'
-                  : 'Mover pré-confirmados para Validação (manager aprova)'
-              }
+              title="Mover pré-confirmados para Validação (manager aprova)"
             >
               {enviandoManager ? <Loader2 size={13} className="animate-spin" /> : <UserCheck size={13} />}
               Enviar ao manager
+              {(nProposta + nAceitacao + nAlterar) > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold" title="Há DJs com resposta pendente">
+                  !
+                </span>
+              )}
               <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">
                 {nPreConf}
               </span>
