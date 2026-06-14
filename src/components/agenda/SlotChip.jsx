@@ -37,6 +37,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
   const isAceitacao   = estado === 'aceitação'
   const isAlterar     = estado === 'alterar'
   const isValidacao   = estado === 'validação'
+  const isAceite      = estado === 'aceite'
   const isPreConf     = estado === 'pré-confirmado'
   const isTrocado     = estado === 'trocado'
   const isCancelado   = estado === 'cancelado' || estado === 'faltou'
@@ -77,6 +78,8 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
                           ? 'border-status-proposta/40 bg-status-proposta/[0.17] hover:bg-status-proposta/25'
                           : isAceitacao
                             ? 'border-orange-400/40 bg-orange-500/[0.15] hover:bg-orange-500/25'
+                            : isAceite
+                              ? 'border-teal-400/40 bg-teal-500/[0.15] hover:bg-teal-500/25'
                             : isValidacao
                               ? 'border-amber-400/40 bg-amber-500/[0.15] hover:bg-amber-500/25'
                               : isPreConf
@@ -103,6 +106,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
         isAlterar     ? 'font-semibold text-rose-400'                  :
         isProposta    ? 'font-semibold text-status-proposta'          :
         isAceitacao   ? 'font-semibold text-orange-400'               :
+        isAceite      ? 'font-semibold text-teal-400'                 :
         isValidacao   ? 'font-semibold text-amber-400'                :
         isPreConf     ? 'font-semibold text-sky-400'                  :
         isTrocado     ? 'font-semibold text-zinc-400'                 :

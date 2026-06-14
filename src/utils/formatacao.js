@@ -26,6 +26,7 @@ export const labelTipoEspaco = (tipo) => ({
 export const labelEstado = (estado) => ({
   proposta:         'Proposta',
   'aceitação':      'Aceitação',
+  aceite:           'Validação',
   'validação':      'Validação',
   'pré-confirmado': 'Pré-confirmado',
   confirmado:       'Confirmado',
@@ -39,6 +40,7 @@ export const labelEstado = (estado) => ({
 export const corEstado = (estado) => ({
   proposta:         'text-status-proposta',
   'aceitação':      'text-orange-400',
+  aceite:           'text-teal-400',
   'validação':      'text-violet-400',
   'pré-confirmado': 'text-sky-400',
   confirmado:       'text-status-confirmado',
@@ -53,6 +55,7 @@ export const corEstado = (estado) => ({
 export const bgEstado = (estado) => ({
   proposta:         'bg-status-proposta/10 border-status-proposta/30',
   'aceitação':      'bg-orange-500/10 border-orange-500/30',
+  aceite:           'bg-teal-500/10 border-teal-500/30',
   'validação':      'bg-violet-500/10 border-violet-500/30',
   'pré-confirmado': 'bg-sky-500/10 border-sky-500/30',
   confirmado:       'bg-status-confirmado/10 border-status-confirmado/30',

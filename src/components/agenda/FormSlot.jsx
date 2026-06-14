@@ -1,10 +1,10 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
 import { Badge } from '@/components/ui/Badge'
-import { agendaApi } from '@/lib/api'
+import { agendaApi, turnoValoresDiaApi } from '@/lib/api'
 import { useUndo } from '@/contexts/UndoContext'
 import { supabase } from '@/lib/supabase'
 import { useDJs } from '@/hooks/useDJs'
@@ -37,9 +37,29 @@ const ESTADO_OPCOES = [
   { value: 'sem_efeito',      label: 'Sem Efeito' },
 ]
 
+const TIPO_SLOT_OPCOES = [
+  { value: 'residente anl', label: 'Residente ANL' },
+  { value: 'residente',     label: 'Residente' },
+  { value: 'residente st',  label: 'Residente ST' },
+  { value: 'convidado int', label: 'Convidado INT' },
+  { value: 'convidado ext', label: 'Convidado EXT' },
+  { value: 'premium',       label: 'Premium' },
+]
+
+const KEY_TIPO_MAP = {
+  'residente_anl': 'residente anl',
+  'residente_st':  'residente st',
+  'residente':     'residente',
+  'convidado_int': 'convidado int',
+  'convidado_ext': 'convidado ext',
+  'premium':       'premium',
+}
+
+const safeParse = (s, fb) => { try { return s ? JSON.parse(s) : fb } catch { return fb } }
+
 const vazio = {
   dj_id: '', dj_externo: '', espaco_id: '', data: '', hora_inicio: '22:00', hora_fim: '02:00',
-  valor: '', margem: '', estado: 'proposta', evento: '', notas: '',
+  valor: '', margem: '', estado: 'proposta', evento: '', notas: '', tipo_slot: '', subtipo_key: '',
 }
 
 export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = false, conflito = false }) {
@@ -74,7 +94,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
   useEffect(() => {
     if (aberto && slot) {
-      setForm({
+      const initialForm = {
         ...vazio,
         ...slot,
         valor: slot.valor ?? '',
@@ -83,10 +103,15 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         evento: slot.evento ?? '',
         notas: slot.notas ?? '',
         estado: slot.estado ?? 'confirmado',
-        // DJ externo: carregado quando o slot tem nome mas não tem dj_id (da base)
         dj_externo: !slot.dj_id && slot.dj_nome ? slot.dj_nome : '',
         margem: slot.margem ?? '',
-      })
+      }
+      // Se vem com subtipo_key mas sem tipo_slot, derivar tipo_slot do subtipo
+      if (slot.subtipo_key && !slot.tipo_slot) {
+        const sub = subtiposDisp.find(s => s.key === slot.subtipo_key)
+        if (sub) initialForm.tipo_slot = KEY_TIPO_MAP[sub.tipo] ?? sub.tipo
+      }
+      setForm(initialForm)
       setLoading(false)
       setErro(null)
       setConflitos([])
@@ -118,6 +143,25 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       .then(({ data }) => setAvaliacao(data ?? null))
   }, [aberto, slot?.id])
 
+  // Auto-fill valor + subtipo quando abre slot com turno_id e sem valor definido
+  useEffect(() => {
+    if (!aberto || !slot?.turno_id || !slot?.data || slot?.valor) return
+    const diaSemana = new Date(slot.data + 'T12:00:00').getDay()
+    turnoValoresDiaApi.buscarConfigDia(slot.turno_id, diaSemana).then(cfg => {
+      if (!cfg) return
+      setForm(f => {
+        if (f.valor !== '' && f.subtipo_key) return f
+        const sub = cfg.subtipo_key ? subtiposDisp.find(s => s.key === cfg.subtipo_key) : null
+        return {
+          ...f,
+          valor:       f.valor === '' && cfg.valor != null ? String(cfg.valor) : f.valor,
+          subtipo_key: !f.subtipo_key && cfg.subtipo_key ? cfg.subtipo_key : f.subtipo_key,
+          tipo_slot:   !f.tipo_slot && sub ? (KEY_TIPO_MAP[sub.tipo] ?? sub.tipo) : f.tipo_slot,
+        }
+      })
+    }).catch(() => {})
+  }, [aberto, slot?.turno_id, slot?.data, slot?.valor]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-fill evento quando data + espaco_id mudam
   useEffect(() => {
     if (!form.data || !form.espaco_id || form.evento) return
@@ -131,6 +175,26 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       })
       .catch(() => {})
   }, [form.data, form.espaco_id])
+
+  const subtiposDisp = useMemo(() => {
+    const transps = safeParse(config.contas_transportes, [])
+    const transpDefault = transps[0]?.valor ?? 0
+    const subs = safeParse(config.contas_subtipos, [])
+    return subs.map(s => ({
+      ...s,
+      total: (s.custo ?? 0) + (s.margem ?? 0) + (s.semTransporte ? 0 : transpDefault),
+    }))
+  }, [config])
+
+  const setSubtipoKey = (key) => {
+    const sub = subtiposDisp.find(s => s.key === key)
+    setForm(f => ({
+      ...f,
+      subtipo_key: key,
+      tipo_slot: sub ? (KEY_TIPO_MAP[sub.tipo] ?? sub.tipo) : f.tipo_slot,
+      valor: sub?.custo > 0 ? String(sub.custo) : f.valor,
+    }))
+  }
 
   const set = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }))
 
@@ -261,8 +325,9 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     setLoading(true)
     try {
       const isConvidado = !!form.dj_externo?.trim()
+      const { subtipo_key: _sk, ...formData } = form
       const payload = {
-        ...form,
+        ...formData,
         dj_id:     form.dj_id || null,
         dj_nome:   isConvidado ? form.dj_externo.trim() : null,
         espaco_id: form.espaco_id || null,
@@ -310,6 +375,18 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     setLoading(true)
     try {
       await agendaApi.mudarEstado(slot.id, 'confirmado')
+      onGuardado()
+      onFechar()
+    } catch (e) {
+      setErro(e.message)
+      setLoading(false)
+    }
+  }
+
+  const confirmarAceite = async () => {
+    setLoading(true)
+    try {
+      await agendaApi.mudarEstado(slot.id, 'pré-confirmado')
       onGuardado()
       onFechar()
     } catch (e) {
@@ -465,7 +542,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           {(!slot || aba === 0) && (simplificado ? (
             /* ── MODO SIMPLIFICADO ── */
             <>
-              {/* Horário (editável, vem predefinido) + Valor */}
+              {/* Horário + Valor */}
               <div className="grid grid-cols-3 gap-3">
                 <Input label="Início" value={form.hora_inicio} onChange={set('hora_inicio')} type="time" required />
                 <Input label="Fim" value={form.hora_fim} onChange={set('hora_fim')} type="time" required />
@@ -479,6 +556,16 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                   placeholder="—"
                 />
               </div>
+
+              {/* Subtipo DJ — auto-preenche Valor e Categoria */}
+              {!form.dj_externo?.trim() && subtiposDisp.length > 0 && (
+                <Select label="Subtipo DJ" value={form.subtipo_key} onChange={e => setSubtipoKey(e.target.value)}>
+                  <option value="">— selecionar subtipo —</option>
+                  {subtiposDisp.map(s => (
+                    <option key={s.key} value={s.key}>{s.label}{s.total > 0 ? ` · ${s.total}€` : ''}</option>
+                  ))}
+                </Select>
+              )}
 
               <div className="flex flex-col gap-1.5">
                 <DJCombobox
@@ -506,9 +593,17 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 />
               </div>
 
-              <Select label="Estado" value={form.estado} onChange={set('estado')}>
-                {ESTADO_OPCOES.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-              </Select>
+              <div className="grid grid-cols-2 gap-3">
+                {!form.dj_externo?.trim() && (
+                  <Select label="Categoria DJ" value={form.tipo_slot} onChange={set('tipo_slot')}>
+                    <option value="">—</option>
+                    {TIPO_SLOT_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </Select>
+                )}
+                <Select label="Estado" value={form.estado} onChange={set('estado')} className={form.dj_externo?.trim() ? 'col-span-2' : ''}>
+                  {ESTADO_OPCOES.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+                </Select>
+              </div>
 
               <div className="flex items-end gap-2">
                 <div className="flex-1">
@@ -573,6 +668,16 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 <Input label="Valor (€)" value={form.valor} onChange={set('valor')} type="number" min={0} step={0.01} placeholder="—" />
               </div>
 
+              {/* Subtipo DJ — auto-preenche Valor e Categoria */}
+              {!form.dj_externo?.trim() && subtiposDisp.length > 0 && (
+                <Select label="Subtipo DJ" value={form.subtipo_key} onChange={e => setSubtipoKey(e.target.value)}>
+                  <option value="">— selecionar subtipo —</option>
+                  {subtiposDisp.map(s => (
+                    <option key={s.key} value={s.key}>{s.label}{s.total > 0 ? ` · ${s.total}€` : ''}</option>
+                  ))}
+                </Select>
+              )}
+
               {/* Margem — só visível para DJ convidado */}
               {form.dj_externo?.trim() && (
                 <div className="grid grid-cols-2 gap-3 p-3 bg-surface-2 rounded-lg border border-border/60">
@@ -600,9 +705,17 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 </div>
               )}
 
-              <Select label="Estado" value={form.estado} onChange={set('estado')}>
-                {ESTADO_OPCOES.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-              </Select>
+              <div className="grid grid-cols-2 gap-4">
+                {!form.dj_externo?.trim() && (
+                  <Select label="Categoria DJ" value={form.tipo_slot} onChange={set('tipo_slot')}>
+                    <option value="">—</option>
+                    {TIPO_SLOT_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </Select>
+                )}
+                <Select label="Estado" value={form.estado} onChange={set('estado')} className={form.dj_externo?.trim() ? 'col-span-2' : ''}>
+                  {ESTADO_OPCOES.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+                </Select>
+              </div>
 
               <div className="flex items-end gap-2">
                 <div className="flex-1">
@@ -763,6 +876,14 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 className="text-status-confirmado/80 hover:text-status-confirmado"
               >
                 Confirmar
+              </Button>
+            )}
+            {slot?.id && form.estado === 'aceite' && (
+              <Button
+                type="button" variante="ghost" tamanho="sm" onClick={confirmarAceite} loading={loading}
+                className="text-teal-400/80 hover:text-teal-400"
+              >
+                Pré-confirmar
               </Button>
             )}
             {slot?.id && (

@@ -171,7 +171,7 @@ export function Agenda() {
       : agendaMes
     return {
       nProposta:  fonte.filter(s => s.estado === 'proposta').length,
-      nAceitacao: fonte.filter(s => s.estado === 'aceitação').length,
+      nAceitacao: fonte.filter(s => s.estado === 'aceitação' || s.estado === 'aceite').length,
       nAlterar:   fonte.filter(s => s.estado === 'alterar').length,
       nPreConf:   fonte.filter(s => s.estado === 'pré-confirmado').length,
     }
@@ -197,12 +197,23 @@ export function Agenda() {
   const enviarManager = async () => {
     setEnviandoManager(true)
     try {
-      let q = supabase.from('agenda').update({ estado: 'validação' })
+      // Buscar IDs dos slots pré-confirmados para limpar decisões antigas
+      let qIds = supabase.from('agenda').select('id')
         .eq('estado', 'pré-confirmado')
         .gte('data', mesInicio).lte('data', mesFim)
-      if (filtroEspaco) q = q.eq('espaco_id', filtroEspaco)
-      const { error } = await q
-      if (error) throw error
+      if (filtroEspaco) qIds = qIds.eq('espaco_id', filtroEspaco)
+      const { data: ids, error: eIds } = await qIds
+      if (eIds) throw eIds
+
+      if (ids && ids.length > 0) {
+        const agendaIds = ids.map(r => r.id)
+        // Limpar decisões antigas para que o manager comece com "Aprovar"
+        await supabase.from('validacoes_datas').delete().in('agenda_id', agendaIds)
+        // Mudar estado para validação
+        const { error } = await supabase.from('agenda').update({ estado: 'validação' }).in('id', agendaIds)
+        if (error) throw error
+      }
+
       await Promise.all([recarregar(), recarregarMes()])
     } catch (e) { alert('Erro ao enviar ao manager: ' + e.message) }
     finally { setEnviandoManager(false) }
