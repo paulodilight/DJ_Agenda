@@ -34,7 +34,7 @@ const navItens = [
 function LogoXclusive() {
   return (
     <div className="flex items-center gap-2">
-      <img src="https://xclusive-dj-app.vercel.app/logo-x.png" alt="Xclusive" className="w-8 h-8 object-contain" />
+      <img src="/logo-apoiot.png" alt="Xclusive TS" className="w-8 h-8 object-contain" />
       <span className="text-sm font-bold tracking-widest text-accent uppercase">Clusive</span>
     </div>
   )
@@ -58,11 +58,25 @@ export function ColaboradorLayout() {
     })
   }
 
-  // sincronizar no mount
+  // sincronizar tema no mount
   useEffect(() => {
     if (lightMode) document.documentElement.classList.add('light-mode')
     else           document.documentElement.classList.remove('light-mode')
     return () => document.documentElement.classList.remove('light-mode')
+  }, [])
+
+  // trocar manifest e apple-touch-icon para o ícone TS quando na área apoiot
+  useEffect(() => {
+    const manifestEl = document.querySelector('link[rel="manifest"]')
+    const touchIconEl = document.querySelector('link[rel="apple-touch-icon"]')
+    const prevManifest = manifestEl?.getAttribute('href')
+    const prevIcon = touchIconEl?.getAttribute('href')
+    if (manifestEl) manifestEl.setAttribute('href', '/manifest-apoiot.json')
+    if (touchIconEl) touchIconEl.setAttribute('href', '/logo-apoiot.png')
+    return () => {
+      if (manifestEl) manifestEl.setAttribute('href', prevManifest || '/manifest.json')
+      if (touchIconEl) touchIconEl.setAttribute('href', prevIcon || '/logo-x.png')
+    }
   }, [])
 
   const logout = () => {

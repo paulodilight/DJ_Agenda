@@ -1,15 +1,15 @@
 {
-  "name": "Xclusive Events — Admin",
-  "short_name": "XAdmin",
-  "description": "Painel de administração Xclusive Events",
-  "start_url": "/",
+  "name": "Xclusive TS — Técnicos",
+  "short_name": "XTS",
+  "description": "Área técnica Xclusive Events",
+  "start_url": "/apoiot",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/logo-x.png",
+      "src": "/logo-apoiot.png",
       "sizes": "any",
       "type": "image/png",
       "purpose": "any maskable"

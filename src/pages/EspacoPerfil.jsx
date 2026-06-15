@@ -707,19 +707,18 @@ export function EspacoPerfil() {
           <CardBody>
             {/* Links Vercel */}
             {(() => {
-              const baseUrl = 'https://xclusive-manager.vercel.app'
-              const prefixo = form.grupo ? `/${form.grupo}` : ''
+              const sufixo = form.grupo ? `/${form.grupo}` : ''
               return (
                 <div className="mb-4 flex items-center gap-3 flex-wrap">
                   <span className="text-[11px] text-accent-subtle uppercase tracking-wider">
-                    Links Vercel{form.grupo ? '' : ' (LMD)'}:
+                    Links{form.grupo ? '' : ' (LMD)'}:
                   </span>
                   {[
-                    { label: 'Operator', path: '' },
-                    { label: 'Manager', path: '/manager' },
-                    { label: 'Marketing', path: '/marketing' },
+                    { label: 'Operator',  base: 'https://operator.xclusivedj.app' },
+                    { label: 'Manager',   base: 'https://manager.xclusivedj.app' },
+                    { label: 'Marketing', base: 'https://marketing.xclusivedj.app' },
                   ].map((l) => (
-                    <a key={l.label} href={`${baseUrl}${prefixo}${l.path}`} target="_blank" rel="noreferrer"
+                    <a key={l.label} href={`${l.base}${sufixo}`} target="_blank" rel="noreferrer"
                       className="flex items-center gap-1.5 rounded border border-border bg-surface-2 px-3 py-1.5 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
                       <ExternalLink size={11} /> {l.label}
                     </a>

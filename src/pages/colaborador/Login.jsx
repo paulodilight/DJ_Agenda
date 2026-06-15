@@ -53,7 +53,7 @@ export function ColaboradorLogin() {
 
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <img src="https://xclusive-dj-app.vercel.app/logo-x.png" alt="Xclusive" className="w-9 h-9 object-contain" />
+          <img src="/logo-apoiot.png" alt="Xclusive TS" className="w-9 h-9 object-contain" />
           <span className="text-base font-bold tracking-widest text-accent uppercase">Clusive</span>
         </div>
 
