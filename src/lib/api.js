@@ -16,7 +16,6 @@ export const djsApi = {
   },
 
   async criar(dj) {
-    // eslint-disable-next-line no-unused-vars
     const { tier_ids, id, criado_em, actualizado_em, telefone, dj_tiers, tiers, categoria_id, ...djData } = dj
     const { data, error } = await supabase
       .from('djs')
@@ -28,7 +27,6 @@ export const djsApi = {
   },
 
   async actualizar(id, alteracoes) {
-    // eslint-disable-next-line no-unused-vars
     const { tier_ids, id: _id, criado_em, actualizado_em, telefone, dj_tiers, tiers, categoria_id, ...djData } = alteracoes
     const { data, error } = await supabase
       .from('djs')
@@ -125,7 +123,6 @@ export const espacosApi = {
   },
 
   async actualizar(id, alteracoes) {
-    // eslint-disable-next-line no-unused-vars
     const { turnos_espaco, id: _id, criado_em, actualizado_em, ...dados } = alteracoes
     const { data, error } = await supabase
       .from('espacos')
@@ -241,7 +238,6 @@ export const agendaApi = {
   },
 
   async criar(slot) {
-    // eslint-disable-next-line no-unused-vars
     const { djs, espacos, dj_nome: _djNomeDisplay, dj_tier, dj_presskit, dj_instagram,
             espaco_nome, espaco_tipo, dj_externo, is_premium,
             id: _id, criado_em, actualizado_em, ...dados } = slot
@@ -260,7 +256,6 @@ export const agendaApi = {
   },
 
   async actualizar(id, alteracoes) {
-    // eslint-disable-next-line no-unused-vars
     const { djs, espacos, dj_nome: _djNomeDisplay, dj_tier, dj_presskit, dj_instagram,
             espaco_nome, espaco_tipo, dj_externo, is_premium,
             id: _id, criado_em, actualizado_em, ...dados } = alteracoes

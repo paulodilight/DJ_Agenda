@@ -670,6 +670,7 @@ export function ApoioTecnico() {
       result.push({ dataStr, dia, linhas, folgas: folgasIdx[dataStr] ?? [] })
     })
     return result
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dias, espacos, evIdx, djIdx, agIdx, folgasIdx, evTecIdx, i4djEspacoId])
 
   const linhasPorDia = useMemo(() => {
@@ -845,6 +846,7 @@ export function ApoioTecnico() {
       return
     }
     executarDrop(src, linha)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragSource, eventos, agendamentos, tecnicos, executarDrop])
 
   if (loading) return <LoadingPage />

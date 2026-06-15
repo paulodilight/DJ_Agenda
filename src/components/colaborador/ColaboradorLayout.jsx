@@ -63,6 +63,7 @@ export function ColaboradorLayout() {
     if (lightMode) document.documentElement.classList.add('light-mode')
     else           document.documentElement.classList.remove('light-mode')
     return () => document.documentElement.classList.remove('light-mode')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const logout = () => {

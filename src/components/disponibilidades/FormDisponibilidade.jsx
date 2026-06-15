@@ -62,6 +62,7 @@ export function FormDisponibilidade({ aberto, onFechar }) {
       setErro(null)
       setSucesso(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto])
 
   // Auto-selecionar primeiro DJ se só há um

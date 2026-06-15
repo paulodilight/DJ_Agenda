@@ -131,6 +131,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       setEventoAutoLink(false)
       setAba(0)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto, slot, simplificado])
 
   // Carregar avaliação do gestor quando o modal abre com um slot existente
@@ -175,6 +176,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         }
       })
       .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.data, form.espaco_id])
 
   const subtiposDisp = useMemo(() => {
