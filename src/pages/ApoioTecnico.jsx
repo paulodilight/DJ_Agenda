@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle } from 'lucide-react'
+import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, ExternalLink } from 'lucide-react'
 import { useMesStore } from '@/store'
 import { supabase } from '@/lib/supabase'
 import { Modal } from '@/components/ui/Modal'
@@ -1024,6 +1024,17 @@ export function ApoioTecnico() {
           )}
 
           <div className="ml-auto flex items-center gap-2 shrink-0">
+            {/* Link para a app dos técnicos */}
+            <a
+              href="/apoiot"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs border border-border bg-surface-2 text-accent-muted hover:text-accent hover:border-white/20 transition-all select-none"
+              title="Abrir app dos técnicos"
+            >
+              <ExternalLink size={12} />
+              <span>App Apoio</span>
+            </a>
             {/* Toggle vista */}
             <div className="flex bg-surface-2 border border-border rounded p-0.5">
               <button onClick={() => setVista('colunas')} title="Colunas"
