@@ -29,7 +29,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
   const temDJ         = !!slot.dj_nome
   const isManual      = temDJ && !slot.dj_id
   const estado        = slot.estado
-  const GOLD_ESTADOS  = ['aceitação', 'pré-confirmado', 'confirmado', 'presente']
+  const GOLD_ESTADOS  = ['aceitação', 'pré-confirmado']
   const isGold        = !!slot.is_premium && GOLD_ESTADOS.includes(estado)
   const isSemEfeito   = estado === 'sem_efeito'
   const isAPedido     = estado === 'a_pedido'
