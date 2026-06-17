@@ -18,7 +18,7 @@ import { formatarData, formatarHora } from '@/utils/datas'
 import { FormEvento } from '@/components/eventos/FormEvento'
 import { DJCombobox, NovoDJLink } from './DJCombobox'
 import { supaEventosApi } from '@/lib/supaEventosApi'
-import { trocarDJ } from '@/lib/trocas'
+import { trocarDJ, trocarDJDireto, registarHistorico } from '@/lib/trocas'
 import { clsx } from 'clsx'
 import { CalendarPlus, Link2, Star, ArrowLeftRight } from 'lucide-react'
 
@@ -81,11 +81,18 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const [avaliacao, setAvaliacao] = useState(null)
 
   // ── Troca de DJ ──
-  const [trocaAberta, setTrocaAberta] = useState(false)
-  const [trocaDjId, setTrocaDjId]     = useState('')
-  const [trocaMotivo, setTrocaMotivo] = useState('')
-  const [trocaLoading, setTrocaLoading] = useState(false)
-  const [trocaErro, setTrocaErro]     = useState(null)
+  const [trocaAberta, setTrocaAberta]       = useState(false)
+  const [trocaDjId, setTrocaDjId]           = useState('')
+  const [trocaMotivo, setTrocaMotivo]       = useState('')
+  const [trocaLoading, setTrocaLoading]     = useState(false)
+  const [trocaErro, setTrocaErro]           = useState(null)
+  const [tipoTroca, setTipoTroca]           = useState('substituir')
+  const [trocaDataId, setTrocaDataId]       = useState('')
+  const [trocaSlots, setTrocaSlots]         = useState([])
+  const [trocaSlotsLoading, setTrocaSlotsLoading] = useState(false)
+
+  // ── Histórico ──
+  const [historico, setHistorico] = useState([])
 
   const { djs } = useDJs()
   const { espacos } = useEspacos()
@@ -143,6 +150,35 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       .maybeSingle()
       .then(({ data }) => setAvaliacao(data ?? null))
   }, [aberto, slot?.id])
+
+  // Carrega histórico quando o slot abre
+  useEffect(() => {
+    if (!aberto || !slot?.id) { setHistorico([]); return }
+    supabase
+      .from('agenda_historico')
+      .select('*')
+      .eq('agenda_id', slot.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setHistorico(data ?? []))
+  }, [aberto, slot?.id])
+
+  // Carrega slots futuros do novo DJ quando "troca direta" está activa
+  useEffect(() => {
+    if (!trocaDjId || tipoTroca !== 'troca_direta') { setTrocaSlots([]); return }
+    setTrocaSlotsLoading(true)
+    const hoje = new Date().toISOString().slice(0, 10)
+    supabase
+      .from('agenda')
+      .select('id, data, hora_inicio, espacos!agenda_espaco_id_fkey(nome)')
+      .eq('dj_id', trocaDjId)
+      .gte('data', hoje)
+      .not('estado', 'in', '("cancelado","faltou","sem_efeito")')
+      .neq('id', slot?.id ?? '')
+      .order('data', { ascending: true })
+      .limit(30)
+      .then(({ data }) => { setTrocaSlots(data ?? []); setTrocaSlotsLoading(false) })
+      .catch(() => setTrocaSlotsLoading(false))
+  }, [trocaDjId, tipoTroca, slot?.id])
 
   // Auto-fill valor + subtipo quando abre slot com turno_id e sem valor definido
   useEffect(() => {
@@ -341,6 +377,19 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       }
       if (slot?.id) {
         await agendaApi.actualizar(slot.id, payload)
+        // Histórico — não-bloqueante
+        try {
+          if (slot.estado !== form.estado)
+            await registarHistorico(slot.id, 'estado', `${slot.estado} → ${form.estado}`)
+          const djIdNovo = form.dj_id || null
+          if (slot.dj_id !== djIdNovo) {
+            const velho = djs.find(d => d.id === slot.dj_id)
+            const novo  = djs.find(d => d.id === djIdNovo)
+            const nomeV = velho?.nome_artistico || velho?.nome || slot.dj_nome || 'Sem DJ'
+            const nomeN = novo?.nome_artistico  || novo?.nome  || form.dj_externo || 'Sem DJ'
+            await registarHistorico(slot.id, 'dj', `DJ: ${nomeV} → ${nomeN}`)
+          }
+        } catch {}
       } else {
         await agendaApi.criar(payload)
       }
@@ -376,6 +425,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     setLoading(true)
     try {
       await agendaApi.mudarEstado(slot.id, 'confirmado')
+      await registarHistorico(slot.id, 'estado', `${form.estado} → confirmado`)
       onGuardado()
       onFechar()
     } catch (e) {
@@ -388,6 +438,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     setLoading(true)
     try {
       await agendaApi.mudarEstado(slot.id, 'pré-confirmado')
+      await registarHistorico(slot.id, 'estado', `${form.estado} → pré-confirmado`)
       onGuardado()
       onFechar()
     } catch (e) {
@@ -401,6 +452,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     try {
       const novoEstado = form.estado === 'sem_efeito' ? 'confirmado' : 'sem_efeito'
       await agendaApi.mudarEstado(slot.id, novoEstado)
+      await registarHistorico(slot.id, 'estado', `${form.estado} → ${novoEstado}`)
       onGuardado()
       onFechar()
     } catch (e) {
@@ -410,11 +462,14 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   }
 
   const abrirTroca = () => {
-    setTrocaDjId(''); setTrocaMotivo(''); setTrocaErro(null); setTrocaAberta(true)
+    setTrocaDjId(''); setTrocaMotivo(''); setTrocaErro(null)
+    setTipoTroca('substituir'); setTrocaDataId(''); setTrocaSlots([])
+    setTrocaAberta(true)
   }
 
   const executarTroca = async () => {
     if (!trocaDjId) { setTrocaErro('Escolhe o novo DJ.'); return }
+    if (tipoTroca === 'troca_direta' && !trocaDataId) { setTrocaErro('Escolhe a data para trocar.'); return }
     setTrocaLoading(true); setTrocaErro(null)
     try {
       const djEntra = djs.find(d => d.id === trocaDjId)
@@ -422,21 +477,40 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       const espacoNome = slot.espaco_nome
         ?? espacos.find(e => e.id === slot.espaco_id)?.nome?.trim()
         ?? ''
-      // Valores anteriores para o inverso/undo
       const djAntes     = slot.dj_id ?? null
       const estadoAntes = slot.estado ?? null
-      await trocarDJ({
-        slot, espacoNome, djSai, djEntra,
-        motivo: trocaMotivo.trim() || null, origem: 'admin',
-      })
-      pushUndo({
-        label: 'Troca de DJ',
-        undo: async () => {
-          await agendaApi.atribuirDJ(slot.id, djAntes)
-          if (estadoAntes) await agendaApi.mudarEstado(slot.id, estadoAntes)
-          onGuardado()
-        },
-      })
+
+      if (tipoTroca === 'troca_direta') {
+        const slotB = trocaSlots.find(s => s.id === trocaDataId)
+        if (!slotB) { setTrocaErro('Data inválida.'); setTrocaLoading(false); return }
+        await trocarDJDireto({
+          slotA: slot, slotB,
+          djA: djSai, djB: djEntra,
+          espacoNome, motivo: trocaMotivo.trim() || null,
+        })
+        pushUndo({
+          label: 'Troca direta de DJ',
+          undo: async () => {
+            await agendaApi.atribuirDJ(slot.id, djAntes)
+            if (estadoAntes) await agendaApi.mudarEstado(slot.id, estadoAntes)
+            await agendaApi.atribuirDJ(slotB.id, djEntra?.id ?? null)
+            onGuardado()
+          },
+        })
+      } else {
+        await trocarDJ({
+          slot, espacoNome, djSai, djEntra,
+          motivo: trocaMotivo.trim() || null, origem: 'admin',
+        })
+        pushUndo({
+          label: 'Troca de DJ',
+          undo: async () => {
+            await agendaApi.atribuirDJ(slot.id, djAntes)
+            if (estadoAntes) await agendaApi.mudarEstado(slot.id, estadoAntes)
+            onGuardado()
+          },
+        })
+      }
       setTrocaAberta(false)
       onGuardado()
       onFechar()
@@ -521,7 +595,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           {/* ── Abas — só quando existe slot ── */}
           {slot && (
             <div className="flex gap-0 border-b border-border -mx-6 px-6">
-              {['Atuação', 'Notas & Avaliação', 'Contas'].map((label, i) => (
+              {['Atuação', 'Notas & Avaliação', 'Contas', 'Histórico'].map((label, i) => (
                 <button
                   key={i}
                   type="button"
@@ -862,6 +936,33 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
               <p className="text-xs text-accent-subtle">Em breve</p>
             </div>
           )}
+
+          {/* ── Aba 4: Histórico ── */}
+          {slot && aba === 3 && (
+            <div className="flex flex-col gap-0 py-1">
+              {historico.length === 0 ? (
+                <p className="text-center text-xs text-accent-subtle py-8">Sem histórico registado.</p>
+              ) : (
+                historico.map((h, i) => {
+                  const icone = h.tipo === 'estado' ? '→' : h.tipo === 'dj' ? '⇄' : h.tipo === 'troca' ? '⇄' : '·'
+                  const cor   = h.tipo === 'estado' ? 'text-amber-400' : h.tipo === 'troca' ? 'text-[#fc03c6]' : 'text-sky-400'
+                  const dt    = new Date(h.created_at)
+                  const label = dt.toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                  return (
+                    <div key={h.id} className={clsx('flex items-start gap-3 px-1 py-2.5', i > 0 && 'border-t border-border/30')}>
+                      <div className={clsx('mt-0.5 w-5 h-5 rounded-full bg-surface-3 flex items-center justify-center shrink-0 text-[10px] font-bold', cor)}>
+                        {icone}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-accent leading-snug">{h.descricao}</p>
+                        <p className="text-[10px] text-accent-subtle mt-0.5">{label}</p>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-border flex items-center justify-between">
@@ -941,20 +1042,61 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     {/* Modal de troca de DJ */}
     <Modal aberto={trocaAberta} onFechar={() => setTrocaAberta(false)} titulo="Alterar DJ" largura="max-w-sm">
       <div className="p-5 flex flex-col gap-4">
-        <p className="text-xs text-accent-subtle">
-          O DJ atual sai desta data e o novo DJ é escalado em estado <b>Proposta</b>.
-          Ambos recebem WhatsApp automaticamente.
+
+        {/* Toggle tipo */}
+        <div className="flex rounded-lg border border-border overflow-hidden">
+          {[['substituir', 'Substituição'], ['troca_direta', 'Troca direta']].map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => { setTipoTroca(val); setTrocaDataId(''); setTrocaSlots([]) }}
+              className={clsx(
+                'flex-1 py-1.5 text-xs font-medium transition-colors',
+                tipoTroca === val ? 'bg-surface-3 text-accent' : 'text-accent-subtle hover:text-accent'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <p className="text-xs text-accent-subtle -mt-1">
+          {tipoTroca === 'substituir'
+            ? <>O DJ atual sai desta data e o novo DJ é escalado em estado <b>Proposta</b>. Ambos recebem WhatsApp automaticamente.</>
+            : <>Os dois DJs trocam de data entre si. Ambos ficam em estado <b>Proposta</b> e recebem WhatsApp com a nova data.</>
+          }
         </p>
 
         <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-accent-subtle mb-1">Novo DJ</label>
-          <Select value={trocaDjId} onChange={(e) => setTrocaDjId(e.target.value)}>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-accent-subtle mb-1">
+            {tipoTroca === 'substituir' ? 'Novo DJ' : 'DJ a trocar'}
+          </label>
+          <Select value={trocaDjId} onChange={(e) => { setTrocaDjId(e.target.value); setTrocaDataId('') }}>
             <option value="">— escolher —</option>
             {candidatosTroca.map(d => (
               <option key={d.id} value={d.id}>{d.nome_artistico || d.nome}</option>
             ))}
           </Select>
         </div>
+
+        {tipoTroca === 'troca_direta' && trocaDjId && (
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-accent-subtle mb-1">
+              Data a trocar {trocaSlotsLoading && <span className="normal-case font-normal">a carregar…</span>}
+            </label>
+            <Select value={trocaDataId} onChange={(e) => setTrocaDataId(e.target.value)} disabled={trocaSlotsLoading}>
+              <option value="">— escolher data —</option>
+              {trocaSlots.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.data} · {s.espacos?.nome ?? '?'}{s.hora_inicio ? ` · ${s.hora_inicio.slice(0, 5)}` : ''}
+                </option>
+              ))}
+            </Select>
+            {!trocaSlotsLoading && trocaSlots.length === 0 && (
+              <p className="text-[11px] text-accent-subtle mt-1">Este DJ não tem datas futuras disponíveis.</p>
+            )}
+          </div>
+        )}
 
         <div>
           <label className="block text-[11px] font-semibold uppercase tracking-wider text-accent-subtle mb-1">Motivo (opcional)</label>
@@ -966,8 +1108,9 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variante="ghost" tamanho="sm" onClick={() => setTrocaAberta(false)}>Cancelar</Button>
-          <Button type="button" variante="primary" tamanho="sm" onClick={executarTroca} loading={trocaLoading} disabled={!trocaDjId}>
-            Confirmar troca
+          <Button type="button" variante="primary" tamanho="sm" onClick={executarTroca} loading={trocaLoading}
+            disabled={!trocaDjId || (tipoTroca === 'troca_direta' && !trocaDataId)}>
+            Confirmar {tipoTroca === 'troca_direta' ? 'troca' : 'alteração'}
           </Button>
         </div>
       </div>

@@ -23,18 +23,16 @@ async function enfileirarWpp(wa_id, mensagem, contexto) {
   if (error) throw error
 }
 
+/** Regista uma entrada no histórico do slot. Não lança erro — é não-bloqueante. */
+export async function registarHistorico(agendaId, tipo, descricao) {
+  if (!agendaId) return
+  try {
+    await supabase.from('agenda_historico').insert({ agenda_id: agendaId, tipo, descricao })
+  } catch {}
+}
+
 /**
  * Troca o DJ de uma atuação e notifica ambos por WhatsApp (via outbox).
- *
- * @param {object}  p
- * @param {object}  p.slot         atuação da agenda (id, data, espaco_id, hora_inicio, dj_id)
- * @param {string}  p.espacoNome   nome do Cliente (para as mensagens)
- * @param {object}  p.djSai        DJ que perde a data { id, nome, nome_artistico, telefone }
- * @param {object}  p.djEntra      DJ que ganha a data { id, nome, nome_artistico, telefone }
- * @param {string} [p.motivo]
- * @param {'admin'|'dj_pedido'} [p.origem='admin']
- * @param {boolean} [p.penalizacao=false]
- * @param {string} [p.novoEstado='proposta']  estado do slot após a troca (novo DJ aceita na app)
  */
 export async function trocarDJ({
   slot, espacoNome = '', djSai, djEntra,
@@ -62,10 +60,12 @@ export async function trocarDJ({
   })
   if (e2) throw e2
 
-  // 3. Enfileira as duas mensagens WhatsApp na outbox
-  const nomeSai   = djSai?.nome_artistico || djSai?.nome || 'DJ'
+  // 3. Histórico
+  const nomeSai   = djSai?.nome_artistico || djSai?.nome || 'Sem DJ'
   const nomeEntra = djEntra.nome_artistico || djEntra.nome || 'DJ'
+  await registarHistorico(slot.id, 'troca', `DJ: ${nomeSai} → ${nomeEntra}`)
 
+  // 4. Enfileira as duas mensagens WhatsApp na outbox
   await enfileirarWpp(
     formatarWaId(djSai?.telefone),
     `Olá ${nomeSai}, a tua atuação de ${dataFmt}${espacoNome ? ` em ${espacoNome}` : ''} foi reatribuída a outro DJ. Obrigado pela compreensão.`,
@@ -75,5 +75,62 @@ export async function trocarDJ({
     formatarWaId(djEntra.telefone),
     `Olá ${nomeEntra}, foste escalado para uma nova atuação: ${dataFmt}${espacoNome ? ` em ${espacoNome}` : ''}${hora ? ` às ${hora}` : ''}. Confirma na tua app.`,
     { tipo: 'troca_entrada', agenda_id: slot.id, dj_id: djEntra.id },
+  )
+}
+
+/**
+ * Troca direta entre dois slots: DJ A vai para a data de DJ B e vice-versa.
+ * Ambos os slots ficam em estado Proposta e recebem WhatsApp com a nova data.
+ */
+export async function trocarDJDireto({
+  slotA, slotB, djA, djB,
+  espacoNome = '', motivo = null,
+}) {
+  if (!slotA?.id || !slotB?.id || !djB?.id) throw new Error('Troca direta inválida: slots ou DJs em falta.')
+
+  // 1. Swap DJs, ambos para proposta
+  const { error: e1 } = await supabase.from('agenda')
+    .update({ dj_id: djB.id, dj_nome: null, estado: 'proposta' })
+    .eq('id', slotA.id)
+  if (e1) throw e1
+
+  const { error: e2 } = await supabase.from('agenda')
+    .update({ dj_id: djA?.id ?? null, dj_nome: null, estado: 'proposta' })
+    .eq('id', slotB.id)
+  if (e2) throw e2
+
+  // 2. Regista as duas trocas na auditoria
+  const { error: e3 } = await supabase.from('trocas_dj').insert([
+    {
+      agenda_id: slotA.id, data: slotA.data ?? null, espaco_id: slotA.espaco_id ?? null,
+      dj_saiu: djA?.id ?? null, dj_entrou: djB.id, motivo, origem: 'admin', penalizacao: false,
+    },
+    {
+      agenda_id: slotB.id, data: slotB.data ?? null, espaco_id: slotB.espaco_id ?? null,
+      dj_saiu: djB.id, dj_entrou: djA?.id ?? null, motivo, origem: 'admin', penalizacao: false,
+    },
+  ])
+  if (e3) throw e3
+
+  // 3. Histórico nos dois slots
+  const nomeA  = djA?.nome_artistico  || djA?.nome  || 'Sem DJ'
+  const nomeB  = djB.nome_artistico   || djB.nome   || 'DJ'
+  const dataA  = dataCurta(slotA.data)
+  const dataB  = dataCurta(slotB.data)
+  const sufixo = espacoNome ? ` em ${espacoNome}` : ''
+
+  await registarHistorico(slotA.id, 'troca', `Troca direta: ${nomeA} → ${nomeB} (↔ ${dataB}${sufixo})`)
+  await registarHistorico(slotB.id, 'troca', `Troca direta: ${nomeB} → ${nomeA} (↔ ${dataA}${sufixo})`)
+
+  // 4. WhatsApp para ambos
+  await enfileirarWpp(
+    formatarWaId(djA?.telefone),
+    `Olá ${nomeA}, a tua atuação de ${dataA}${sufixo} foi trocada para ${dataB}. Confirma na tua app.`,
+    { tipo: 'troca_direta', agenda_id: slotA.id, dj_id: djA?.id ?? null },
+  )
+  await enfileirarWpp(
+    formatarWaId(djB.telefone),
+    `Olá ${nomeB}, a tua atuação de ${dataB}${sufixo} foi trocada para ${dataA}. Confirma na tua app.`,
+    { tipo: 'troca_direta', agenda_id: slotB.id, dj_id: djB.id },
   )
 }
