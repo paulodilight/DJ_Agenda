@@ -63,7 +63,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
           : isSemEfeito
             ? 'border-white/[0.07] border-dashed bg-surface-1/50 hover:bg-surface-2'
             : isAPedido
-              ? 'border-zinc-400/35 bg-zinc-400/[0.13] hover:bg-zinc-400/20'
+              ? 'border-teal-400/35 bg-teal-400/[0.13] hover:bg-teal-400/20'
               : isLock
                 ? 'border-status-lock/35 bg-status-lock/[0.13] hover:bg-status-lock/20'
                 : isGold && estado === 'aceitação'
@@ -85,20 +85,20 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
                               : isPreConf
                                 ? 'border-sky-400/40 bg-sky-500/[0.15] hover:bg-sky-500/25'
                                 : isTrocado
-                                  ? 'border-zinc-400/30 bg-zinc-400/[0.10] hover:bg-zinc-400/15'
+                                  ? 'border-[#fc03c6]/30 bg-[#fc03c6]/[0.10] hover:bg-[#fc03c6]/15'
                                   : isCancelado
                                     ? 'border-red-500/40 bg-red-500/[0.13] hover:bg-red-500/20'
                                     : isManual
                                       ? 'border-yellow-400/35 bg-yellow-400/[0.11] hover:bg-yellow-400/20'
                                       : temDJ
                                         ? 'border-status-confirmado/35 bg-status-confirmado/[0.13] hover:bg-status-confirmado/20'
-                                        : 'border-surface-4 bg-surface-3 hover:bg-surface-4 hover:border-border'
+                                        : 'border-violet-400/35 bg-violet-400/[0.13] hover:bg-violet-400/20'
       )}
     >
       <span className={clsx(
         'text-xs truncate flex flex-col items-center leading-tight w-full',
         conflito      ? 'font-semibold text-red-400'                  :
-        isAPedido     ? 'font-semibold text-zinc-300'                 :
+        isAPedido     ? 'font-semibold text-teal-400'                 :
         isLock        ? 'font-semibold text-status-lock'              :
         isGold && estado === 'aceitação'      ? 'font-semibold text-gold-400'  :
         isGold && estado === 'pré-confirmado' ? 'font-semibold text-gold-300'  :
@@ -109,11 +109,11 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
         isAceite      ? 'font-semibold text-teal-400'                 :
         isValidacao   ? 'font-semibold text-amber-400'                :
         isPreConf     ? 'font-semibold text-sky-400'                  :
-        isTrocado     ? 'font-semibold text-zinc-400'                 :
+        isTrocado     ? 'font-semibold text-[#fc03c6]'                :
         isCancelado   ? 'font-semibold text-red-400'                  :
         isManual      ? 'font-semibold text-yellow-300'               :
         temDJ         ? 'font-semibold text-status-confirmado'        :
-                        'italic text-accent-subtle'
+                        'italic text-violet-400'
       )}>
         <span className="truncate w-full text-center">
           {isSemEfeito
