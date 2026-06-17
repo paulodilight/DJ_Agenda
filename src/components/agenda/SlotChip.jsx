@@ -29,19 +29,21 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
   const temDJ         = !!slot.dj_nome
   const isManual      = temDJ && !slot.dj_id
   const estado        = slot.estado
-  const GOLD_ESTADOS  = ['aceitação', 'pré-confirmado']
-  const isGold        = !!slot.is_premium && GOLD_ESTADOS.includes(estado)
-  const isSemEfeito   = estado === 'sem_efeito'
-  const isAPedido     = estado === 'a_pedido'
-  const isProposta    = estado === 'proposta'
-  const isAceitacao   = estado === 'aceitação'
-  const isAlterar     = estado === 'alterar'
-  const isValidacao   = estado === 'validação'
-  const isAceite      = estado === 'aceite'
-  const isPreConf     = estado === 'pré-confirmado'
-  const isTrocado     = estado === 'trocado'
-  const isCancelado   = estado === 'cancelado' || estado === 'faltou'
-  const isDestaque    = !!slot.marketing_destaque
+  const GOLD_ESTADOS       = ['aceitação', 'pré-confirmado']
+  const isGold             = !!slot.is_premium && GOLD_ESTADOS.includes(estado)
+  const isGoldConfirmado   = !!slot.is_premium && (estado === 'confirmado' || estado === 'presente')
+  const isSemEfeito        = estado === 'sem_efeito'
+  const isAPedido          = estado === 'a_pedido'
+  const isProposta         = estado === 'proposta'
+  const isAceitacao        = estado === 'aceitação'
+  const isAlterar          = estado === 'alterar'
+  const isValidacao        = estado === 'validação'
+  const isAceite           = estado === 'aceite'
+  const isPreConf          = estado === 'pré-confirmado'
+  const isTrocado          = estado === 'trocado'
+  const isCancelado        = estado === 'cancelado' || estado === 'faltou'
+  const isManualConfirmado = isManual && (estado === 'confirmado' || estado === 'presente')
+  const isDestaque         = !!slot.marketing_destaque
 
   // ── Slot com ou sem DJ ─────────────────────────────────────────────────────
   const chip = (
@@ -63,15 +65,15 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
           : isSemEfeito
             ? 'border-white/[0.07] border-dashed bg-surface-1/50 hover:bg-surface-2'
             : isAPedido
-              ? 'border-teal-400/35 bg-teal-400/[0.13] hover:bg-teal-400/20'
+              ? 'border-violet-400/50 bg-status-confirmado/[0.10] hover:bg-status-confirmado/20'
               : isLock
                 ? 'border-status-lock/35 bg-status-lock/[0.13] hover:bg-status-lock/20'
                 : isGold && estado === 'aceitação'
                   ? 'border-gold-400/40 bg-gold-400/[0.13] hover:bg-gold-400/20'
-                  : isGold && estado === 'pré-confirmado'
+                  : isGold
                     ? 'border-gold-300/45 bg-gold-300/[0.15] hover:bg-gold-300/22'
-                    : isGold
-                      ? 'border-gold-300/55 bg-gold-300/[0.20] hover:bg-gold-300/28'
+                    : isGoldConfirmado
+                      ? 'border-gold-400/60 bg-status-confirmado/[0.13] hover:bg-status-confirmado/22'
                       : isAlterar
                         ? 'border-rose-400/40 bg-rose-500/[0.15] hover:bg-rose-500/25'
                         : isProposta
@@ -88,32 +90,35 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
                                   ? 'border-[#fc03c6]/30 bg-[#fc03c6]/[0.10] hover:bg-[#fc03c6]/15'
                                   : isCancelado
                                     ? 'border-red-500/40 bg-red-500/[0.13] hover:bg-red-500/20'
-                                    : isManual
-                                      ? 'border-yellow-400/35 bg-yellow-400/[0.11] hover:bg-yellow-400/20'
-                                      : temDJ
-                                        ? 'border-status-confirmado/35 bg-status-confirmado/[0.13] hover:bg-status-confirmado/20'
-                                        : 'border-violet-400/35 bg-violet-400/[0.13] hover:bg-violet-400/20'
+                                    : isManualConfirmado
+                                      ? 'border-gold-400/60 bg-status-confirmado/[0.13] hover:bg-status-confirmado/22'
+                                      : isManual
+                                        ? 'border-yellow-400/35 bg-yellow-400/[0.11] hover:bg-yellow-400/20'
+                                        : temDJ
+                                          ? 'border-status-confirmado/35 bg-status-confirmado/[0.13] hover:bg-status-confirmado/20'
+                                          : 'border-violet-400/35 bg-violet-400/[0.13] hover:bg-violet-400/20'
       )}
     >
       <span className={clsx(
         'text-xs truncate flex flex-col items-center leading-tight w-full',
-        conflito      ? 'font-semibold text-red-400'                  :
-        isAPedido     ? 'font-semibold text-teal-400'                 :
-        isLock        ? 'font-semibold text-status-lock'              :
-        isGold && estado === 'aceitação'      ? 'font-semibold text-gold-400'  :
-        isGold && estado === 'pré-confirmado' ? 'font-semibold text-gold-300'  :
-        isGold        ? 'font-semibold text-gold-300'                 :
-        isAlterar     ? 'font-semibold text-rose-400'                  :
-        isProposta    ? 'font-semibold text-status-proposta'          :
-        isAceitacao   ? 'font-semibold text-orange-400'               :
-        isAceite      ? 'font-semibold text-teal-400'                 :
-        isValidacao   ? 'font-semibold text-amber-400'                :
-        isPreConf     ? 'font-semibold text-sky-400'                  :
-        isTrocado     ? 'font-semibold text-[#fc03c6]'                :
-        isCancelado   ? 'font-semibold text-red-400'                  :
-        isManual      ? 'font-semibold text-yellow-300'               :
-        temDJ         ? 'font-semibold text-status-confirmado'        :
-                        'italic text-violet-400'
+        conflito           ? 'font-semibold text-red-400'             :
+        isAPedido          ? 'font-semibold text-violet-400'          :
+        isLock             ? 'font-semibold text-status-lock'         :
+        isGold && estado === 'aceitação' ? 'font-semibold text-gold-400' :
+        isGold             ? 'font-semibold text-gold-300'            :
+        isGoldConfirmado   ? 'font-semibold text-status-confirmado'   :
+        isAlterar          ? 'font-semibold text-rose-400'            :
+        isProposta         ? 'font-semibold text-status-proposta'     :
+        isAceitacao        ? 'font-semibold text-orange-400'          :
+        isAceite           ? 'font-semibold text-teal-400'            :
+        isValidacao        ? 'font-semibold text-amber-400'           :
+        isPreConf          ? 'font-semibold text-sky-400'             :
+        isTrocado          ? 'font-semibold text-[#fc03c6]'           :
+        isCancelado        ? 'font-semibold text-red-400'             :
+        isManualConfirmado ? 'font-semibold text-status-confirmado'   :
+        isManual           ? 'font-semibold text-yellow-300'          :
+        temDJ              ? 'font-semibold text-status-confirmado'   :
+                             'italic text-violet-400'
       )}>
         <span className="truncate w-full text-center">
           {isSemEfeito
