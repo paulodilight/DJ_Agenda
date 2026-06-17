@@ -986,7 +986,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-border flex items-center justify-between">
+        <div className="sticky bottom-0 px-6 py-4 border-t border-border bg-surface-1 flex items-center justify-between">
           <div className="flex gap-2">
             {slot?.id && (
               <Button type="button" variante="danger" tamanho="sm" onClick={apagar} loading={loading}>
