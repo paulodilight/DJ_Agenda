@@ -26,6 +26,23 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
     )
   }
 
+  // Slot completamente vazio após reset — aparece como célula "+"
+  if (!slot.dj_id && !slot.dj_nome && !slot.estado) {
+    return (
+      <button
+        onClick={(e) => { if (!isDragging) onClick?.(e) }}
+        className={clsx(
+          'w-full px-2 py-1 rounded border border-dashed min-h-[34px] flex items-center justify-center transition-colors',
+          dimmed
+            ? 'border-surface-4/15 bg-black/[0.35] text-white/[0.07] hover:text-white/20 hover:border-surface-4/40'
+            : 'border-surface-4 bg-surface-2 text-accent-subtle/40 hover:text-accent-subtle hover:border-border'
+        )}
+      >
+        +
+      </button>
+    )
+  }
+
   const temDJ         = !!slot.dj_nome
   const isManual      = temDJ && !slot.dj_id
   const estado        = slot.estado

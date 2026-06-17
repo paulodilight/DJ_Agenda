@@ -20,7 +20,7 @@ import { DJCombobox, NovoDJLink } from './DJCombobox'
 import { supaEventosApi } from '@/lib/supaEventosApi'
 import { trocarDJ, trocarDJDireto, registarHistorico } from '@/lib/trocas'
 import { clsx } from 'clsx'
-import { CalendarPlus, Link2, Star, ArrowLeftRight } from 'lucide-react'
+import { CalendarPlus, Link2, Star, ArrowLeftRight, RotateCcw } from 'lucide-react'
 
 const ESTADO_OPCOES = [
   { value: 'proposta',        label: 'Proposta' },
@@ -461,6 +461,27 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     }
   }
 
+  const resetar = async () => {
+    const djAntes = djs.find(d => d.id === form.dj_id)
+    const nomeAntes = djAntes?.nome_artistico || djAntes?.nome || form.dj_externo || 'Sem DJ'
+    if (!confirm(`Limpar este slot? O DJ (${nomeAntes}), estado e valores serão removidos — a posição fica disponível para nova atribuição.`)) return
+    setLoading(true)
+    try {
+      await agendaApi.actualizar(slot.id, {
+        dj_id: null, dj_nome: null, estado: null,
+        valor: null, margem: null, tipo_slot: null,
+        evento: null, notas: null,
+      })
+      try { await registarHistorico(slot.id, 'estado', `Reset: slot limpo (era ${nomeAntes})`) } catch {}
+      onGuardado()
+      onFechar()
+    } catch (e) {
+      setErro(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const abrirTroca = () => {
     setTrocaDjId(''); setTrocaMotivo(''); setTrocaErro(null)
     setTipoTroca('substituir'); setTrocaDataId(''); setTrocaSlots([])
@@ -532,7 +553,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
   return (
     <>
-    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-sm' : 'max-w-lg'}>
+    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-sm' : 'max-w-2xl'}>
       <form onSubmit={guardar}>
         <div className="px-6 py-5 flex flex-col gap-4">
           {erro && <Alerta tipo="erro" mensagem={erro} />}
@@ -970,6 +991,15 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
             {slot?.id && (
               <Button type="button" variante="danger" tamanho="sm" onClick={apagar} loading={loading}>
                 Apagar
+              </Button>
+            )}
+            {slot?.id && (
+              <Button
+                type="button" variante="ghost" tamanho="sm" onClick={resetar} loading={loading}
+                className="border border-border/50 text-accent-subtle hover:text-orange-400 hover:border-orange-400/40 transition-colors inline-flex items-center gap-1"
+                title="Limpar slot: remove DJ, estado e valores"
+              >
+                <RotateCcw size={13} /> Limpar
               </Button>
             )}
             {slot?.id && form.estado === 'proposta' && (
