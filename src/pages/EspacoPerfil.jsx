@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Save, ChevronLeft, ChevronRight, ImageIcon, X, ExternalLink } from 'lucide-react'
 import { espacosApi, turnosApi, djsFixosApi, espacoDjPreferenciasApi, turnoValoresDiaApi, categoriasDjApi, turnoCategoriaApi } from '@/lib/api'
@@ -10,7 +10,10 @@ import { Alerta } from '@/components/ui/Alerta'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { formatarEuro } from '@/utils/formatacao'
+import { useAppStore } from '@/store'
 import { clsx } from 'clsx'
+
+const safeParse = (s, fb) => { try { return s ? JSON.parse(s) : fb } catch { return fb } }
 
 const DIAS = [
   { idx: 1, curto: 'Seg', longo: 'Segunda' },
@@ -38,6 +41,18 @@ export function EspacoPerfil() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { djs } = useDJs()
+  const config = useAppStore((s) => s.config)
+
+  const subtiposDisp = useMemo(() => {
+    const transps = safeParse(config.contas_transportes, [])
+    const transpDefault = transps[0]?.valor ?? 0
+    const subs = safeParse(config.contas_subtipos, [])
+    return subs.map(s => ({
+      ...s,
+      custo: s.custo ?? 0,
+      total: (s.custo ?? 0) + (s.margem ?? 0) + (s.semTransporte ? 0 : transpDefault),
+    }))
+  }, [config])
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -132,12 +147,13 @@ export function EspacoPerfil() {
       try {
         const valoresData = await turnoValoresDiaApi.listarPorEspaco(id)
         const valoresIdx = {}
-        valoresData.forEach(({ turno_id, dia_semana, valor, hora_inicio, hora_fim }) => {
+        valoresData.forEach(({ turno_id, dia_semana, valor, hora_inicio, hora_fim, subtipo_key }) => {
           if (!valoresIdx[turno_id]) valoresIdx[turno_id] = {}
           valoresIdx[turno_id][dia_semana] = {
             valor:       valor != null ? String(valor) : '',
             hora_inicio: hora_inicio ? hora_inicio.slice(0, 5) : '',
             hora_fim:    hora_fim    ? hora_fim.slice(0, 5)    : '',
+            subtipo_key: subtipo_key ?? '',
           }
         })
         const novaConfig = {}
@@ -504,7 +520,37 @@ export function EspacoPerfil() {
                           >
                             {dia.curto}
                           </button>
-                          {/* Valor */}
+                          {/* Subtipo → auto-preenche valor */}
+                          {subtiposDisp.length > 0 && (
+                            <select
+                              disabled={!activo}
+                              value={cfg.subtipo_key ?? ''}
+                              onChange={(e) => {
+                                const sub = subtiposDisp.find(s => s.key === e.target.value)
+                                setConfigDia((prev) => ({
+                                  ...prev,
+                                  [turno._key]: {
+                                    ...prev[turno._key],
+                                    [dia.idx]: {
+                                      ...(prev[turno._key]?.[dia.idx] ?? {}),
+                                      subtipo_key: e.target.value,
+                                      valor: sub?.custo > 0 ? String(sub.custo) : (prev[turno._key]?.[dia.idx]?.valor ?? ''),
+                                    },
+                                  },
+                                }))
+                              }}
+                              className={clsx(
+                                'w-full bg-surface-2 border rounded px-1 py-0.5 text-[10px] text-center text-accent-subtle focus:outline-none focus:border-white/20 transition-colors',
+                                activo ? 'border-border' : 'border-border/20 opacity-20 cursor-not-allowed'
+                              )}
+                            >
+                              <option value="">—</option>
+                              {subtiposDisp.map(s => (
+                                <option key={s.key} value={s.key}>{s.label}{s.custo > 0 ? ` · ${s.custo}€` : ''}</option>
+                              ))}
+                            </select>
+                          )}
+                          {/* Valor editável */}
                           <input
                             type="number" min={0} step={0.01}
                             disabled={!activo}

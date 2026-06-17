@@ -29,8 +29,10 @@ export const useAuthStore = create((set) => ({
 
 export const useAppStore = create((set) => ({
   config: {},
-
   setConfig: (config) => set({ config }),
+
+  headerAction: null,
+  setHeaderAction: (action) => set({ headerAction: action }),
 }))
 
 // ─── Mês de trabalho global ───────────────────────────────────────────────────

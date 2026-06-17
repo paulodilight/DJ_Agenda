@@ -1,18 +1,44 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Star, ExternalLink, Search } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import { Card, CardHeader, CardBody } from '@/components/ui/Card'
+import { Users, Plus, Trash2, Pencil, Search, ArrowDownUp, Star } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { LoadingPage } from '@/components/ui/LoadingSpinner'
+import { Alerta } from '@/components/ui/Alerta'
+import { Badge } from '@/components/ui/Badge'
+import { FormDJ } from '@/components/djs/FormDJ'
+import { useDJs } from '@/hooks/useDJs'
+import { djsApi, agendaApi, categoriasDjApi, djCategoriasApi } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
+import { formatarEuro, labelEstadoDJ } from '@/utils/formatacao'
+import { useUndo } from '@/contexts/UndoContext'
+import { clsx } from 'clsx'
+import { format, addMonths, startOfMonth } from 'date-fns'
+import { pt } from 'date-fns/locale'
 
-// Categorias de convidados (INT excluído — é tratado como residente interno)
-const CAT_IDS = [4, 5] // DJ Convidado EXT, Premium
-const CAT_NOMES = { 4: 'Convidado EXT', 5: 'Premium' }
+// Categorias de convidados
+const CAT_IDS_CONVIDADOS = [4, 5]
+
+function gerarMeses() {
+  const lista = []
+  const agora = new Date()
+  for (let i = -12; i <= 6; i++) {
+    const d = addMonths(startOfMonth(agora), i)
+    lista.push({ value: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: pt }) })
+  }
+  return lista
+}
+const MESES_OPCOES = gerarMeses()
+
+const ORDENACAO_OPCOES = [
+  { value: 'nome',          label: 'Nome' },
+  { value: 'interesse_desc', label: 'Maior interesse' },
+  { value: 'valor_desc',    label: 'Maior valor' },
+  { value: 'datas_desc',    label: 'Mais datas' },
+]
 
 function EstrelasInteresse({ valor }) {
-  if (!valor) return <span className="text-xs text-accent-subtle">—</span>
+  if (!valor) return <span className="text-xs text-accent-subtle/40">—</span>
   return (
     <span className="flex items-center gap-0.5">
       {[1,2,3,4,5].map((n) => (
@@ -26,185 +52,259 @@ function EstrelasInteresse({ valor }) {
 
 export function DJConvidados() {
   const navigate = useNavigate()
-  const [djs, setDjs] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [pesquisa, setPesquisa] = useState('')
-  const [criando, setCriando] = useState(false)
-  const [novoNome, setNovoNome] = useState('')
-  const [mostrarFormNovo, setMostrarFormNovo] = useState(false)
+  const { djs, loading, erro, recarregar } = useDJs()
+  const { pushUndo } = useUndo()
+  const [modalAberto, setModalAberto]       = useState(false)
+  const [djSeleccionado, setDJSeleccionado] = useState(null)
+  const [apagando, setApagando]             = useState(null)
+  const [counts, setCounts]                 = useState({})
+  const [categorias, setCategorias]         = useState([])
+  const [djCatsMap, setDjCatsMap]           = useState({})
+  const [interesseMap, setInteresseMap]     = useState({})
 
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    try {
-      // DJs com categorias convidado/premium + interesse médio dos gestores
-      const { data: cats } = await supabase
-        .from('dj_categorias')
-        .select('dj_id, categoria_id')
-        .in('categoria_id', CAT_IDS)
+  // Filtros
+  const [pesquisa, setPesquisa]       = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('')
+  const [ordenacao, setOrdenacao]     = useState('nome')
+  const [filtroMes, setFiltroMes]     = useState(format(new Date(), 'yyyy-MM'))
 
-      if (!cats?.length) { setDjs([]); return }
-      const djIds = [...new Set(cats.map((c) => c.dj_id))]
+  useEffect(() => {
+    agendaApi.contarPorDJ(filtroMes).then(setCounts).catch(() => {})
+  }, [filtroMes])
 
-      const { data: djsData } = await supabase
-        .from('djs')
-        .select('id, nome, nome_artistico, foto_url, estado, instagram_url')
-        .in('id', djIds)
-        .neq('estado', 'banido')
-        .order('nome_artistico', { nullsFirst: false })
-        .order('nome')
-
-      // Interesse médio dos gestores (espaco_dj_preferencias)
-      const { data: prefs } = await supabase
-        .from('espaco_dj_preferencias')
-        .select('dj_id, interesse')
-        .in('dj_id', djIds)
-        .not('interesse', 'is', null)
-
-      const interesseMap = {}
-      const cntMap = {}
-      ;(prefs ?? []).forEach(({ dj_id, interesse }) => {
-        interesseMap[dj_id] = (interesseMap[dj_id] ?? 0) + interesse
-        cntMap[dj_id] = (cntMap[dj_id] ?? 0) + 1
-      })
-
-      // Contagem de actuações
-      const { data: atuacoes } = await supabase
-        .from('agenda')
-        .select('dj_id')
-        .in('dj_id', djIds)
-        .neq('estado', 'cancelado')
-
-      const atuacoesMap = {}
-      ;(atuacoes ?? []).forEach(({ dj_id }) => { atuacoesMap[dj_id] = (atuacoesMap[dj_id] ?? 0) + 1 })
-
-      const catMap = {}
-      cats.forEach(({ dj_id, categoria_id }) => { catMap[dj_id] = categoria_id })
-
-      const lista = (djsData ?? []).map((d) => ({
-        ...d,
-        categoria_id: catMap[d.id],
-        interesseMedio: cntMap[d.id] ? Math.round((interesseMap[d.id] / cntMap[d.id]) * 10) / 10 : null,
-        totalAtuacoes: atuacoesMap[d.id] ?? 0,
-      })).sort((a, b) => (b.interesseMedio ?? 0) - (a.interesseMedio ?? 0))
-
-      setDjs(lista)
-    } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    categoriasDjApi.listar().then(setCategorias).catch(() => {})
   }, [])
 
-  useEffect(() => { carregar() }, [carregar])
+  useEffect(() => {
+    if (!djs.length) return
+    Promise.all(
+      djs.map(d => djCategoriasApi.listar(d.id).then(ids => ({ djId: d.id, ids })))
+    ).then(resultados => {
+      const map = {}
+      resultados.forEach(({ djId, ids }) => { map[djId] = ids })
+      setDjCatsMap(map)
+    }).catch(() => {})
+  }, [djs])
 
-  async function criarNovoDJ() {
-    if (!novoNome.trim() || criando) return
-    setCriando(true)
-    try {
-      const { data, error } = await supabase
-        .from('djs')
-        .insert({
-          nome: novoNome.trim(),
-          estado: 'activo',
-          qualidade_artistica: 0, assiduidade: 0, profissionalismo: 0, adaptacao_espaco: 0,
-          prioridade_admin: 0, excluido_admin: false,
+  // Carregar interesse médio dos gestores
+  useEffect(() => {
+    if (!djs.length) return
+    const djIds = djs.map(d => d.id)
+    supabase
+      .from('espaco_dj_preferencias')
+      .select('dj_id, interesse')
+      .in('dj_id', djIds)
+      .not('interesse', 'is', null)
+      .then(({ data }) => {
+        const soma = {}, cnt = {}
+        ;(data ?? []).forEach(({ dj_id, interesse }) => {
+          soma[dj_id] = (soma[dj_id] ?? 0) + interesse
+          cnt[dj_id]  = (cnt[dj_id] ?? 0) + 1
         })
-        .select()
-        .single()
-      if (error) throw error
-      await supabase.from('dj_categorias').insert({ dj_id: data.id, categoria_id: 4 }) // EXT
-      setNovoNome('')
-      setMostrarFormNovo(false)
-      navigate(`/djs/${data.id}`)
+        const mapa = {}
+        Object.keys(cnt).forEach(id => {
+          mapa[id] = Math.round((soma[id] / cnt[id]) * 10) / 10
+        })
+        setInteresseMap(mapa)
+      })
+      .catch(() => {})
+  }, [djs])
+
+  const abrirCriar  = () => { setDJSeleccionado(null); setModalAberto(true) }
+  const fecharModal = () => { setModalAberto(false); setDJSeleccionado(null) }
+
+  const apagar = async (dj) => {
+    if (!confirm(`Apagar "${dj.nome_artistico || dj.nome}"?`)) return
+    setApagando(dj.id)
+    try {
+      const backup = { ...dj }
+      await djsApi.apagar(dj.id)
+      recarregar()
+      pushUndo({
+        label: `DJ "${dj.nome_artistico || dj.nome}" apagado`,
+        undo: async () => {
+          const { id: _id, created_at, ...payload } = backup
+          await djsApi.criar(payload)
+          recarregar()
+        },
+      })
     } catch (e) {
-      alert('Erro: ' + e.message)
+      alert(e.message)
     } finally {
-      setCriando(false)
+      setApagando(null)
     }
   }
 
-  const djsFiltrados = djs.filter((d) => {
-    const q = pesquisa.toLowerCase()
-    return !q || (d.nome_artistico || d.nome || '').toLowerCase().includes(q)
-  })
+  const djsFiltrados = useMemo(() => {
+    // Só convidados (cat 4 ou 5)
+    let lista = djs.filter(d =>
+      (djCatsMap[d.id] ?? []).some(id => CAT_IDS_CONVIDADOS.includes(Number(id)))
+    )
 
-  if (loading) return <LoadingPage />
+    // Estado
+    if (filtroEstado === 'activos') {
+      lista = lista.filter(d => d.estado === 'activo' || d.estado === 'activo_ext')
+    } else if (filtroEstado) {
+      lista = lista.filter(d => d.estado === filtroEstado)
+    } else {
+      lista = lista.filter(d => d.estado !== 'banido')
+    }
+
+    // Pesquisa livre
+    if (pesquisa.trim()) {
+      const q = pesquisa.toLowerCase()
+      lista = lista.filter(d =>
+        (d.nome_artistico ?? '').toLowerCase().includes(q) ||
+        (d.nome ?? '').toLowerCase().includes(q) ||
+        (d.email ?? '').toLowerCase().includes(q) ||
+        (d.whatsapp ?? '').toLowerCase().includes(q)
+      )
+    }
+
+    // Ordenação
+    if (ordenacao === 'interesse_desc') {
+      lista.sort((a, b) => (interesseMap[b.id] ?? 0) - (interesseMap[a.id] ?? 0))
+    } else if (ordenacao === 'valor_desc') {
+      lista.sort((a, b) => (b.valor_sessao ?? 0) - (a.valor_sessao ?? 0))
+    } else if (ordenacao === 'datas_desc') {
+      lista.sort((a, b) => (counts[b.id]?.total ?? 0) - (counts[a.id]?.total ?? 0))
+    } else {
+      lista.sort((a, b) =>
+        (a.nome_artistico || a.nome).localeCompare(b.nome_artistico || b.nome)
+      )
+    }
+
+    return lista
+  }, [djs, djCatsMap, filtroEstado, pesquisa, ordenacao, counts, interesseMap])
+
+  const mesCorrente = format(new Date(), 'yyyy-MM')
+  const temFiltroActivo = filtroEstado || pesquisa || filtroMes !== mesCorrente
 
   return (
-    <div className="flex flex-col gap-6 px-6 py-6">
+    <div className="p-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-lg font-bold text-accent">DJ Convidados</h1>
+          <h1 className="text-base font-semibold text-accent">DJ Convidados</h1>
           <p className="text-xs text-accent-muted mt-0.5">
-            DJs Convidado EXT · Premium — {djs.length} no total
+            {djsFiltrados.length !== djs.filter(d => (djCatsMap[d.id] ?? []).some(id => CAT_IDS_CONVIDADOS.includes(Number(id)))).length
+              ? `${djsFiltrados.length} de ${djs.filter(d => (djCatsMap[d.id] ?? []).some(id => CAT_IDS_CONVIDADOS.includes(Number(id)))).length}`
+              : djsFiltrados.length} DJ{djsFiltrados.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button variante="primario" tamanho="sm" onClick={() => setMostrarFormNovo(true)}>
-          <Plus size={14} /> Novo DJ Convidado
+        <Button variante="primary" tamanho="sm" onClick={abrirCriar}>
+          <Plus size={14} />
+          Novo Convidado
         </Button>
       </div>
 
-      {/* Form novo DJ */}
-      {mostrarFormNovo && (
-        <Card>
-          <CardBody>
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
-                <label className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">Nome do DJ</label>
-                <input
-                  autoFocus
-                  type="text"
-                  value={novoNome}
-                  onChange={(e) => setNovoNome(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && criarNovoDJ()}
-                  placeholder="Nome artístico..."
-                  className="mt-1 w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-accent focus:outline-none focus:border-white/20"
-                />
-              </div>
-              <Button variante="primario" tamanho="sm" onClick={criarNovoDJ} loading={criando}>
-                Criar e editar perfil
-              </Button>
-              <Button variante="secundario" tamanho="sm" onClick={() => { setMostrarFormNovo(false); setNovoNome('') }}>
-                Cancelar
-              </Button>
-            </div>
-            <p className="mt-1.5 text-[11px] text-accent-subtle">
-              O DJ será criado com categoria <strong>Convidado EXT</strong> e abrirá o perfil para completar.
-            </p>
-          </CardBody>
-        </Card>
-      )}
+      {/* Toolbar de filtros */}
+      <div className="flex items-center gap-2 flex-wrap mb-5">
+        {/* Pesquisa */}
+        <div className="relative">
+          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-accent-subtle pointer-events-none" />
+          <input
+            type="text"
+            value={pesquisa}
+            onChange={(e) => setPesquisa(e.target.value)}
+            placeholder="Pesquisar DJ…"
+            className="bg-surface-2 border border-border rounded pl-8 pr-3 py-1.5 text-xs text-accent placeholder:text-accent-subtle/60 focus:outline-none focus:border-white/20 transition-colors w-44"
+          />
+        </div>
 
-      {/* Pesquisa */}
-      <div className="relative max-w-xs">
-        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-accent-subtle" />
-        <input
-          type="text"
-          value={pesquisa}
-          onChange={(e) => setPesquisa(e.target.value)}
-          placeholder="Pesquisar…"
-          className="w-full rounded border border-border bg-surface-2 pl-8 pr-3 py-2 text-sm text-accent placeholder:text-accent-subtle focus:outline-none focus:border-white/20"
-        />
+        {/* Estado */}
+        <select
+          value={filtroEstado}
+          onChange={(e) => setFiltroEstado(e.target.value)}
+          className="bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-accent-muted focus:outline-none focus:border-white/20"
+        >
+          <option value="">Todos (excl. banidos)</option>
+          <option value="activos">Activos (todos)</option>
+          <option value="activo">Activo</option>
+          <option value="activo_ext">Activo EXT</option>
+          <option value="inactivo">Inactivo</option>
+          <option value="banido">Banido</option>
+        </select>
+
+        {/* Mês */}
+        <select
+          value={filtroMes}
+          onChange={(e) => setFiltroMes(e.target.value)}
+          className="bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-accent-muted focus:outline-none focus:border-white/20"
+        >
+          {MESES_OPCOES.map(m => (
+            <option key={m.value} value={m.value}>{m.label}</option>
+          ))}
+        </select>
+
+        {/* Ordenação */}
+        <div className="flex items-center gap-1 ml-auto">
+          <ArrowDownUp size={11} className="text-accent-subtle" />
+          <select
+            value={ordenacao}
+            onChange={(e) => setOrdenacao(e.target.value)}
+            className="bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-accent-muted focus:outline-none focus:border-white/20"
+          >
+            {ORDENACAO_OPCOES.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Limpar filtros */}
+        {temFiltroActivo && (
+          <button
+            onClick={() => { setPesquisa(''); setFiltroEstado(''); setFiltroMes(mesCorrente) }}
+            className="text-[11px] text-accent-subtle hover:text-accent transition-colors underline underline-offset-2"
+          >
+            Limpar filtros
+          </button>
+        )}
       </div>
 
-      {/* Lista */}
-      {djsFiltrados.length === 0 ? (
-        <EmptyState mensagem="Sem DJs convidados." />
-      ) : (
-        <Card>
-          <CardBody className="p-0">
-            <table className="w-full text-sm">
-              <thead className="border-b border-border">
-                <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">DJ</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">Categoria</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">Actuações</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-accent-muted">Interesse médio</th>
-                  <th className="px-4 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {djsFiltrados.map((dj) => (
-                  <tr key={dj.id} className="hover:bg-surface-2/50 transition-colors">
+      {loading && <LoadingPage />}
+      {erro && <Alerta tipo="erro" mensagem={erro} />}
+
+      {!loading && !erro && djsFiltrados.length === 0 && (
+        <EmptyState
+          icone={Users}
+          titulo="Sem DJs convidados"
+          descricao="Adiciona o primeiro DJ convidado."
+          accao={<Button variante="primary" tamanho="sm" onClick={abrirCriar}><Plus size={14} />Novo Convidado</Button>}
+        />
+      )}
+
+      {!loading && !erro && djsFiltrados.length > 0 && (
+        <div className="bg-surface-1 border border-border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left px-4 py-3 text-xs font-medium text-accent-muted">Nome artístico</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-accent-muted">Categoria</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-accent-muted">Estado</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">Interesse</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">Total datas</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">
+                  Datas <span className="text-accent-subtle/60 font-normal capitalize">{format(new Date(filtroMes + '-01'), 'MMM', { locale: pt })}</span>
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-accent-muted">
+                  Valor <span className="text-accent-subtle/60 font-normal capitalize">{format(new Date(filtroMes + '-01'), 'MMM', { locale: pt })}</span>
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-accent-muted">Valor/sessão</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {djsFiltrados.map((dj, i) => {
+                const c = counts[dj.id] ?? { total: 0, mesCorrente: 0 }
+                const djCatIds = djCatsMap[dj.id] ?? []
+                const djCatObjs = djCatIds.map(id => categorias.find(c => c.id === id)).filter(Boolean)
+                return (
+                  <tr key={dj.id} className={clsx(
+                    i < djsFiltrados.length - 1 && 'border-b border-border/50',
+                    'hover:bg-surface-2/30 transition-colors'
+                  )}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {dj.foto_url
@@ -213,33 +313,102 @@ export function DJConvidados() {
                               {(dj.nome_artistico || dj.nome || '?').slice(0, 2).toUpperCase()}
                             </div>
                         }
-                        <span className="font-medium text-accent">{dj.nome_artistico || dj.nome}</span>
+                        <div>
+                          <p className="font-medium text-accent">{dj.nome_artistico || dj.nome}</p>
+                          {dj.nome_artistico && <p className="text-xs text-accent-subtle">{dj.nome}</p>}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-xs text-accent-muted">{CAT_NOMES[dj.categoria_id] ?? '—'}</span>
-                    </td>
-                    <td className="px-4 py-3 tabular-nums text-accent-muted text-xs">
-                      {dj.totalAtuacoes}
+                      {djCatObjs.length > 0
+                        ? <div className="flex flex-wrap gap-1">
+                            {djCatObjs.map(c => (
+                              <span key={c.id} className="text-[10px] bg-surface-3 text-accent-muted border border-border rounded px-1.5 py-0.5 whitespace-nowrap">
+                                {c.nome}
+                              </span>
+                            ))}
+                          </div>
+                        : <span className="text-xs text-accent-subtle/40">—</span>
+                      }
                     </td>
                     <td className="px-4 py-3">
-                      <EstrelasInteresse valor={dj.interesseMedio} />
+                      <Badge variante={
+                        dj.estado === 'activo'     ? 'confirmado' :
+                        dj.estado === 'activo_ext' ? 'proposta'   :
+                        dj.estado === 'banido'     ? 'ban'        : 'default'
+                      }>
+                        {labelEstadoDJ(dj.estado)}
+                      </Badge>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => navigate(`/djs/${dj.id}`)}
-                        className="flex items-center gap-1 text-xs text-accent-subtle hover:text-accent transition-colors ml-auto"
-                      >
-                        Perfil <ExternalLink size={11} />
-                      </button>
+                    <td className="px-4 py-3 text-center">
+                      <EstrelasInteresse valor={interesseMap[dj.id]} />
+                    </td>
+                    <td className="px-4 py-3 text-center tabular-nums text-accent text-xs">
+                      {c.total > 0 ? c.total : <span className="text-accent-subtle/40">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center tabular-nums text-xs">
+                      {c.mesCorrente > 0
+                        ? <span className="text-accent font-medium">{c.mesCorrente}</span>
+                        : <span className="text-accent-subtle/40">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-xs">
+                      {c.mesCorrente > 0 && dj.valor_sessao
+                        ? <span className="text-status-confirmado font-medium">{formatarEuro(c.mesCorrente * dj.valor_sessao)}</span>
+                        : <span className="text-accent-subtle/40">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-accent-muted text-xs">
+                      {dj.valor_sessao ? formatarEuro(dj.valor_sessao) : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variante="ghost" tamanho="sm" onClick={() => navigate(`/djs/${dj.id}`)} title="Editar perfil">
+                          <Pencil size={13} />
+                        </Button>
+                        <Button
+                          variante="ghost" tamanho="sm" loading={apagando === dj.id}
+                          onClick={() => apagar(dj)}
+                          className="text-status-cancelado/60 hover:text-status-cancelado"
+                        >
+                          <Trash2 size={13} />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardBody>
-        </Card>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border bg-surface-2/20">
+                <td colSpan={4} className="px-4 py-2.5 text-xs font-semibold text-accent-muted">
+                  Total ({djsFiltrados.length})
+                </td>
+                <td className="px-4 py-2.5 text-center tabular-nums text-xs font-semibold text-accent">
+                  {(() => { const t = djsFiltrados.reduce((s, d) => s + (counts[d.id]?.total ?? 0), 0); return t > 0 ? t : <span className="text-accent-subtle/40 font-normal">—</span> })()}
+                </td>
+                <td className="px-4 py-2.5 text-center tabular-nums text-xs font-semibold text-accent">
+                  {(() => { const t = djsFiltrados.reduce((s, d) => s + (counts[d.id]?.mesCorrente ?? 0), 0); return t > 0 ? t : <span className="text-accent-subtle/40 font-normal">—</span> })()}
+                </td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-xs font-semibold text-status-confirmado">
+                  {(() => {
+                    const t = djsFiltrados.reduce((s, d) => s + ((counts[d.id]?.mesCorrente ?? 0) * (d.valor_sessao ?? 0)), 0)
+                    return t > 0 ? formatarEuro(t) : <span className="text-accent-subtle/40 font-normal">—</span>
+                  })()}
+                </td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       )}
+
+      <FormDJ
+        aberto={modalAberto}
+        dj={djSeleccionado}
+        onFechar={fecharModal}
+        onGuardado={recarregar}
+      />
     </div>
   )
 }

@@ -1,12 +1,14 @@
-﻿import { useState } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, MapPin, CalendarDays, Ban,
   Settings, LogOut, Mic2, Bell, Music2, Scale, Send, Wallet,
-  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar,
+  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw,
 } from 'lucide-react'
-import { useAuthStore, useMesStore } from '@/store'
+import { useAuthStore, useMesStore, useAppStore } from '@/store'
+import { configuracoesApi } from '@/lib/api'
 import { UndoToast } from '@/components/ui/UndoToast'
+import { useUndo } from '@/contexts/UndoContext'
 import { clsx } from 'clsx'
 import { format, addMonths } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -89,6 +91,15 @@ function NavItem({ para, icone: Icone, label, collapsed }) {
 export function Layout() {
   const logout = useAuthStore((s) => s.logout)
   const { anoMes, navegar, setAnoMes } = useMesStore()
+  const { executarUndo, podeDesfazer, executando } = useUndo()
+  const headerAction = useAppStore((s) => s.headerAction)
+  const { config, setConfig } = useAppStore((s) => ({ config: s.config, setConfig: s.setConfig }))
+
+  useEffect(() => {
+    if (Object.keys(config).length === 0) {
+      configuracoesApi.listar().then(setConfig).catch(() => {})
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
 
@@ -269,11 +280,44 @@ export function Layout() {
             </div>
           )}
 
-          {/* Bell + avatar */}
+          {/* Bell + undo + avatar */}
           <div className="flex items-center gap-3">
+            {headerAction && (
+              <button
+                onClick={headerAction.onClick}
+                disabled={headerAction.loading}
+                className={clsx(
+                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border',
+                  headerAction.loading
+                    ? 'border-border/30 text-accent-subtle/40 cursor-not-allowed'
+                    : 'border-status-confirmado/40 text-status-confirmado bg-status-confirmado/10 hover:bg-status-confirmado/20'
+                )}
+              >
+                {headerAction.loading ? 'A guardar…' : headerAction.label}
+              </button>
+            )}
+            <button
+              onClick={() => window.location.reload()}
+              title="Recarregar página"
+              className="p-1.5 rounded hover:bg-surface-2 text-accent-muted hover:text-accent transition-colors"
+            >
+              <RefreshCw size={14} />
+            </button>
             <button className="relative p-1.5 rounded hover:bg-surface-2 text-accent-muted hover:text-accent transition-colors">
               <Bell size={14} />
               <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-status-cancelado" />
+            </button>
+            <button
+              onClick={executarUndo}
+              disabled={!podeDesfazer || executando}
+              title="Desfazer última ação (Ctrl+Z)"
+              className={clsx(
+                'p-1.5 rounded transition-colors',
+                podeDesfazer && !executando
+                  ? 'text-accent-muted hover:text-accent hover:bg-surface-2'
+                  : 'text-border/25 cursor-not-allowed'
+              )}>
+              <Undo2 size={14} />
             </button>
             <div className="w-7 h-7 rounded-full bg-status-confirmado/20 flex items-center justify-center text-xs font-bold text-status-confirmado border border-status-confirmado/30 select-none">
               A

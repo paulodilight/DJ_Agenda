@@ -351,6 +351,26 @@ export function DJs() {
                 )
               })}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border bg-surface-2/20">
+                <td colSpan={4} className="px-4 py-2.5 text-xs font-semibold text-accent-muted">
+                  Total ({djsFiltrados.length})
+                </td>
+                <td className="px-4 py-2.5 text-center tabular-nums text-xs font-semibold text-accent">
+                  {(() => { const t = djsFiltrados.reduce((s, d) => s + (counts[d.id]?.total ?? 0), 0); return t > 0 ? t : <span className="text-accent-subtle/40 font-normal">—</span> })()}
+                </td>
+                <td className="px-4 py-2.5 text-center tabular-nums text-xs font-semibold text-accent">
+                  {(() => { const t = djsFiltrados.reduce((s, d) => s + (counts[d.id]?.mesCorrente ?? 0), 0); return t > 0 ? t : <span className="text-accent-subtle/40 font-normal">—</span> })()}
+                </td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-xs font-semibold text-status-confirmado">
+                  {(() => {
+                    const t = djsFiltrados.reduce((s, d) => s + ((counts[d.id]?.mesCorrente ?? 0) * (d.valor_sessao ?? 0)), 0)
+                    return t > 0 ? formatarEuro(t) : <span className="text-accent-subtle/40 font-normal">—</span>
+                  })()}
+                </td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}

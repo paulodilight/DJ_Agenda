@@ -1,6 +1,6 @@
 ﻿import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2, Send, UserCheck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2, Send, UserCheck, MessageSquare, RefreshCw } from 'lucide-react'
 import { startOfWeek, addDays, addWeeks, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import {
@@ -26,6 +26,8 @@ import { gravarSnapshot, listarSnapshots, restaurarSnapshot, apagarSnapshot } fr
 import { useUndo } from '@/contexts/UndoContext'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { Modal } from '@/components/ui/Modal'
+import { NotasGeraisAdminModal } from '@/components/agenda/NotasGeraisAdminModal'
+import { useNotasNaoLidasAdmin } from '@/hooks/useNotasGeraisAdmin'
 import { formatarEuro } from '@/utils/formatacao'
 import { isoData } from '@/utils/datas'
 import { clsx } from 'clsx'
@@ -51,6 +53,7 @@ export function Agenda() {
   const [eventoModal, setEventoModal] = useState(null)
   const [eventoModalAberto, setEventoModalAberto] = useState(false)
   const [distribuindo, setDistribuindo] = useState(false)
+  const [redistribuindo, setRedistribuindo] = useState(false)
   const { pushUndo, executarUndo, podeDesfazer, executando: undoExec } = useUndo()
 
   // Quando o mês global muda (pelo header), actualizar a referência da agenda
@@ -118,6 +121,13 @@ export function Agenda() {
     dataInicio: isoData(inicio),
     dataFim: isoData(fim),
   })
+  const { eventos: supaEventosMes } = useSupaEventos({ dataInicio: mesInicio, dataFim: mesFim })
+  const nEventosMes = useMemo(() => {
+    const fonte = filtroEspaco
+      ? supaEventosMes.filter(e => e.espaco_id === filtroEspaco)
+      : supaEventosMes
+    return fonte.length
+  }, [supaEventosMes, filtroEspaco])
 
   const { espacos } = useEspacos({ anoMes })
   const { bloqueios } = useBloqueios()
@@ -165,20 +175,40 @@ export function Agenda() {
   const modoDistribuir = jaDistribuido ? 'ajustes' : 'completo'
 
   // ── Contadores para botões de envio em bulk ──────────────────────────────────
-  const { nProposta, nAceitacao, nAlterar, nPreConf } = useMemo(() => {
+  const { nProposta, nAceitacao, nAlterar, nPreConf, nConfirmado, nValidacao, nPresente, nTrocado, nAPedido, nSemDJ, nTotal } = useMemo(() => {
     const fonte = filtroEspaco
       ? agendaMes.filter(s => s.espaco_id === filtroEspaco)
       : agendaMes
+    const activos = fonte.filter(s => s.estado !== 'cancelado' && s.estado !== 'sem_efeito')
     return {
-      nProposta:  fonte.filter(s => s.estado === 'proposta').length,
-      nAceitacao: fonte.filter(s => s.estado === 'aceitação' || s.estado === 'aceite').length,
-      nAlterar:   fonte.filter(s => s.estado === 'alterar').length,
-      nPreConf:   fonte.filter(s => s.estado === 'pré-confirmado').length,
+      nProposta:   fonte.filter(s => s.estado === 'proposta').length,
+      nAceitacao:  fonte.filter(s => s.estado === 'aceitação' || s.estado === 'aceite').length,
+      nAlterar:    fonte.filter(s => s.estado === 'alterar').length,
+      nValidacao:  fonte.filter(s => s.estado === 'validação').length,
+      nPreConf:    fonte.filter(s => s.estado === 'pré-confirmado').length,
+      nConfirmado: fonte.filter(s => s.estado === 'confirmado').length,
+      nPresente:   fonte.filter(s => s.estado === 'presente').length,
+      nTrocado:    fonte.filter(s => s.estado === 'trocado').length,
+      nAPedido:    fonte.filter(s => s.estado === 'a_pedido').length,
+      nSemDJ:      activos.filter(s => !s.dj_id && !s.dj_nome).length,
+      nTotal:      activos.length,
     }
   }, [agendaMes, filtroEspaco])
 
   const [enviandoDatas, setEnviandoDatas] = useState(false)
   const [enviandoManager, setEnviandoManager] = useState(false)
+  const [enviandoConfirmados, setEnviandoConfirmados] = useState(false)
+  const [notasModalAberto, setNotasModalAberto] = useState(false)
+
+  const lsKeyConfirmados = `confirmados_env_${anoMesAlvo}_${filtroEspaco || 'todos'}`
+  const confirmadosEnviadosCount = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem(lsKeyConfirmados) ?? 'null')?.count ?? 0 }
+    catch { return 0 }
+  }, [lsKeyConfirmados])
+  const mostrarBotaoConfirmados = nConfirmado > confirmadosEnviadosCount
+
+  const { naoLidasPorEspaco, totalNaoLidas } = useNotasNaoLidasAdmin(anoMesAlvo)
+  const badgeNotas = filtroEspaco ? (naoLidasPorEspaco[filtroEspaco] ?? 0) : totalNaoLidas
 
   const enviarDatas = async () => {
     setEnviandoDatas(true)
@@ -190,6 +220,12 @@ export function Agenda() {
       const { error } = await q
       if (error) throw error
       await Promise.all([recarregar(), recarregarMes()])
+      // Notificação N8N
+      fetch('https://i4dj.app.n8n.cloud/webhook/dj-enviar-datas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes: anoMesAlvo, espaco_id: filtroEspaco || null }),
+      }).catch(() => {})
     } catch (e) { alert('Erro ao enviar datas: ' + e.message) }
     finally { setEnviandoDatas(false) }
   }
@@ -215,8 +251,28 @@ export function Agenda() {
       }
 
       await Promise.all([recarregar(), recarregarMes()])
+      // Notificação N8N
+      fetch('https://i4dj.app.n8n.cloud/webhook/dj-enviar-manager', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes: anoMesAlvo, espaco_id: filtroEspaco || null }),
+      }).catch(() => {})
     } catch (e) { alert('Erro ao enviar ao manager: ' + e.message) }
     finally { setEnviandoManager(false) }
+  }
+
+  const enviarConfirmados = async () => {
+    setEnviandoConfirmados(true)
+    try {
+      // Apenas notificação — sem mudança de estado
+      fetch('https://i4dj.app.n8n.cloud/webhook/dj-enviar-confirmados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes: anoMesAlvo, espaco_id: filtroEspaco || null }),
+      }).catch(() => {})
+      localStorage.setItem(lsKeyConfirmados, JSON.stringify({ count: nConfirmado }))
+    } catch (e) { alert('Erro ao enviar confirmados: ' + e.message) }
+    finally { setEnviandoConfirmados(false) }
   }
 
   const distribuir = async () => {
@@ -293,6 +349,70 @@ export function Agenda() {
       alert('Erro na distribuição: ' + e.message)
     } finally {
       setDistribuindo(false)
+    }
+  }
+
+  const redistribuir = async () => {
+    if (espacos.length === 0 || redistribuindo) return
+    if (!window.confirm(
+      `Re-distribuir TODOS os clientes para ${anoMesAlvo}?\n\nTodos os slots automáticos serão apagados e recriados com as disponibilidades actuais. Slots em Validação, A pedido e DJs Convidado EXT / Premium são preservados.`
+    )) return
+    setRedistribuindo(true)
+    try {
+      let snapAuto = null
+      try {
+        snapAuto = await gravarSnapshot({ anoMes: anoMesAlvo, label: 'Antes de re-distribuir', tipo: 'auto' })
+      } catch { /* prossegue mesmo sem snapshot */ }
+
+      const preAlocacoes = await calcularPreAlocacoes(anoMesAlvo)
+
+      const [prefsRes, turnosRes, djsComRegRes] = await Promise.all([
+        supabase.from('espaco_dj_preferencias').select('espaco_id, dj_id').eq('tipo', 'preferido'),
+        supabase.from('turnos_espaco').select('espaco_id, dias_semana'),
+        supabase.from('disponibilidades').select('dj_id').gte('data', mesInicio).lte('data', mesFim),
+      ])
+      const djsActivos = new Set((djsComRegRes.data ?? []).map(r => r.dj_id))
+      const prefCount = {}
+      ;(prefsRes.data ?? []).forEach(p => {
+        if (djsActivos.has(p.dj_id)) prefCount[p.espaco_id] = (prefCount[p.espaco_id] ?? 0) + 1
+      })
+      const opDias = {}
+      ;(turnosRes.data ?? []).forEach(t => {
+        if (!opDias[t.espaco_id]) opDias[t.espaco_id] = new Set()
+        ;(t.dias_semana ?? []).forEach(d => opDias[t.espaco_id].add(d))
+      })
+      const alvos = [...espacos].sort((a, b) => {
+        const aO = a.ordem_distribuicao ?? Infinity, bO = b.ordem_distribuicao ?? Infinity
+        if (aO !== bO) return aO - bO
+        const dd = (opDias[a.id]?.size ?? 7) - (opDias[b.id]?.size ?? 7)
+        if (dd !== 0) return dd
+        return (prefCount[b.id] ?? 0) - (prefCount[a.id] ?? 0)
+      })
+
+      let total = 0
+      for (const espaco of alvos) {
+        const { inseridos } = await correrDistribuicao({
+          anoMes: anoMesAlvo, espacoId: espaco.id, preAlocacoes, modo: 'completo',
+        })
+        total += inseridos
+      }
+      await Promise.all([recarregar(), recarregarMes()])
+      console.info(`Re-distribuição concluída: ${total} slots em ${alvos.length} Cliente(s).`)
+
+      if (snapAuto) {
+        pushUndo({
+          label: 'Re-distribuição',
+          undo: async () => {
+            await restaurarSnapshot(snapAuto.id)
+            await Promise.all([recarregar(), recarregarMes()])
+            await apagarSnapshot(snapAuto.id).catch(() => {})
+          },
+        })
+      }
+    } catch (e) {
+      alert('Erro na re-distribuição: ' + e.message)
+    } finally {
+      setRedistribuindo(false)
     }
   }
 
@@ -576,62 +696,13 @@ export function Agenda() {
 
   return (
     <><div id="agenda-app" className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-5 py-2 border-b border-border/50 bg-surface-0/60 shrink-0">
-        <div className="flex items-center gap-3 flex-1">
+      {/* Toolbar — 3 linhas explícitas */}
+      <div className="flex flex-col border-b border-border/50 bg-surface-0/60 shrink-0">
 
-          {/* Navegação (todas as vistas) */}
-          <div className="flex items-center gap-0.5">
-            <button onClick={navAnterior} className="p-1 rounded text-accent-subtle hover:text-accent hover:bg-surface-2 transition-colors">
-              <ChevronLeft size={13} />
-            </button>
-            <span className={clsx(
-              'px-1 text-xs font-medium text-accent-muted capitalize text-center',
-              vista === 'Dia' ? 'min-w-[190px]' : 'min-w-[130px]'
-            )}>
-              {tituloPeriodo}
-            </span>
-            <button onClick={navProxima} className="p-1 rounded text-accent-subtle hover:text-accent hover:bg-surface-2 transition-colors">
-              <ChevronRight size={13} />
-            </button>
-          </div>
-
-          {/* Toggle Dia / Semana / Mês */}
-          <div className="flex bg-surface-2 border border-border rounded p-0.5">
-            {VISTAS.map((v) => (
-              <button
-                key={v}
-                onClick={() => setVista(v)}
-                className={clsx(
-                  'px-3 py-1 rounded text-xs transition-colors',
-                  vista === v ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent'
-                )}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Indicador de preenchimento — centro (máximo teórico = turnos × dias do mês) */}
-        <div className="flex-1 flex justify-center">
-          {filtroEspaco && esperadosMes > 0 && (
-            datasOk ? (
-              <span className="text-sm font-bold tracking-widest uppercase text-status-confirmado">
-                ✓ Datas Completas · {comDJMes} / {esperadosMes}
-              </span>
-            ) : (
-              <span className="text-sm font-bold tracking-widest uppercase text-orange-400">
-                Faltam {faltamPreencher} {faltamPreencher === 1 ? 'DJ' : 'DJs'} · {comDJMes} / {esperadosMes}
-              </span>
-            )
-          )}
-        </div>
-
-        <div className="flex items-center gap-3 flex-wrap justify-end flex-1">
-
-          {/* Ir para data */}
-          <div className="flex items-center gap-1">
+        {/* Linha 1: Ir para (esq) · nav + vista (centro) · Top DJs + Imprimir (dir) */}
+        <div className="flex items-center justify-between px-5 py-2 gap-4">
+          {/* Esquerda: Ir para data */}
+          <div className="flex items-center gap-1.5">
             <label className="text-[11px] text-accent-subtle whitespace-nowrap">Ir para</label>
             <input
               type="date"
@@ -644,115 +715,180 @@ export function Agenda() {
             />
           </div>
 
-          {/* Top DJs */}
-          <button
-            onClick={() => setRankingAberto(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
-            title="Top DJs do mês"
-          >
-            <Trophy size={13} />
-            Top DJs
-          </button>
-
-          {/* Imprimir */}
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
-            title="Imprimir programa do mês"
-          >
-            <Printer size={13} />
-            Imprimir
-          </button>
-
-          {/* Undo — desfaz a última ação */}
-          <button
-            onClick={async () => { await executarUndo(); recarregar(); recarregarMes() }}
-            disabled={!podeDesfazer || undoExec}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Desfazer a última ação"
-          >
-            <RotateCcw size={13} />
-            {undoExec ? 'A desfazer…' : 'Undo'}
-          </button>
-
-          {/* Gravar / Checkpoints */}
-          <button
-            onClick={abrirCheckpoints}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
-            title="Gravar / restaurar estado do mês"
-          >
-            <Save size={13} />
-            Gravar
-          </button>
-
-          {/* Enviar Datas / Re-enviar ajustes */}
-          {(nProposta > 0 || nAlterar > 0) && (
-            <button
-              onClick={enviarDatas}
-              disabled={enviandoDatas}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 border-yellow-500/40 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20"
-              title={nAlterar > 0 && nProposta === 0 ? 'Reenviar slots em Alterar para Aceitação' : 'Mover todos os slots em Proposta para Aceitação'}
-            >
-              {enviandoDatas ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-              {nAlterar > 0 && nProposta === 0 ? 'Re-enviar ajustes' : 'Enviar datas'}
-              <span className="px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 text-[10px] font-bold">
-                {nProposta + nAlterar}
+          {/* Centro: navegação + toggle vista */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-0.5">
+              <button onClick={navAnterior} className="p-1 rounded text-accent-subtle hover:text-accent hover:bg-surface-2 transition-colors">
+                <ChevronLeft size={13} />
+              </button>
+              <span className={clsx(
+                'px-1 text-xs font-medium text-accent-muted capitalize text-center',
+                vista === 'Dia' ? 'min-w-[190px]' : 'min-w-[130px]'
+              )}>
+                {tituloPeriodo}
               </span>
-            </button>
-          )}
+              <button onClick={navProxima} className="p-1 rounded text-accent-subtle hover:text-accent hover:bg-surface-2 transition-colors">
+                <ChevronRight size={13} />
+              </button>
+            </div>
+            <div className="flex bg-surface-2 border border-border rounded p-0.5">
+              {VISTAS.map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setVista(v)}
+                  className={clsx(
+                    'px-3 py-1 rounded text-xs transition-colors',
+                    vista === v ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent'
+                  )}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          {/* Enviar ao Manager */}
-          {nPreConf > 0 && (
+          {/* Direita: Top DJs + Imprimir + Undo + Gravar */}
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                const pendentes = nProposta + nAceitacao + nAlterar
-                if (pendentes > 0 && !window.confirm(
-                  `Ainda há ${pendentes} DJ${pendentes > 1 ? 's' : ''} sem resposta (proposta/aceitação/alterar).\n\nEnviar só os ${nPreConf} pré-confirmados ao manager na mesma?`
-                )) return
-                enviarManager()
-              }}
-              disabled={enviandoManager}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20"
-              title="Mover pré-confirmados para Validação (manager aprova)"
+              onClick={() => setRankingAberto(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
+              title="Top DJs do mês"
             >
-              {enviandoManager ? <Loader2 size={13} className="animate-spin" /> : <UserCheck size={13} />}
-              Enviar ao manager
-              {(nProposta + nAceitacao + nAlterar) > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold" title="Há DJs com resposta pendente">
-                  !
-                </span>
-              )}
-              <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">
-                {nPreConf}
-              </span>
+              <Trophy size={13} />
+              Top DJs
             </button>
-          )}
-
-          {/* Distribuir / Ajustes */}
-          <button
-            onClick={distribuir}
-            disabled={distribuindo || espacos.length === 0 || (modoDistribuir === 'ajustes' && !temAlterar)}
-            title={
-              modoDistribuir === 'completo'
-                ? `Distribuir ${filtroEspaco ? nomeEspacoFiltro : 'todos os clientes'} para ${anoMesAlvo}`
-                : temAlterar
-                  ? `Reajustar apenas as datas em estado Alterar${filtroEspaco ? ` em ${nomeEspacoFiltro}` : ''}`
-                  : 'Sem datas em estado Alterar para reajustar'
-            }
-            className={clsx(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold tracking-wide uppercase transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
-              modoDistribuir === 'completo'
-                ? 'bg-accent text-black border-accent hover:bg-accent/80'
-                : 'bg-surface-2 text-accent border-white/20 hover:border-white/40'
-            )}
-          >
-            {distribuindo
-              ? <Loader2 size={13} className="animate-spin" />
-              : modoDistribuir === 'completo' ? <Shuffle size={13} /> : <SlidersHorizontal size={13} />}
-            {distribuindo ? 'A processar…' : modoDistribuir === 'completo' ? 'Distribuir' : 'Ajustes'}
-          </button>
-
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
+              title="Imprimir programa do mês"
+            >
+              <Printer size={13} />
+              Imprimir
+            </button>
+            <button
+              onClick={async () => { await executarUndo(); recarregar(); recarregarMes() }}
+              disabled={!podeDesfazer || undoExec}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Desfazer a última ação"
+            >
+              <RotateCcw size={13} />
+              {undoExec ? 'A desfazer…' : 'Undo'}
+            </button>
+            <button
+              onClick={abrirCheckpoints}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
+              title="Gravar / restaurar estado do mês"
+            >
+              <Save size={13} />
+              Gravar
+            </button>
+          </div>
         </div>
+
+        {/* Linha 2: indicador preenchimento — só aparece com filtro de cliente */}
+        {filtroEspaco && esperadosMes > 0 && (
+          <div className="flex items-center px-5 py-1.5 border-t border-border/30">
+            {datasOk ? (
+              <span className="text-sm font-bold tracking-widest uppercase text-status-confirmado">
+                ✓ Datas Completas · {comDJMes} / {esperadosMes}
+              </span>
+            ) : (
+              <span className="text-sm font-bold tracking-widest uppercase text-orange-400">
+                Faltam {faltamPreencher} {faltamPreencher === 1 ? 'DJ' : 'DJs'} · {comDJMes} / {esperadosMes}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Linha 3: botões dinâmicos (só aparece se houver algum) */}
+        {((nProposta > 0 || nAlterar > 0) || nPreConf > 0 || mostrarBotaoConfirmados || true) && (
+          <div className="flex items-center justify-end gap-2 px-5 py-1.5 border-t border-border/30 flex-wrap">
+
+            {(nProposta > 0 || nAlterar > 0) && (
+              <button
+                onClick={enviarDatas}
+                disabled={enviandoDatas}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 border-yellow-500/40 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20"
+                title={nAlterar > 0 && nProposta === 0 ? 'Reenviar slots em Alterar para Aceitação' : 'Mover todos os slots em Proposta para Aceitação'}
+              >
+                {enviandoDatas ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                {nAlterar > 0 && nProposta === 0 ? 'Re-enviar ajustes' : 'Enviar datas'}
+                <span className="px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 text-[10px] font-bold">
+                  {nProposta + nAlterar}
+                </span>
+              </button>
+            )}
+
+            {nPreConf > 0 && (
+              <button
+                onClick={() => {
+                  const pendentes = nProposta + nAceitacao + nAlterar
+                  if (pendentes > 0 && !window.confirm(
+                    `Ainda há ${pendentes} DJ${pendentes > 1 ? 's' : ''} sem resposta (proposta/aceitação/alterar).\n\nEnviar só os ${nPreConf} pré-confirmados ao manager na mesma?`
+                  )) return
+                  enviarManager()
+                }}
+                disabled={enviandoManager}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20"
+                title="Mover pré-confirmados para Validação (manager aprova)"
+              >
+                {enviandoManager ? <Loader2 size={13} className="animate-spin" /> : <UserCheck size={13} />}
+                Enviar ao manager
+                {(nProposta + nAceitacao + nAlterar) > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold" title="Há DJs com resposta pendente">!</span>
+                )}
+                <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">{nPreConf}</span>
+              </button>
+            )}
+
+            {mostrarBotaoConfirmados && (
+              <button
+                onClick={enviarConfirmados}
+                disabled={enviandoConfirmados}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                title="Enviar notificação aos DJs com agenda confirmada"
+              >
+                {enviandoConfirmados ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                Enviar confirmados
+                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">{nConfirmado}</span>
+              </button>
+            )}
+
+            <button
+              onClick={distribuir}
+              disabled={distribuindo || redistribuindo || espacos.length === 0 || (modoDistribuir === 'ajustes' && !temAlterar)}
+              title={
+                modoDistribuir === 'completo'
+                  ? `Distribuir ${filtroEspaco ? nomeEspacoFiltro : 'todos os clientes'} para ${anoMesAlvo}`
+                  : temAlterar
+                    ? `Reajustar apenas as datas em estado Alterar${filtroEspaco ? ` em ${nomeEspacoFiltro}` : ''}`
+                    : 'Sem datas em estado Alterar para reajustar'
+              }
+              className={clsx(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold tracking-wide uppercase transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                modoDistribuir === 'completo'
+                  ? 'bg-accent text-black border-accent hover:bg-accent/80'
+                  : 'bg-surface-2 text-accent border-white/20 hover:border-white/40'
+              )}
+            >
+              {distribuindo ? <Loader2 size={13} className="animate-spin" /> : modoDistribuir === 'completo' ? <Shuffle size={13} /> : <SlidersHorizontal size={13} />}
+              {distribuindo ? 'A processar…' : modoDistribuir === 'completo' ? 'Distribuir' : 'Ajustes'}
+            </button>
+
+            {jaDistribuido && (
+              <button
+                onClick={redistribuir}
+                disabled={redistribuindo || distribuindo || espacos.length === 0}
+                title={`Re-distribuir todos os clientes para ${anoMesAlvo} (apaga e recria slots automáticos com disponibilidades actuais)`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold tracking-wide uppercase transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap bg-surface-2 text-orange-400 border-orange-500/30 hover:border-orange-400/60"
+              >
+                {redistribuindo ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                {redistribuindo ? 'A processar…' : 'Re-distribuir Total'}
+              </button>
+            )}
+
+          </div>
+        )}
       </div>
 
       {/* Tabs de Cliente */}
@@ -782,7 +918,59 @@ export function Agenda() {
             {e.nome.trim()}
           </button>
         ))}
+
+        {filtroEspaco && (
+          <button
+            onClick={() => setNotasModalAberto(true)}
+            title="Notas gerais do mês"
+            className={clsx(
+              'relative ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded text-xs transition-colors border',
+              badgeNotas > 0
+                ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'
+                : 'bg-surface-2 text-accent-muted border-border hover:text-accent'
+            )}
+          >
+            <MessageSquare size={12} />
+            Notas
+            {badgeNotas > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                {badgeNotas}
+              </span>
+            )}
+          </button>
+        )}
       </div>
+
+      {/* Barra de estado — oculta quando tudo confirmado/presente ou total = 0 */}
+      {nTotal > 0 && (nProposta + nAceitacao + nAlterar + nValidacao + nPreConf + nTrocado + nAPedido + nSemDJ) > 0 && (
+        <div className="flex items-center gap-3 px-6 py-1.5 border-b border-border/40 bg-surface-0/30 shrink-0 flex-wrap">
+          <span className="text-[11px] font-semibold text-accent-subtle uppercase tracking-wider">Total {nTotal}</span>
+          <span className="text-border/40">·</span>
+          {[
+            { n: nProposta,   label: 'Proposta',    cor: 'text-yellow-400' },
+            { n: nAceitacao,  label: 'Aceitação',   cor: 'text-orange-400' },
+            { n: nAlterar,    label: 'Alterar',     cor: 'text-rose-400' },
+            { n: nValidacao,  label: 'Validação',   cor: 'text-amber-400' },
+            { n: nPreConf,    label: 'Pré-conf',    cor: 'text-sky-400' },
+            { n: nConfirmado, label: 'Confirmado',  cor: 'text-emerald-400' },
+            { n: nPresente,   label: 'Presente',    cor: 'text-emerald-300' },
+            { n: nTrocado,    label: 'Trocado',     cor: 'text-pink-400' },
+            { n: nAPedido,    label: 'A pedido',    cor: 'text-violet-400' },
+            { n: nSemDJ,      label: 'Sem DJ',      cor: 'text-teal-400' },
+          ].filter(({ n }) => n > 0).map(({ n, label, cor }, i, arr) => (
+            <span key={label} className="flex items-center gap-2">
+              <span className="text-[11px] text-accent-subtle/60">{label} <span className={clsx('font-bold', cor)}>{n}</span></span>
+              {i < arr.length - 1 && <span className="text-border/40">·</span>}
+            </span>
+          ))}
+          {nEventosMes > 0 && (
+            <>
+              <span className="text-border/40">·</span>
+              <span className="text-[11px] text-accent-subtle/60">Eventos <span className="font-bold text-yellow-300">{nEventosMes}</span></span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Legenda */}
       <div className="flex items-center gap-4 px-6 py-2 border-b border-border shrink-0">
@@ -1062,6 +1250,15 @@ export function Agenda() {
           fn?.()
         }}
         onCancelar={() => setConfirmPendente(null)}
+      />
+
+      <NotasGeraisAdminModal
+        aberto={notasModalAberto}
+        onFechar={() => setNotasModalAberto(false)}
+        espacos={espacos}
+        defaultEspacoId={filtroEspaco}
+        anoMes={anoMesAlvo}
+        naoLidasPorEspaco={naoLidasPorEspaco}
       />
 
     </div>

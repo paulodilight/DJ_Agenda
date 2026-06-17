@@ -15,6 +15,7 @@ const TIPO_OPCOES = [
 const vazio = {
   nome: '', tipo: 'club', budget_max: '', valor_avenca: '',
   dias_sem_repeticao: 14, dias_espacamento: 7, notas: '', activo: true,
+  morada: '',
 }
 
 /**
@@ -93,6 +94,8 @@ export function FormEspaco({ aberto, espaco, onFechar, onGuardado }) {
               type="number" min={1} max={365}
             />
           </div>
+
+          <Input label="Morada" value={form.morada ?? ''} onChange={set('morada')} placeholder="Rua, cidade (ex: Herdade da Comporta, Comporta)" />
 
           <Textarea label="Notas / Regras do Cliente" value={form.notas} onChange={set('notas')} placeholder="Regras específicas, preferências, notas internas..." />
         </div>

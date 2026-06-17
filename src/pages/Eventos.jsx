@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
-import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { format, startOfMonth, endOfMonth, addMonths } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import {
   Plus, CalendarDays, MapPin, FileText,
   Search, X, ChevronDown, ChevronRight,
-  Clock, Wrench, Star,
+  Clock, Wrench, Star, ArrowUpDown,
 } from 'lucide-react'
 import { useEventos } from '@/hooks/useEventos'
 import { FormEvento } from '@/components/eventos/FormEvento'
@@ -48,13 +48,15 @@ function Campo({ label, valor, icone: Icone }) {
 }
 
 export function Eventos() {
-  const { anoMes } = useMesStore()
+  const { anoMes, setAnoMes } = useMesStore()
   const [modalAberto, setModalAberto]   = useState(false)
   const [eventoActual, setEventoActual] = useState(null)
   const [dataInicial, setDataInicial]   = useState('')
   const [notasModal, setNotasModal]     = useState(null)
   const [pesquisa, setPesquisa]         = useState('')
   const [abertos, setAbertos]           = useState(new Set())
+  const [ordenar, setOrdenar]           = useState('asc') // 'asc' = próximos primeiro
+  const [filtroEspaco, setFiltroEspaco] = useState('')
 
   const { dataInicio, dataFim } = useMemo(() => {
     const [ano, mes] = anoMes.split('-').map(Number)
@@ -68,6 +70,19 @@ export function Eventos() {
   const { eventos, loading, recarregar } = useEventos({ dataInicio, dataFim })
   const titulo = cap(format(new Date(anoMes + '-01'), 'MMMM yyyy', { locale: pt }))
 
+  const espacos = useMemo(() => {
+    const set = new Set(eventos.map(e => e.espaco_nome).filter(Boolean))
+    return [...set].sort()
+  }, [eventos])
+
+  const mesesOpcoes = useMemo(() => {
+    const hoje = new Date()
+    return Array.from({ length: 25 }, (_, i) => {
+      const d = addMonths(hoje, i - 12)
+      return { val: format(d, 'yyyy-MM'), label: cap(format(d, 'MMMM yyyy', { locale: pt })) }
+    })
+  }, [])
+
   const abrirNovo = (data = '') => { setEventoActual(null); setDataInicial(data); setModalAberto(true) }
   const abrirEditar = (ev) => { setEventoActual(ev); setDataInicial(''); setModalAberto(true) }
   const fecharModal = () => { setModalAberto(false); setEventoActual(null) }
@@ -78,14 +93,23 @@ export function Eventos() {
     return next
   })
 
+  const HOJE = format(new Date(), 'yyyy-MM-dd')
+
   const eventosFiltrados = useMemo(() => {
+    let list = eventos
     const q = pesquisa.trim().toLowerCase()
-    if (!q) return eventos
-    return eventos.filter(e =>
+    if (q) list = list.filter(e =>
       [e.evento, e.cliente, e.tipo, e.espaco_nome, e.morada, e.responsavel, e.status]
         .some(v => v?.toLowerCase().includes(q))
     )
-  }, [eventos, pesquisa])
+    if (filtroEspaco) list = list.filter(e => e.espaco_nome === filtroEspaco)
+    if (ordenar === 'asc') list = list.filter(e => (e.data_evento ?? '') >= HOJE)
+    return [...list].sort((a, b) => {
+      const da = a.data_evento ?? ''
+      const db = b.data_evento ?? ''
+      return ordenar === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+    })
+  }, [eventos, pesquisa, filtroEspaco, ordenar, HOJE])
 
   return (
     <div className="flex flex-col h-full">
@@ -98,18 +122,19 @@ export function Eventos() {
               Eventos — {titulo}
             </h1>
             <p className="text-xs text-accent-muted mt-0.5">
-              {eventosFiltrados.length}{pesquisa ? ` de ${eventos.length}` : ''} evento{eventosFiltrados.length !== 1 ? 's' : ''}
+              {eventosFiltrados.length}{pesquisa || filtroEspaco ? ` de ${eventos.length}` : ''} evento{eventosFiltrados.length !== 1 ? 's' : ''}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Pesquisa */}
             <div className="relative">
               <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent-subtle pointer-events-none" />
               <input
                 type="text"
                 value={pesquisa}
                 onChange={e => setPesquisa(e.target.value)}
-                placeholder="Pesquisar eventos…"
-                className="pl-7 pr-7 py-1.5 text-xs bg-surface-2 border border-border rounded text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/30 focus:bg-surface-3 transition-colors w-44"
+                placeholder="Pesquisar…"
+                className="pl-7 pr-7 py-1.5 text-xs bg-surface-2 border border-border rounded text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/30 focus:bg-surface-3 transition-colors w-36"
               />
               {pesquisa && (
                 <button onClick={() => setPesquisa('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-accent-subtle hover:text-accent">
@@ -117,6 +142,45 @@ export function Eventos() {
                 </button>
               )}
             </div>
+
+            {/* Ordenar */}
+            <button
+              onClick={() => setOrdenar(o => o === 'asc' ? 'desc' : 'asc')}
+              className={clsx(
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs transition-colors whitespace-nowrap',
+                ordenar === 'asc'
+                  ? 'border-status-confirmado/40 bg-status-confirmado/10 text-status-confirmado'
+                  : 'border-border bg-surface-2 text-accent-muted hover:text-accent'
+              )}
+            >
+              <ArrowUpDown size={11} />
+              {ordenar === 'asc' ? 'Próximos' : 'Recentes'}
+            </button>
+
+            {/* Mês */}
+            <select
+              value={anoMes}
+              onChange={e => setAnoMes(e.target.value)}
+              className="px-2 py-1.5 text-xs bg-surface-2 border border-border rounded text-accent-muted focus:outline-none focus:border-white/30 transition-colors"
+            >
+              {mesesOpcoes.map(m => (
+                <option key={m.val} value={m.val}>{m.label}</option>
+              ))}
+            </select>
+
+            {/* Espaço */}
+            <select
+              value={filtroEspaco}
+              onChange={e => setFiltroEspaco(e.target.value)}
+              className={clsx(
+                'px-2 py-1.5 text-xs bg-surface-2 border rounded focus:outline-none focus:border-white/30 transition-colors',
+                filtroEspaco ? 'border-status-confirmado/40 text-status-confirmado' : 'border-border text-accent-muted'
+              )}
+            >
+              <option value="">Todos os espaços</option>
+              {espacos.map(esp => <option key={esp} value={esp}>{esp}</option>)}
+            </select>
+
             <button
               onClick={() => abrirNovo()}
               className="flex items-center gap-2 px-4 py-2 rounded border border-status-confirmado/40 bg-status-confirmado/10 text-status-confirmado text-xs font-semibold hover:bg-status-confirmado/20 transition-colors"

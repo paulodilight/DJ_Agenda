@@ -12,7 +12,7 @@ export const supaEventosApi = {
   async listar({ dataInicio, dataFim } = {}) {
     let query = supabase
       .from(TABLE)
-      .select('*, espacos(id, nome)')
+      .select('*, espacos(id, nome), tecnicos(nome, foto_url)')
       .order('data_evento', { ascending: true })
       .order('hora_inicio', { ascending: true })
 
@@ -22,10 +22,14 @@ export const supaEventosApi = {
     const { data, error } = await query
     if (error) throw error
 
-    return (data ?? []).map((e) => ({
-      ...e,
-      espaco_nome: e.espacos?.nome ?? null,
-    }))
+    return (data ?? []).map((e) => {
+      const tec = e.tecnicos
+      return {
+        ...e,
+        espaco_nome: e.espacos?.nome ?? null,
+        tecnico: Array.isArray(tec) ? (tec[0] ?? null) : (tec ?? null),
+      }
+    })
   },
 
   // ── Sincronizar tecnico_id em evento_tecnicos ─────────────────────────────
@@ -36,12 +40,22 @@ export const supaEventosApi = {
       .upsert({ evento_id: eventoId, tecnico_id: tecnicoId }, { onConflict: 'evento_id,tecnico_id' })
   },
 
+  // Colunas válidas para write — garante que joins/campos calculados nunca chegam ao payload
+  _payload(dados) {
+    const COLS = [
+      'evento', 'data_evento', 'hora_inicio', 'hora_fim', 'hora_instalacao', 'dia_instalacao',
+      'status', 'espaco_id', 'tecnico_id', 'tipo', 'notas_operacionais', 'Equipamentos',
+      'contacto_pelo_evento', 'morada', 'artista_id', 'xclusive',
+      'valor', 'valor_artistico', 'valor_apoio_tecnico', 'notas_faturacao',
+    ]
+    return Object.fromEntries(COLS.filter(k => k in dados).map(k => [k, dados[k]]))
+  },
+
   // ── Criar ─────────────────────────────────────────────────────────────────
   async criar(dados) {
-    const { id: _id, created_at, espacos: _e, espaco_nome: _en, espaco_id_dj: _eidj, ...payload } = dados
     const { data, error } = await supabase
       .from(TABLE)
-      .insert(payload)
+      .insert(this._payload(dados))
       .select('id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, espaco_id, tecnico_id, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, artista_id, xclusive')
       .single()
     if (error) throw error
@@ -51,10 +65,9 @@ export const supaEventosApi = {
 
   // ── Actualizar ────────────────────────────────────────────────────────────
   async actualizar(id, dados) {
-    const { id: _id, created_at, espacos: _e, espaco_nome: _en, espaco_id_dj: _eidj, ...payload } = dados
     const { data, error } = await supabase
       .from(TABLE)
-      .update(payload)
+      .update(this._payload(dados))
       .eq('id', id)
       .select('id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, espaco_id, tecnico_id, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, artista_id, xclusive')
       .single()

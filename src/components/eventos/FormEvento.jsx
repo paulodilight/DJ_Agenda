@@ -1,12 +1,12 @@
 ﻿import { useState, useEffect } from 'react'
-import { X, Database, Star } from 'lucide-react'
+import { X, Database, Star, Plus, Check, Trash2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
+import { supabase } from '@/lib/supabase'
 import { supaEventosApi } from '@/lib/supaEventosApi'
 import { artistasApi } from '@/lib/api'
 import { useUndo } from '@/contexts/UndoContext'
-import { supabase } from '@/lib/supabase'
 import { clsx } from 'clsx'
 
 const STATUS_OPTS = [
@@ -36,12 +36,22 @@ const VAZIO = {
   dia_instalacao: '',
   hora_instalacao: '',
   notas_operacionais: '',
+  notas_faturacao: '',
   Equipamentos: '',
   valor: '',
   valor_artistico: '',
   valor_apoio_tecnico: '',
   tecnico_id: '',
 }
+
+const uidF = () => Math.random().toString(36).slice(2)
+const emptyItem = () => ({ _key: uidF(), descricao: '', unidades: 1, valor_unitario: '' })
+
+const BILLING_CAMPOS = [
+  { key: 'equipamentos_alugado',  tipo: 'equipamento_alugado',  label: 'Equipamentos Alugados' },
+  { key: 'equipamentos_comprado', tipo: 'equipamento_comprado', label: 'Equipamentos Comprados' },
+  { key: 'extras',                tipo: 'extra',                label: 'Extras' },
+]
 
 function Field({ label, children, required }) {
   return (
@@ -57,6 +67,86 @@ function Field({ label, children, required }) {
 const inputCls = 'w-full bg-surface-2 border border-border rounded px-3 py-2 text-xs text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/30 focus:bg-surface-3 transition-colors'
 const textareaCls = `${inputCls} resize-none`
 
+// ── Picker de artista: selecionar da lista ou criar novo ─────────────────────
+function ArtistaPicker({ artistas, value, onChange, onNovoArtista }) {
+  const [modo, setModo]     = useState('lista') // 'lista' | 'novo'
+  const [nome, setNome]     = useState('')
+  const [tipo, setTipo]     = useState('')
+  const [salvando, setSalv] = useState(false)
+  const [erro, setErro]     = useState(null)
+
+  const criarArtista = async () => {
+    if (!nome.trim()) { setErro('Nome obrigatório.'); return }
+    setSalv(true); setErro(null)
+    try {
+      const novo = await artistasApi.criar({ nome: nome.trim(), tipo: tipo || null })
+      onNovoArtista(novo)
+      setModo('lista'); setNome(''); setTipo('')
+    } catch (e) { setErro(e.message) }
+    finally { setSalv(false) }
+  }
+
+  const cancelar = () => { setModo('lista'); setNome(''); setTipo(''); setErro(null) }
+
+  return (
+    <Field label="Artista">
+      {modo === 'lista' ? (
+        <div className="flex gap-2">
+          <select
+            className={inputCls}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          >
+            <option value="">— Seleccionar artista —</option>
+            {artistas.map(a => (
+              <option key={a.id} value={a.id}>{a.nome}{a.tipo ? ` · ${a.tipo}` : ''}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setModo('novo')}
+            title="Novo artista"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/25 transition-colors whitespace-nowrap"
+          >
+            <Plus size={12} />Novo
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 p-3 bg-surface-2/60 rounded-lg border border-white/15">
+          <p className="text-[10px] font-bold text-accent-subtle uppercase tracking-wider">Adicionar artista</p>
+          {erro && <p className="text-[11px] text-status-cancelado">{erro}</p>}
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              autoFocus
+              className={inputCls}
+              value={nome}
+              onChange={e => setNome(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && criarArtista()}
+              placeholder="Nome do artista *"
+            />
+            <input
+              className={inputCls}
+              value={tipo}
+              onChange={e => setTipo(e.target.value)}
+              placeholder="Tipo (Músico, Banda…)"
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={cancelar}
+              className="px-3 py-1.5 rounded border border-border text-xs text-accent-muted hover:text-accent transition-colors">
+              Cancelar
+            </button>
+            <button type="button" onClick={criarArtista} disabled={salvando}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-status-confirmado/40 bg-status-confirmado/10 text-status-confirmado text-xs font-semibold hover:bg-status-confirmado/20 transition-colors disabled:opacity-40">
+              <Check size={12} />{salvando ? 'A criar…' : 'Criar artista'}
+            </button>
+          </div>
+        </div>
+      )}
+    </Field>
+  )
+}
+
 export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuardado }) {
   const [form, setForm]       = useState(VAZIO)
   const [loading, setLoading] = useState(false)
@@ -67,6 +157,12 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   const [espacos, setEspacos]   = useState([])
   const [tecnicos, setTecnicos] = useState([])
   const [artistas, setArtistas] = useState([])
+  // Estado billing (itens de faturação ligados ao evento)
+  const [billing, setBilling] = useState({
+    equipamentos_alugado: [],
+    equipamentos_comprado: [],
+    extras: [],
+  })
 
   useEffect(() => {
     supabase.from('tipo_eventos').select('id, nome, tem_artista').order('nome')
@@ -83,6 +179,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
     if (!aberto) return
     setErro(null)
     setAba('geral')
+    setBilling({ equipamentos_alugado: [], equipamentos_comprado: [], extras: [] })
     if (evento?.id) {
       setForm({
         ...VAZIO,
@@ -90,6 +187,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         valor:               evento.valor               != null ? String(evento.valor)               : '',
         valor_artistico:     evento.valor_artistico     != null ? String(evento.valor_artistico)     : '',
         valor_apoio_tecnico: evento.valor_apoio_tecnico != null ? String(evento.valor_apoio_tecnico) : '',
+        notas_faturacao:     evento.notas_faturacao     ?? '',
         xclusive:    evento.xclusive    ?? false,
         artista_id:  evento.artista_id  ?? '',
         tecnico_id:      evento.tecnico_id ?? '',
@@ -97,8 +195,18 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         hora_fim:        evento.hora_fim?.slice(0, 5)        ?? '',
         hora_instalacao: evento.hora_instalacao?.slice(0, 5) ?? '',
       })
+      // Carregar itens de billing existentes para este evento
+      supabase.from('contas_clientes').select('*').eq('evento_id', evento.id)
+        .then(({ data }) => {
+          if (!data) return
+          const toItem = r => ({ _key: uidF(), id: r.id, descricao: r.descricao ?? '', unidades: r.unidades ?? 1, valor_unitario: r.valor_unitario != null ? String(r.valor_unitario) : '' })
+          setBilling({
+            equipamentos_alugado:  data.filter(r => r.tipo === 'equipamento_alugado').map(toItem),
+            equipamentos_comprado: data.filter(r => r.tipo === 'equipamento_comprado').map(toItem),
+            extras:                data.filter(r => r.tipo === 'extra').map(toItem),
+          })
+        })
     } else {
-      // Suporte a pré-preenchimento parcial (ex: criado a partir de slot)
       setForm({
         ...VAZIO,
         data_evento: dataInicial || evento?.data_evento || '',
@@ -123,6 +231,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         valor:               form.valor               !== '' ? Number(form.valor)               : null,
         valor_artistico:     form.valor_artistico     !== '' ? Number(form.valor_artistico)     : null,
         valor_apoio_tecnico: form.valor_apoio_tecnico !== '' ? Number(form.valor_apoio_tecnico) : null,
+        notas_faturacao:     form.notas_faturacao?.trim() || null,
         espaco_id:       form.espaco_id       || null,
         artista_id:      form.artista_id      || null,
         tecnico_id:      form.tecnico_id      || null,
@@ -131,11 +240,39 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         hora_instalacao: form.hora_instalacao || null,
         dia_instalacao:  form.dia_instalacao  || null,
       }
+      let savedId = evento?.id
       if (evento?.id) {
         await supaEventosApi.actualizar(evento.id, dados)
       } else {
-        await supaEventosApi.criar(dados)
+        const criado = await supaEventosApi.criar(dados)
+        savedId = criado?.id ?? criado?.[0]?.id
       }
+
+      // Guardar itens de billing (apagar os existentes e reinserir)
+      if (savedId && form.espaco_id && form.data_evento) {
+        await supabase.from('contas_clientes').delete().eq('evento_id', savedId)
+        const mes = form.data_evento.slice(0, 7)
+        const inserts = []
+        BILLING_CAMPOS.forEach(({ key, tipo }) => {
+          billing[key].forEach(r => {
+            const val = (Number(r.unidades) || 1) * (parseFloat(String(r.valor_unitario).replace(',', '.')) || 0)
+            if (val > 0 || r.descricao?.trim()) {
+              inserts.push({
+                espaco_id: form.espaco_id,
+                mes,
+                tipo,
+                evento_id: savedId,
+                descricao: r.descricao || null,
+                unidades: Number(r.unidades) || 1,
+                valor_unitario: parseFloat(String(r.valor_unitario).replace(',', '.')) || 0,
+                valor: val,
+              })
+            }
+          })
+        })
+        if (inserts.length > 0) await supabase.from('contas_clientes').insert(inserts)
+      }
+
       onGuardado?.()
       onFechar()
     } catch (e) {
@@ -188,8 +325,9 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         {/* Abas */}
         <div className="flex border-b border-border px-6">
           {[
-            { id: 'geral',   label: 'Geral' },
-            { id: 'tecnico', label: 'Técnico & Notas' },
+            { id: 'geral',      label: 'Geral' },
+            { id: 'tecnico',    label: 'Técnico & Notas' },
+            { id: 'faturacao',  label: 'Faturação' },
           ].map((aba) => (
             <button
               key={aba.id}
@@ -285,18 +423,15 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
 
               {/* Artista — só aparece quando Xclusive está activo */}
               {form.xclusive && (
-                <Field label="Artista">
-                  <select
-                    className={inputCls}
-                    value={form.artista_id}
-                    onChange={(e) => set('artista_id', e.target.value)}
-                  >
-                    <option value="">— Seleccionar artista —</option>
-                    {artistas.map(a => (
-                      <option key={a.id} value={a.id}>{a.nome}</option>
-                    ))}
-                  </select>
-                </Field>
+                <ArtistaPicker
+                  artistas={artistas}
+                  value={form.artista_id}
+                  onChange={(id) => set('artista_id', id)}
+                  onNovoArtista={(novoArtista) => {
+                    setArtistas(prev => [...prev, novoArtista].sort((a, b) => a.nome.localeCompare(b.nome)))
+                    set('artista_id', novoArtista.id)
+                  }}
+                />
               )}
 
               {/* Valores — apoio técnico sempre visível; artístico só para tipos com artista */}
@@ -439,6 +574,64 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   placeholder="Informações operacionais do evento…"
                 />
               </Field>
+            </>
+          )}
+
+          {/* ── Aba Faturação ── */}
+          {abaActiva === 'faturacao' && (
+            <>
+              <Field label="Notas de faturação">
+                <textarea
+                  className={textareaCls}
+                  rows={3}
+                  value={form.notas_faturacao}
+                  onChange={(e) => set('notas_faturacao', e.target.value)}
+                  placeholder="Notas que aparecem na fatura / documento de contas…"
+                />
+              </Field>
+
+              {BILLING_CAMPOS.map(({ key, label }) => {
+                const items = billing[key]
+                const addItem = () => setBilling(b => ({ ...b, [key]: [...b[key], emptyItem()] }))
+                const updItem = (k, field, val) => setBilling(b => ({
+                  ...b,
+                  [key]: b[key].map(it => it._key === k ? { ...it, [field]: val } : it),
+                }))
+                const remItem = (k) => setBilling(b => ({ ...b, [key]: b[key].filter(it => it._key !== k) }))
+                return (
+                  <div key={key} className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-medium text-accent-subtle uppercase tracking-wider">{label}</label>
+                      <button type="button" onClick={addItem}
+                        className="flex items-center gap-1 text-[11px] text-accent-subtle/50 hover:text-status-confirmado/70 transition-colors">
+                        <Plus size={11} />Adicionar
+                      </button>
+                    </div>
+                    {items.length === 0 && (
+                      <p className="text-[11px] text-accent-subtle/25 italic pl-1">Sem itens</p>
+                    )}
+                    {items.map(it => (
+                      <div key={it._key} className="grid grid-cols-[1fr_52px_76px_24px] gap-1.5 items-center">
+                        <input type="text" value={it.descricao}
+                          onChange={e => updItem(it._key, 'descricao', e.target.value)}
+                          placeholder="Descrição…"
+                          className={inputCls} />
+                        <input type="number" min="0" step="1" value={it.unidades}
+                          onChange={e => updItem(it._key, 'unidades', e.target.value)}
+                          className={inputCls + ' text-center px-1'} />
+                        <input type="number" min="0" step="0.01" value={it.valor_unitario}
+                          onChange={e => updItem(it._key, 'valor_unitario', e.target.value)}
+                          placeholder="€/un"
+                          className={inputCls + ' text-right px-2'} />
+                        <button type="button" onClick={() => remItem(it._key)}
+                          className="flex items-center justify-center text-border/30 hover:text-red-400/60 transition-colors">
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
             </>
           )}
         </div>

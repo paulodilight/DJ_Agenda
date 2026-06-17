@@ -4,8 +4,9 @@ import {
   ArrowLeft, ArrowUp, ArrowDown, Printer,
   CalendarCheck, CalendarX, Plus, Trash2,
   Camera, Save, Check, Maximize2, Star,
+  Copy, Mail, X, ExternalLink,
 } from 'lucide-react'
-import { useDJ } from '@/hooks/useDJs'
+import { useDJ, useDJs } from '@/hooks/useDJs'
 import { useAgenda } from '@/hooks/useAgenda'
 import { useConflitos } from '@/hooks/useConflitos'
 import { useEspacos } from '@/hooks/useEspacos'
@@ -14,6 +15,7 @@ import {
   djsApi, djPreferenciasEspacoApi, espacoDjPreferenciasApi, categoriasDjApi, djCategoriasApi,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { useAppStore, useMesStore } from '@/store'
 import { useUndo } from '@/contexts/UndoContext'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -24,7 +26,7 @@ import { FormSlot } from '@/components/agenda/FormSlot'
 import { formatarData, formatarHora } from '@/utils/datas'
 import { formatarEuro, labelEstadoDJ, corEstado } from '@/utils/formatacao'
 import {
-  format, addMonths, startOfMonth, getDaysInMonth, parse, isValid,
+  format, addMonths, startOfMonth, endOfMonth, getDaysInMonth, parse, isValid,
 } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { clsx } from 'clsx'
@@ -82,6 +84,49 @@ function gerarMeses() {
 }
 
 const MESES_DISP = gerarMeses()
+
+function slugify(str) {
+  return (str ?? '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+}
+
+const APP_ABAS_OPCOES = [
+  { id: 'agenda',           label: 'Agenda',           desc: 'Calendário de datas e actuações' },
+  { id: 'dados',            label: 'Dados',             desc: 'Perfil e informação pessoal' },
+  { id: 'disponibilidades', label: 'Disponibilidades',  desc: 'Gestão de disponibilidade (em breve)' },
+  { id: 'learn',            label: 'Learn',             desc: 'Formação e conteúdos (em breve)' },
+  { id: 'club',             label: 'Club',              desc: 'Secção Club (em breve)' },
+]
+
+// ── Contas helpers ───────────────────────────────────────────────────────────
+const PAGAVEIS_C = new Set(['confirmado', 'presente', 'a_pedido'])
+const CFG_C      = { horaExtraRate: 30, premioRate: 2, ivaRate: 0.23 }
+function safeParseC(str, fb) { try { return str ? JSON.parse(str) : fb } catch { return fb } }
+function isTransporteC(m) { return m ? /comporta|alcácer|grandola|grândola|melides|carvalhal|troia|tróia/i.test(m) : false }
+function toMinC(t) { if (!t) return 0; const [h, mn] = t.split(':').map(Number); return h * 60 + mn }
+function calcHorasExtraC(slot) {
+  const padrao = slot.turnos_espaco?.hora_fim
+  if (!padrao) return 0
+  let diff = toMinC(slot.hora_fim) - toMinC(padrao)
+  if (diff < 0) diff += 24 * 60
+  return diff > 0 ? Math.round(diff / 30) * 0.5 : 0
+}
+function assStatusC(slot) {
+  const p = slot.presencas_djs
+  if (!p?.signed_at) return 'ausente'
+  return new Date(p.signed_at) <= new Date(`${slot.data}T${slot.hora_inicio}`) ? 'a_tempo' : 'atrasada'
+}
+
+function BRow({ label, value, bold, accent }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-2">
+      <span className={clsx('text-xs', bold ? 'font-semibold text-accent' : 'text-accent-muted')}>{label}</span>
+      <span className={clsx('text-xs tabular-nums font-semibold', accent ?? (bold ? 'text-accent' : 'text-accent-muted'))}>{value}</span>
+    </div>
+  )
+}
 
 // ── Shared small components ──────────────────────────────────────────────────
 
@@ -160,6 +205,16 @@ export function DJPerfil() {
   const navigate = useNavigate()
   const { dj, loading: loadingDJ, erro: erroDJ, recarregar: recarregarDJ } = useDJ(id)
   const { agenda, loading: loadingAgenda, erro: erroAgenda, recarregar } = useAgenda({ djId: id })
+  const { djs: todosDJs } = useDJs()
+
+  // Lista ordenada alfabeticamente (igual à página /djs)
+  const djsOrdenados = useMemo(() =>
+    [...todosDJs].sort((a, b) =>
+      (a.nome_artistico || a.nome).localeCompare(b.nome_artistico || b.nome)
+    ), [todosDJs])
+  const idxActual   = djsOrdenados.findIndex(d => d.id === id)
+  const djAnterior  = idxActual > 0 ? djsOrdenados[idxActual - 1] : null
+  const djProximo   = idxActual !== -1 && idxActual < djsOrdenados.length - 1 ? djsOrdenados[idxActual + 1] : null
   // Preferências podem existir para qualquer cliente activo (mesmo sem calendário semanal),
   // por isso usamos todos os espaços e filtramos apenas os inactivos.
   const { espacos: todosEspacos } = useEspacos({ todos: true })
@@ -208,6 +263,27 @@ export function DJPerfil() {
   const [fotoPreview, setFotoPreview]   = useState(null)
   const fotoInputRef                    = useRef(null)
   const [bioModalAberto, setBioModalAberto] = useState(false)
+  const [conviteAberto, setConviteAberto]   = useState(false)
+  const [emailEditado, setEmailEditado]     = useState('')
+  const [enviandoConvite, setEnviandoConvite] = useState(false)
+  const [conviteEnviado, setConviteEnviado] = useState(false)
+  const [conviteErro, setConviteErro]       = useState(null)
+  const [copiado, setCopiado]               = useState(null)
+  const [passLoading, setPassLoading]       = useState(false)
+  const [passErro, setPassErro]             = useState(null)
+  const [passSucesso, setPassSucesso]       = useState(false)
+
+  // ── contas ──
+  const { anoMes }      = useMesStore()
+  const storeConfig     = useAppStore((s) => s.config)
+  const [slotsContas, setSlotsContas]         = useState([])
+  const [loadingContas, setLoadingContas]     = useState(false)
+  const [docTipo, setDocTipo]                 = useState('recibo')
+  const [comRetencao, setComRetencao]         = useState(false)
+  const [retencaoPct, setRetencaoPct]         = useState(25)
+  const [premioOverrideC, setPremioOverrideC] = useState(null)
+  const [descontoOpC, setDescontoOpC]         = useState(2)
+  const [contasSucesso, setContasSucesso]     = useState(false)
 
   // ── conflitos ──
   const { dataInicioRange, dataFimRange } = useMemo(() => {
@@ -263,6 +339,97 @@ export function DJPerfil() {
     return [...set].sort().reverse()
   }, [disponibilidades])
 
+  // ── contas: config derivados ──
+  const cfgTransportesCon = useMemo(() => safeParseC(storeConfig?.contas_transportes, [{ valor: 120 }]), [storeConfig])
+  const cfgDescontosCon   = useMemo(() => safeParseC(storeConfig?.contas_descontos,   [{ valor: 2 }]),   [storeConfig])
+  const transporteRateCon = cfgTransportesCon[0]?.valor ?? 120
+
+  const { dataInicioCon, dataFimCon } = useMemo(() => {
+    const [ano, mes] = anoMes.split('-').map(Number)
+    const ref = new Date(ano, mes - 1, 1)
+    return {
+      dataInicioCon: format(startOfMonth(ref), 'yyyy-MM-dd'),
+      dataFimCon:    format(endOfMonth(ref),   'yyyy-MM-dd'),
+    }
+  }, [anoMes])
+
+  useEffect(() => {
+    if (aba !== 'contas' || !id) return
+    let cancelled = false
+    setLoadingContas(true)
+    supabase
+      .from('agenda')
+      .select(`
+        id, dj_id, turno_id, data, hora_inicio, hora_fim, valor, estado,
+        espacos(id, nome, morada),
+        presencas_djs(agenda_id, signed_at, signed_by),
+        turnos_espaco(hora_fim)
+      `)
+      .eq('dj_id', id)
+      .gte('data', dataInicioCon)
+      .lte('data', dataFimCon)
+      .order('data')
+      .then(({ data, error }) => {
+        if (cancelled || error) return
+        setSlotsContas(data ?? [])
+      })
+      .finally(() => { if (!cancelled) setLoadingContas(false) })
+    return () => { cancelled = true }
+  }, [aba, id, dataInicioCon, dataFimCon])
+
+  const slotsRichCon = useMemo(() => {
+    return slotsContas
+      .filter(s => PAGAVEIS_C.has(s.estado))
+      .map(s => ({
+        ...s,
+        horasExtra: calcHorasExtraC(s),
+        transporte: isTransporteC(s.espacos?.morada),
+        assStatus:  assStatusC(s),
+      }))
+  }, [slotsContas])
+
+  const premioAutoC  = slotsRichCon.length > 0 && slotsRichCon.every(s => s.assStatus === 'a_tempo')
+  const premioAtivoC = premioOverrideC !== null ? premioOverrideC : premioAutoC
+
+  const calcCon = useMemo(() => {
+    if (!slotsRichCon.length) return null
+    const n             = slotsRichCon.length
+    const valorAtuacoes = slotsRichCon.reduce((s, sl) => s + Number(sl.valor ?? 0), 0)
+    const totalHExt     = slotsRichCon.reduce((s, sl) => s + sl.horasExtra, 0)
+    const valorHExt     = totalHExt * CFG_C.horaExtraRate
+    const nTransp       = slotsRichCon.filter(s => s.transporte).length
+    const valorTransp   = nTransp * transporteRateCon
+    const valorPremio   = premioAtivoC ? n * CFG_C.premioRate : 0
+    const valorDesconto = descontoOpC * n
+    const subtotal      = valorAtuacoes + valorHExt + valorTransp + valorPremio - valorDesconto
+    const ajuste        = docTipo === 'fatura'
+      ? subtotal * CFG_C.ivaRate
+      : comRetencao ? -(subtotal * retencaoPct / 100) : 0
+    const labelAjuste   = docTipo === 'fatura' ? 'IVA (23%)' : `Retenção (${retencaoPct}%)`
+    return { n, valorAtuacoes, totalHExt, valorHExt, nTransp, valorTransp, valorPremio, valorDesconto, subtotal, ajuste, labelAjuste, total: subtotal + ajuste }
+  }, [slotsRichCon, premioAtivoC, descontoOpC, docTipo, comRetencao, retencaoPct, transporteRateCon])
+
+  // reset + carrega opções das contas por DJ (evita que opções de outro DJ persistam)
+  useEffect(() => {
+    if (!id) return
+    setDocTipo('recibo')
+    setComRetencao(false)
+    setRetencaoPct(25)
+    setDescontoOpC(2)
+    setPremioOverrideC(null)
+    setContasSucesso(false)
+    setSlotsContas([])
+    const raw = localStorage.getItem(`dj_contas_${id}`)
+    if (!raw) return
+    try {
+      const s = JSON.parse(raw)
+      if (s.docTipo)             setDocTipo(s.docTipo)
+      if (s.comRetencao != null) setComRetencao(s.comRetencao)
+      if (s.retencaoPct != null) setRetencaoPct(s.retencaoPct)
+      if (s.descontoOpC != null) setDescontoOpC(s.descontoOpC)
+    } catch {}
+  }, [id])
+
   // ── carregar categorias globais (uma vez) ──
   useEffect(() => {
     categoriasDjApi.listar().then(setCategorias).catch(() => {})
@@ -289,6 +456,8 @@ export function DJPerfil() {
       prioridade_admin:     dj.prioridade_admin      ?? 5,
       excluido_admin:       dj.excluido_admin        ?? false,
       bio:                  dj.bio                   ?? '',
+      app_abas:             dj.app_abas              ?? null,
+      password_app:         dj.password_app          ?? '',
     })
     setFotoFile(null)
     setFotoPreview(null)
@@ -442,6 +611,33 @@ export function DJPerfil() {
     return `${urlData.publicUrl}?t=${Date.now()}`
   }
 
+  // ── guardar password ──
+  const guardarPassword = async () => {
+    const pwd = perfilForm.password_app?.trim()
+    if (!pwd) return
+    setPassLoading(true)
+    setPassErro(null)
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-dj-password`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dj_id: id, password: pwd }),
+        }
+      )
+      const json = await res.json()
+      if (!res.ok || !json.ok) throw new Error(json.error ?? 'Erro desconhecido')
+      recarregarDJ()
+      setPassSucesso(true)
+      setTimeout(() => setPassSucesso(false), 3500)
+    } catch (e) {
+      setPassErro(e.message)
+    } finally {
+      setPassLoading(false)
+    }
+  }
+
   // ── guardar perfil ──
   const guardarPerfil = async () => {
     if (!perfilForm.nome?.trim()) {
@@ -463,6 +659,19 @@ export function DJPerfil() {
         foto_url,
       }
       await djsApi.actualizar(id, payload)
+
+      // Se a password mudou, sincronizar com auth.users via Edge Function
+      const pwdAtual = perfilForm.password_app?.trim()
+      if (pwdAtual && pwdAtual !== dj?.password_app) {
+        await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-dj-password`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dj_id: id, password: pwdAtual }),
+          }
+        )
+      }
 
       const catsIds = catsSel.map(v => v === '' ? null : Number(v))
       await djCategoriasApi.guardar(id, catsIds)
@@ -522,10 +731,32 @@ export function DJPerfil() {
 
       {/* ── Header ── */}
       <div className="px-6 py-4 border-b border-border shrink-0">
-        <button onClick={() => navigate('/djs')}
-          className="no-print flex items-center gap-1.5 text-xs text-accent-muted hover:text-accent mb-3 transition-colors">
-          <ArrowLeft size={13} />Voltar aos DJs
-        </button>
+        <div className="no-print flex items-center justify-between mb-3">
+          <button onClick={() => navigate('/djs')}
+            className="flex items-center gap-1.5 text-xs text-accent-muted hover:text-accent transition-colors">
+            <ArrowLeft size={13} />Voltar aos DJs
+          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => djAnterior && navigate(`/djs/${djAnterior.id}`)}
+              disabled={!djAnterior}
+              title={djAnterior ? `← ${djAnterior.nome_artistico || djAnterior.nome}` : undefined}
+              className="flex items-center gap-1 px-2.5 py-1 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ArrowUp size={12} className="-rotate-90" />
+              {djAnterior ? (djAnterior.nome_artistico || djAnterior.nome) : 'Anterior'}
+            </button>
+            <button
+              onClick={() => djProximo && navigate(`/djs/${djProximo.id}`)}
+              disabled={!djProximo}
+              title={djProximo ? `${djProximo.nome_artistico || djProximo.nome} →` : undefined}
+              className="flex items-center gap-1 px-2.5 py-1 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              {djProximo ? (djProximo.nome_artistico || djProximo.nome) : 'Próximo'}
+              <ArrowDown size={12} className="-rotate-90" />
+            </button>
+          </div>
+        </div>
         {dj && (
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3">
@@ -544,6 +775,37 @@ export function DJPerfil() {
                   <Badge variante={dj.estado === 'activo' ? 'confirmado' : dj.estado === 'banido' ? 'ban' : 'default'}>
                     {labelEstadoDJ(dj.estado)}
                   </Badge>
+                  {aba === 'perfil' && (
+                    <>
+                      <button onClick={guardarPerfil} disabled={perfilLoading}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-border bg-surface-2 text-xs font-medium text-accent-muted hover:text-accent hover:border-white/20 transition-colors disabled:opacity-50">
+                        {perfilLoading ? 'A guardar…' : <><Save size={11} />Guardar</>}
+                      </button>
+                      {perfilSucesso && (
+                        <span className="text-[11px] text-status-confirmado flex items-center gap-1">
+                          <Check size={11} />Guardado
+                        </span>
+                      )}
+                    </>
+                  )}
+                  {aba === 'contas' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ docTipo, comRetencao, retencaoPct, descontoOpC }))
+                          setContasSucesso(true)
+                          setTimeout(() => setContasSucesso(false), 2500)
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-border bg-surface-2 text-xs font-medium text-accent-muted hover:text-accent hover:border-white/20 transition-colors">
+                        <Save size={11} />Guardar
+                      </button>
+                      {contasSucesso && (
+                        <span className="text-[11px] text-status-confirmado flex items-center gap-1">
+                          <Check size={11} />Guardado
+                        </span>
+                      )}
+                    </>
+                  )}
                 </div>
                 <div className="flex items-center gap-4 mt-1.5 flex-wrap">
                   {dj.whatsapp && <span className="text-xs text-accent-muted">{dj.whatsapp}</span>}
@@ -566,19 +828,17 @@ export function DJPerfil() {
 
       {/* ── Tabs ── */}
       {(() => {
-        const isConvidadoINT = catsSel.some(v => v === '3')
         return (
           <div className="no-print flex border-b border-border px-6 shrink-0">
             <button className={tabCls('perfil')} onClick={() => setAba('perfil')}>Dados</button>
             <button className={tabCls('agenda')} onClick={() => setAba('agenda')}>Agenda</button>
-            {isConvidadoINT && (
-              <button className={tabCls('disponibilidade')} onClick={() => setAba('disponibilidade')}>
-                Disponibilidades
-                {disponibilidades.length > 0 && (
-                  <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-accent-subtle">{disponibilidades.length}</span>
-                )}
-              </button>
-            )}
+            <button className={tabCls('disponibilidade')} onClick={() => setAba('disponibilidade')}>
+              Disponibilidades
+              {disponibilidades.length > 0 && (
+                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-accent-subtle">{disponibilidades.length}</span>
+              )}
+            </button>
+            <button className={tabCls('contas')} onClick={() => setAba('contas')}>Contas</button>
           </div>
         )
       })()}
@@ -737,6 +997,210 @@ export function DJPerfil() {
                       placeholder="150"
                     />
                   </Field>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Acesso & Links ── */}
+            {(() => {
+              const slug     = slugify(dj.nome_artistico || dj.nome)
+              const appUrl   = `https://xclusiveDJ.app/dj/${slug}`
+              const kitUrl   = `https://mypresskitdj.com/${slug}`
+              const copiar = (texto, key) => {
+                navigator.clipboard.writeText(texto)
+                setCopiado(key)
+                setTimeout(() => setCopiado(null), 2000)
+              }
+              return (
+                <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-border/50 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-accent uppercase tracking-wider">Acesso & Links</p>
+                      <p className="text-[11px] text-accent-subtle mt-0.5">Links do DJ para partilhar.</p>
+                    </div>
+                    <Button
+                      variante="primary" tamanho="sm"
+                      onClick={() => {
+                        const s = slugify(dj.nome_artistico || dj.nome)
+                        const url = `https://xclusiveDJ.app/dj/${s}`
+                        const nome = (dj.nome_artistico || dj.nome || '').split(' ')[0]
+
+                        // Datas futuras confirmadas/proposta
+                        const proximas = agenda
+                          .filter(sl => sl.data >= HOJE && (sl.estado === 'confirmado' || sl.estado === 'proposta'))
+                          .sort((a, b) => a.data.localeCompare(b.data))
+
+                        const secaoDatas = proximas.length > 0 ? `
+———
+
+DATAS ATRIBUÍDAS
+
+${proximas.map(sl => {
+  const dataFmt = cap(format(parse(sl.data, 'yyyy-MM-dd', new Date()), "EEEE, d 'de' MMMM yyyy", { locale: pt }))
+  const horario = sl.hora_inicio ? `${formatarHora(sl.hora_inicio)}${sl.hora_fim ? `–${formatarHora(sl.hora_fim)}` : ''}` : ''
+  return `📅 ${dataFmt}${sl.espaco_nome ? `\n📍 ${sl.espaco_nome}` : ''}${horario ? `\n🕙 ${horario}` : ''}${sl.evento ? `\n🎵 ${sl.evento}` : ''}`
+}).join('\n\n')}
+
+Assim que confirmares o teu perfil, as datas ficarão visíveis na tua agenda.` : ''
+
+                        setEmailEditado(`Olá ${nome},
+
+É com prazer que te damos as boas-vindas à XclusiveDJ — a plataforma que utilizamos para gerir toda a programação dos nossos espaços.
+
+Criámos o teu perfil e está pronto para seres ativada.
+
+———
+
+O QUE É A XCLUSIVEDNJ.APP
+
+A Xclusive DJ é a nossa plataforma de gestão de DJ's. É aqui que:
+• Recebes as datas de atuação atribuídas
+• Confirmas a tua disponibilidade
+• Tens acesso ao detalhe de cada atuação (local, horário, valor)
+• Manténs o teu perfil artístico atualizado (bio, links musicais, redes sociais)
+
+———
+
+O QUE PRECISAMOS DE TI
+
+Acede à tua área pessoal através do link abaixo e completa o teu perfil:
+• Nome artístico e bio
+• Links musicais (Spotify, Soundcloud…)
+• Foto de perfil
+• Disponibilidades
+
+👉 Aceder ao meu perfil: ${url}${secaoDatas}
+
+———
+
+Qualquer dúvida estou disponível.
+
+Bem-vinda à equipa.
+
+Paulo DiLight
+LMD · XclusiveDJ`)
+                        setConviteEnviado(false)
+                        setConviteErro(null)
+                        setConviteAberto(true)
+                      }}
+                    >
+                      <Mail size={12} />Enviar convite
+                    </Button>
+                  </div>
+                  <div className="px-5 py-4 flex flex-col gap-3">
+                    {/* App */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-medium text-accent-muted uppercase tracking-wider mb-0.5">App Xclusive DJ</p>
+                        <p className="text-xs text-accent font-mono truncate">{appUrl}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => copiar(appUrl, 'app')}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent transition-colors"
+                          title="Copiar link"
+                        >
+                          {copiado === 'app' ? <><Check size={11} className="text-status-confirmado" /> Copiado</> : <><Copy size={11} /> Copiar</>}
+                        </button>
+                        <a href={appUrl} target="_blank" rel="noreferrer"
+                          className="flex items-center justify-center w-7 h-7 rounded border border-border bg-surface-2 text-accent-muted hover:text-accent transition-colors">
+                          <ExternalLink size={11} />
+                        </a>
+                      </div>
+                    </div>
+                    {/* Presskit */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-medium text-accent-muted uppercase tracking-wider mb-0.5">
+                          Press Kit <span className="text-accent-subtle/60 normal-case font-normal">(em construção)</span>
+                        </p>
+                        <p className="text-xs text-accent font-mono truncate">{kitUrl}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => copiar(kitUrl, 'kit')}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent transition-colors"
+                          title="Copiar link"
+                        >
+                          {copiado === 'kit' ? <><Check size={11} className="text-status-confirmado" /> Copiado</> : <><Copy size={11} /> Copiar</>}
+                        </button>
+                        <a href={kitUrl} target="_blank" rel="noreferrer"
+                          className="flex items-center justify-center w-7 h-7 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent/50 transition-colors opacity-40 cursor-not-allowed pointer-events-none">
+                          <ExternalLink size={11} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* ── App Xclusive DJ · abas visíveis ── */}
+            <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-border/50">
+                <p className="text-xs font-semibold text-accent uppercase tracking-wider">App Xclusive DJ</p>
+                <p className="text-[11px] text-accent-subtle mt-0.5">Secções visíveis para este DJ na app.</p>
+              </div>
+              <div className="px-5 py-4 flex flex-col gap-3">
+                {APP_ABAS_OPCOES.map(({ id, label, desc }) => {
+                  const abas = perfilForm.app_abas ?? APP_ABAS_OPCOES.map(a => a.id)
+                  const ativo = abas.includes(id)
+                  const toggleAba = () => {
+                    const atual = perfilForm.app_abas ?? APP_ABAS_OPCOES.map(a => a.id)
+                    const nova = ativo ? atual.filter(a => a !== id) : [...atual, id]
+                    setPerfilForm(f => ({ ...f, app_abas: nova.length === APP_ABAS_OPCOES.length ? null : nova }))
+                  }
+                  return (
+                    <div key={id} className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-medium text-accent">{label}</p>
+                        <p className="text-[11px] text-accent-subtle">{desc}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={toggleAba}
+                        className={clsx(
+                          'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors',
+                          ativo
+                            ? 'bg-status-confirmado/70 border-status-confirmado/50'
+                            : 'bg-surface-3 border-border'
+                        )}
+                      >
+                        <span className={clsx(
+                          'inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform mt-[-1px]',
+                          ativo ? 'translate-x-4' : 'translate-x-0.5'
+                        )} />
+                      </button>
+                    </div>
+                  )
+                })}
+                {perfilForm.app_abas !== null && perfilForm.app_abas?.length === 0 && (
+                  <p className="text-[11px] text-status-cancelado/70">Atenção: sem nenhuma secção activa o DJ não vê nada na app.</p>
+                )}
+
+                {/* Password App */}
+                <div className="flex flex-col gap-1.5 border border-border/60 rounded-lg p-3 bg-surface-2/40 mt-1">
+                  <p className="text-[10px] font-bold text-accent-subtle/50 uppercase tracking-wider">Password App DJ</p>
+                  {passErro && <p className="text-xs text-status-cancelado">{passErro}</p>}
+                  {passSucesso && <p className="text-xs text-status-confirmado">Password actualizada.</p>}
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      className={clsx(iCls, 'flex-1 font-mono tracking-widest')}
+                      value={perfilForm.password_app ?? ''}
+                      onChange={e => setPerfilForm(f => ({ ...f, password_app: e.target.value }))}
+                      placeholder="ex: 0000"
+                    />
+                    <button
+                      type="button"
+                      onClick={guardarPassword}
+                      disabled={passLoading || !perfilForm.password_app?.trim()}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded border border-border bg-surface-2 text-xs font-medium text-accent-muted hover:text-accent hover:border-white/20 transition-colors disabled:opacity-40 whitespace-nowrap"
+                    >
+                      {passLoading ? 'A guardar…' : <><Save size={11} />Guardar</>}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-accent-subtle/40">Actualiza a password no app do DJ e na conta Supabase Auth.</p>
                 </div>
               </div>
             </div>
@@ -1130,14 +1594,110 @@ export function DJPerfil() {
               </div>
             )}
 
-            {/* ── Guardar ── */}
-            <div className="flex justify-end pb-2">
-              <Button onClick={guardarPerfil} disabled={perfilLoading}>
-                {perfilLoading
-                  ? 'A guardar…'
-                  : <span className="flex items-center gap-1.5"><Save size={12} />Guardar alterações</span>
-                }
-              </Button>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal convite ── */}
+      {conviteAberto && dj && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setConviteAberto(false)}>
+          <div className="bg-surface-1 border border-border rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <div className="flex items-center gap-2">
+                <Mail size={14} className="text-accent-muted" />
+                <div>
+                  <p className="text-sm font-semibold text-accent">Convite · {dj.nome_artistico || dj.nome}</p>
+                  {dj.email && <p className="text-[11px] text-accent-subtle">Para: {dj.email}</p>}
+                </div>
+              </div>
+              <button onClick={() => setConviteAberto(false)} className="text-accent-subtle hover:text-accent transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Subject */}
+            <div className="px-5 pt-4 shrink-0">
+              <p className="text-[10px] font-semibold text-accent-subtle uppercase tracking-wider mb-1">Assunto</p>
+              <p className="text-xs text-accent bg-surface-2 border border-border rounded px-3 py-2">
+                Bem-vinda à XclusiveDJ · O teu perfil está pronto
+              </p>
+            </div>
+
+            {/* Body editável */}
+            <div className="flex-1 overflow-auto px-5 py-3 min-h-0">
+              <p className="text-[10px] font-semibold text-accent-subtle uppercase tracking-wider mb-1">Mensagem <span className="font-normal normal-case text-accent-subtle/60">(editável)</span></p>
+              <textarea
+                className="w-full h-full min-h-[320px] text-xs text-accent-muted font-mono leading-relaxed bg-surface-2 border border-border rounded-lg p-4 resize-none focus:outline-none focus:border-white/20 transition-colors"
+                value={emailEditado}
+                onChange={e => setEmailEditado(e.target.value)}
+              />
+            </div>
+
+            {/* Feedback */}
+            {conviteEnviado && (
+              <div className="mx-5 mb-2 flex items-center gap-2 px-3 py-2 rounded border border-status-confirmado/30 bg-status-confirmado/10 text-status-confirmado text-xs">
+                <Check size={12} />Email enviado com sucesso para {dj.email}
+              </div>
+            )}
+            {conviteErro && (
+              <div className="mx-5 mb-2 px-3 py-2 rounded border border-status-cancelado/30 bg-status-cancelado/10 text-status-cancelado text-xs">
+                {conviteErro}
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-border shrink-0">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(emailEditado)
+                  setCopiado('email')
+                  setTimeout(() => setCopiado(null), 2500)
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent transition-colors"
+              >
+                {copiado === 'email' ? <><Check size={11} className="text-status-confirmado" />Copiado</> : <><Copy size={11} />Copiar</>}
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button onClick={() => setConviteAberto(false)} className="px-3 py-1.5 text-xs text-accent-muted hover:text-accent transition-colors">
+                  Fechar
+                </button>
+                {dj.email ? (
+                  <Button
+                    variante="primary" tamanho="sm"
+                    loading={enviandoConvite}
+                    onClick={async () => {
+                      setEnviandoConvite(true)
+                      setConviteErro(null)
+                      try {
+                        const res = await fetch('https://i4dj.app.n8n.cloud/webhook/enviar-convite-dj', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            to: dj.email,
+                            subject: 'Bem-vinda à XclusiveDJ · O teu perfil está pronto',
+                            body: emailEditado,
+                          }),
+                        })
+                        if (!res.ok) throw new Error(`Erro ${res.status}`)
+                        setConviteEnviado(true)
+                        setTimeout(() => setConviteAberto(false), 2500)
+                      } catch (e) {
+                        setConviteErro('Não foi possível enviar o email. Verifica a ligação.')
+                      } finally {
+                        setEnviandoConvite(false)
+                      }
+                    }}
+                  >
+                    <Mail size={12} />Enviar para {dj.email}
+                  </Button>
+                ) : (
+                  <span className="text-[11px] text-accent-subtle italic">Sem email registado — não é possível enviar.</span>
+                )}
+              </div>
             </div>
 
           </div>
@@ -1401,6 +1961,272 @@ export function DJPerfil() {
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ════ TAB CONTAS ════ */}
+      {aba === 'contas' && (
+        <div className="flex-1 overflow-auto">
+          <div className="p-6 flex flex-col gap-5">
+
+            {loadingContas && (
+              <div className="text-center py-12 text-accent-subtle/40 text-sm">A carregar…</div>
+            )}
+
+            {!loadingContas && slotsContas.length === 0 && (
+              <div className="text-center py-12 text-accent-subtle/40 text-sm">
+                Sem atuações em {nomeMesAno(anoMes)}.
+              </div>
+            )}
+
+            {!loadingContas && slotsContas.length > 0 && (
+              <div className="grid xl:grid-cols-[240px_1fr_220px] md:grid-cols-[210px_1fr] gap-5 items-start">
+
+                {/* Card 2 — Opções (esquerda) */}
+                <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-border bg-surface-2">
+                    <span className="text-[11px] font-semibold text-accent-muted uppercase tracking-widest">Opções</span>
+                  </div>
+                  <div className="p-4 flex flex-col gap-5">
+
+                    {/* Documento */}
+                    <div>
+                      <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Documento</p>
+                      <div className="flex gap-1 p-1 bg-surface-0 rounded-lg border border-border">
+                        {[['recibo', 'Recibo Verde'], ['fatura', 'Fatura']].map(([v, l]) => (
+                          <button key={v} onClick={() => setDocTipo(v)}
+                            className={clsx('flex-1 text-xs py-1.5 rounded-md transition-colors font-medium',
+                              docTipo === v ? 'bg-surface-2 text-accent shadow-sm border border-border' : 'text-accent-muted hover:text-accent')}
+                          >{l}</button>
+                        ))}
+                      </div>
+                      {docTipo === 'fatura' && (
+                        <p className="mt-2 text-[11px] text-status-proposta pl-1">+23% IVA aplicado ao total</p>
+                      )}
+                      {docTipo === 'recibo' && (
+                        <div className="mt-2.5 flex flex-col gap-2">
+                          <div className="flex gap-1 p-1 bg-surface-0 rounded-lg border border-border">
+                            <button onClick={() => setComRetencao(false)}
+                              className={clsx('flex-1 text-xs py-1.5 rounded-md transition-colors font-medium',
+                                !comRetencao ? 'bg-surface-2 text-accent shadow-sm border border-border' : 'text-accent-muted hover:text-accent')}
+                            >Sem retenção</button>
+                            <button onClick={() => setComRetencao(true)}
+                              className={clsx('flex-1 text-xs py-1.5 rounded-md transition-colors font-medium',
+                                comRetencao ? 'bg-surface-2 text-accent shadow-sm border border-border' : 'text-accent-muted hover:text-accent')}
+                            >Com retenção</button>
+                          </div>
+                          {comRetencao && (
+                            <div className="flex items-center gap-2 pl-1">
+                              <span className="text-xs text-accent-muted">Percentagem</span>
+                              <input type="number" min={0} max={100} value={retencaoPct}
+                                onChange={e => setRetencaoPct(Number(e.target.value))}
+                                className="w-14 bg-surface-0 border border-border rounded-lg px-2 py-1 text-xs text-accent text-center focus:outline-none" />
+                              <span className="text-xs text-accent-muted">%</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Prémio assiduidade */}
+                    <div>
+                      <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Prémio Assiduidade</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={clsx('text-[11px]', premioAtivoC ? 'text-status-confirmado' : 'text-accent-muted')}>
+                          {premioOverrideC === null
+                            ? premioAutoC ? 'Auto · elegível' : 'Auto · não elegível'
+                            : premioOverrideC ? 'Ativado manualmente' : 'Desativado manualmente'}
+                        </p>
+                        <button onClick={() => setPremioOverrideC(premioOverrideC !== null ? null : !premioAutoC)}
+                          className={clsx('text-[10px] px-2 py-0.5 rounded border flex-shrink-0 transition-colors',
+                            premioOverrideC !== null ? 'border-accent/40 bg-accent/5 text-accent' : 'border-border text-accent-muted hover:border-accent/30')}
+                        >{premioOverrideC !== null ? 'auto' : 'forçar'}</button>
+                      </div>
+                      {premioOverrideC !== null && (
+                        <div className="mt-2 flex gap-2">
+                          <button onClick={() => setPremioOverrideC(true)}
+                            className={clsx('flex-1 text-[11px] py-1.5 rounded-lg border transition-colors',
+                              premioOverrideC ? 'bg-status-confirmado/10 border-status-confirmado/40 text-status-confirmado font-medium' : 'border-border text-accent-muted')}
+                          >Ativar</button>
+                          <button onClick={() => setPremioOverrideC(false)}
+                            className={clsx('flex-1 text-[11px] py-1.5 rounded-lg border transition-colors',
+                              !premioOverrideC ? 'bg-status-cancelado/10 border-status-cancelado/40 text-status-cancelado font-medium' : 'border-border text-accent-muted')}
+                          >Desativar</button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Desconto */}
+                    {cfgDescontosCon.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Desconto</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {cfgDescontosCon.map((d, i) => (
+                            <button key={i} type="button" onClick={() => setDescontoOpC(d.valor)}
+                              className={clsx('px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
+                                descontoOpC === d.valor ? 'bg-accent/10 border-accent/40 text-accent' : 'border-border text-accent-muted')}
+                            >{d.label || `Desconto ${i + 1}`} — {d.valor}€</button>
+                          ))}
+                          <button type="button" onClick={() => setDescontoOpC(0)}
+                            className={clsx('px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
+                              descontoOpC === 0 ? 'bg-accent/10 border-accent/40 text-accent' : 'border-border text-accent-muted')}
+                          >Sem desconto</button>
+                        </div>
+                        {calcCon && descontoOpC > 0 && (
+                          <span className="text-xs text-accent-subtle mt-1 block tabular-nums">= −{formatarEuro(calcCon.valorDesconto)}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Guardar opções */}
+                    <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                      {contasSucesso && (
+                        <span className="text-[11px] text-status-confirmado flex items-center gap-1">
+                          <Check size={11} />Guardado
+                        </span>
+                      )}
+                      <button
+                        onClick={() => {
+                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ docTipo, comRetencao, retencaoPct, descontoOpC }))
+                          setContasSucesso(true)
+                          setTimeout(() => setContasSucesso(false), 2500)
+                        }}
+                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs font-medium text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
+                      ><Save size={11} />Guardar preferências</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 1 — Lista de atuações (centro) */}
+                <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
+                  <div className="px-5 py-3 border-b border-border bg-surface-2 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-accent">{dj?.nome_artistico || dj?.nome}</span>
+                    <span className="text-[11px] text-accent-muted">{slotsRichCon.length} atuações confirmadas · {nomeMesAno(anoMes)}</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse table-fixed">
+                      <colgroup>
+                        <col className="w-[92px]" />
+                        <col className="w-[100px]" />
+                        <col className="w-[84px]" />
+                        <col className="w-[40px]" />
+                        <col className="w-[40px]" />
+                        <col className="w-[40px]" />
+                        <col className="w-[64px]" />
+                      </colgroup>
+                      <thead>
+                        <tr className="border-b border-border/50">
+                          <th className="text-left px-4 py-2 font-medium text-accent-muted">Data</th>
+                          <th className="text-left px-3 py-2 font-medium text-accent-muted">Espaço</th>
+                          <th className="text-left px-3 py-2 font-medium text-accent-muted">Horário</th>
+                          <th className="text-center px-2 py-2 font-medium text-accent-muted" title="Assinatura">Ass.</th>
+                          <th className="text-center px-2 py-2 font-medium text-accent-muted" title="Horas extra">H+</th>
+                          <th className="text-center px-2 py-2 font-medium text-accent-muted" title="Transporte">Trp.</th>
+                          <th className="text-right px-4 py-2 font-medium text-accent-muted">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {slotsContas.map((s, i) => {
+                          const isPag = PAGAVEIS_C.has(s.estado)
+                          const rich  = slotsRichCon.find(r => r.id === s.id)
+                          return (
+                            <tr key={s.id} className={clsx(
+                              'border-b border-border/20 last:border-0',
+                              i % 2 !== 0 ? 'bg-surface-0/30' : '',
+                              !isPag && 'opacity-40'
+                            )}>
+                              <td className="px-4 py-2.5 text-accent-muted tabular-nums whitespace-nowrap">
+                                {format(new Date(s.data + 'T00:00:00'), 'EEE d MMM', { locale: pt })}
+                              </td>
+                              <td className="px-3 py-2.5 text-accent-muted truncate max-w-[120px]">
+                                {s.espacos?.nome ?? '—'}
+                              </td>
+                              <td className="px-3 py-2.5 text-accent-muted tabular-nums whitespace-nowrap">
+                                {s.hora_inicio?.slice(0,5)}–{s.hora_fim?.slice(0,5)}
+                              </td>
+                              <td className="px-2 py-2.5 text-center">
+                                {!isPag ? <span className="text-border/40">—</span>
+                                  : rich?.assStatus === 'a_tempo'  ? <span className="text-status-confirmado font-bold" title="Assinado a tempo">✓</span>
+                                  : rich?.assStatus === 'atrasada' ? <span className="text-amber-500" title="Assinatura atrasada">!</span>
+                                  : <span className="text-border/50" title="Sem assinatura">✗</span>}
+                              </td>
+                              <td className="px-2 py-2.5 text-center tabular-nums">
+                                {rich?.horasExtra > 0
+                                  ? <span className="text-status-proposta font-medium">+{rich.horasExtra}h</span>
+                                  : <span className="text-border/40">—</span>}
+                              </td>
+                              <td className="px-2 py-2.5 text-center">
+                                {rich?.transporte
+                                  ? <span className="text-accent-muted" title="Transporte incluído">↗</span>
+                                  : <span className="text-border/40">—</span>}
+                              </td>
+                              <td className={clsx('px-4 py-2.5 text-right tabular-nums font-semibold',
+                                isPag ? 'text-accent' : 'text-accent-subtle line-through')}>
+                                {s.valor != null ? formatarEuro(Number(s.valor)) : '—'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                      {slotsRichCon.length > 0 && (
+                        <tfoot>
+                          <tr className="border-t border-border bg-surface-2/60">
+                            <td colSpan={3} className="px-4 py-2 text-xs font-semibold text-accent-muted">Totais</td>
+                            <td className="px-2 py-2 text-center text-[10px] text-accent-muted">
+                              {slotsRichCon.filter(s => s.assStatus === 'a_tempo').length}/{slotsRichCon.length}
+                            </td>
+                            <td className="px-2 py-2 text-center text-xs font-medium text-status-proposta tabular-nums">
+                              {slotsRichCon.reduce((s, r) => s + r.horasExtra, 0) > 0
+                                ? `+${slotsRichCon.reduce((s, r) => s + r.horasExtra, 0)}h` : '—'}
+                            </td>
+                            <td className="px-2 py-2 text-center text-[10px] text-accent-muted">
+                              {slotsRichCon.filter(s => s.transporte).length > 0
+                                ? slotsRichCon.filter(s => s.transporte).length : '—'}
+                            </td>
+                            <td className="px-4 py-2 text-right font-bold text-accent tabular-nums">
+                              {formatarEuro(slotsRichCon.reduce((s, r) => s + Number(r.valor ?? 0), 0))}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                </div>
+
+                {/* Card 3 — Resumo (direita) */}
+                {calcCon && (
+                  <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
+                    <div className="px-4 py-2.5 border-b border-border bg-surface-2">
+                      <span className="text-[11px] font-semibold text-accent-muted uppercase tracking-widest">Resumo</span>
+                    </div>
+                    <div className="divide-y divide-border/30">
+                      <BRow label={`Valor atuações (${calcCon.n} data${calcCon.n !== 1 ? 's' : ''})`} value={formatarEuro(calcCon.valorAtuacoes)} />
+                      {calcCon.valorHExt > 0 && (
+                        <BRow label={`Horas extra (${calcCon.totalHExt}h × ${CFG_C.horaExtraRate}€)`} value={`+${formatarEuro(calcCon.valorHExt)}`} accent="text-status-proposta" />
+                      )}
+                      {calcCon.valorTransp > 0 && (
+                        <BRow label={`Transporte (${calcCon.nTransp} × ${transporteRateCon}€)`} value={`+${formatarEuro(calcCon.valorTransp)}`} accent="text-status-proposta" />
+                      )}
+                      {premioAtivoC && (
+                        <BRow label={`Prémio assiduidade (${calcCon.n} × ${CFG_C.premioRate}€)`} value={`+${formatarEuro(calcCon.valorPremio)}`} accent="text-status-proposta" />
+                      )}
+                      {calcCon.valorDesconto > 0 && (
+                        <BRow label={`Desconto operação (${descontoOpC}€ × ${calcCon.n})`} value={`−${formatarEuro(calcCon.valorDesconto)}`} accent="text-status-cancelado" />
+                      )}
+                      <BRow label="Subtotal" value={formatarEuro(calcCon.subtotal)} bold />
+                      {calcCon.ajuste !== 0 && (
+                        <BRow label={calcCon.labelAjuste} value={`${calcCon.ajuste > 0 ? '+' : ''}${formatarEuro(calcCon.ajuste)}`} accent={calcCon.ajuste < 0 ? 'text-status-cancelado' : 'text-status-proposta'} />
+                      )}
+                      <div className="px-4 py-3.5 flex items-center justify-between bg-surface-2/40">
+                        <span className="text-sm font-bold text-accent">Total a pagar</span>
+                        <span className="text-lg font-bold text-status-confirmado tabular-nums">{formatarEuro(calcCon.total)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

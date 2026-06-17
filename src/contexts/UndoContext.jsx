@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 
 /**
  * UndoContext — pilha global de desfazer (stack).
@@ -65,6 +65,21 @@ export function UndoProvider({ children }) {
   const limpar = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
     setPilha([]); setToast(null)
+  }, [])
+
+  // Ctrl+Z / Cmd+Z global — não actua dentro de inputs/textareas
+  const executarUndoRef = useRef(executarUndo)
+  useEffect(() => { executarUndoRef.current = executarUndo }, [executarUndo])
+  useEffect(() => {
+    const handler = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key !== 'z' || e.shiftKey) return
+      const tag = e.target?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) return
+      e.preventDefault()
+      executarUndoRef.current()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
   }, [])
 
   return (

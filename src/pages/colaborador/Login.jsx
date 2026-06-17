@@ -69,12 +69,12 @@ export function ColaboradorLogin() {
                 <p className="text-sm text-accent-muted mt-1">Escolhe o teu nome para entrar.</p>
               </div>
               {erro && <p className="text-sm text-status-cancelado text-center">{erro}</p>}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-wrap justify-center gap-4">
                 {colaboradores.map((c) => (
                   <button
                     key={c.id}
                     onClick={() => { setSel(c); setErro(null) }}
-                    className="flex flex-col items-center gap-3 py-6 px-3 rounded-2xl bg-surface-1 border border-border hover:border-white/25 hover:bg-surface-2 active:scale-95 transition-all"
+                    className="w-[calc(50%-8px)] flex flex-col items-center gap-3 py-6 px-3 rounded-2xl bg-surface-1 border border-border hover:border-white/25 hover:bg-surface-2 active:scale-95 transition-all"
                   >
                     <Avatar nome={c.nome} foto={c.foto_url} tamanho="md" />
                     <span className="text-sm font-semibold">{c.nome}</span>

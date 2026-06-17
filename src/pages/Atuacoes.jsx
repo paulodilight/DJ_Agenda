@@ -122,6 +122,7 @@ export function Atuacoes() {
   }
 
   const [avaliacoes, setAvaliacoes] = useState({}) // { agenda_id: avaliacao }
+  const [validacoes, setValidacoes] = useState({}) // { agenda_id: validacao_nota }
 
   const { agenda, loading, erro, recarregar } = useAgenda({
     dataInicio,
@@ -143,13 +144,23 @@ export function Atuacoes() {
     const ids = agenda.map((s) => s.id)
     supabase
       .from('avaliacoes_djs')
-      .select('agenda_id, nota_artistica, nota_assiduidade, nota_profissionalismo, nota_adaptacao, interesse, gravado, notas_bloqueadas, comentario')
+      .select('agenda_id, nota, nota_artistica, nota_assiduidade, nota_profissionalismo, nota_adaptacao, interesse, gravado, notas_bloqueadas, comentario, notas_dj, auto_nota_artistica, auto_nota_assiduidade, auto_nota_profissionalismo, auto_nota_adaptacao')
       .in('agenda_id', ids)
       .then(({ data }) => {
         if (!data) return
         const map = {}
         data.forEach((a) => { map[a.agenda_id] = a })
         setAvaliacoes(map)
+      })
+    supabase
+      .from('validacoes_datas')
+      .select('agenda_id, nota, decisao')
+      .in('agenda_id', ids)
+      .then(({ data }) => {
+        if (!data) return
+        const map = {}
+        data.forEach((v) => { map[v.agenda_id] = v })
+        setValidacoes(map)
       })
   }, [agenda])
 
@@ -434,6 +445,7 @@ export function Atuacoes() {
       {/* ── Card de detalhe ── */}
       {cardAberto && slotDetalhe && (() => {
         const av = avaliacoes[slotDetalhe.id]
+        const val = validacoes[slotDetalhe.id]
         const total = av ? (av.nota_artistica ?? 0) + (av.nota_assiduidade ?? 0) + (av.nota_profissionalismo ?? 0) + (av.nota_adaptacao ?? 0) : 0
         const eHoje = slotDetalhe.data === hoje
         return (
@@ -469,20 +481,20 @@ export function Atuacoes() {
               </div>
 
               {/* Corpo */}
-              <div className="px-5 py-4 flex flex-col gap-4">
+              <div className="px-5 py-4 flex flex-col gap-3 max-h-[65vh] overflow-y-auto">
 
-                {/* Valor */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-accent-muted uppercase tracking-wider">Valor total</span>
-                  <span className="text-lg font-bold text-accent tabular-nums">{formatarEuro(slotDetalhe.valor)}</span>
-                </div>
-
-                {/* Horas extras */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-accent-muted uppercase tracking-wider">Horas extras</span>
-                  <span className="text-sm text-accent tabular-nums">
-                    {slotDetalhe.valor_extra != null ? formatarEuro(slotDetalhe.valor_extra) : <span className="text-accent-subtle/40">—</span>}
-                  </span>
+                {/* Valor + Horas extras */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-medium text-accent-muted uppercase tracking-wider mb-0.5">Valor</p>
+                    <span className="text-base font-bold text-accent tabular-nums">{formatarEuro(slotDetalhe.valor)}</span>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium text-accent-muted uppercase tracking-wider mb-0.5">Horas extras</p>
+                    <span className="text-base font-bold text-accent tabular-nums">
+                      {slotDetalhe.horas_extra != null ? `${slotDetalhe.horas_extra}h` : <span className="text-accent-subtle/40">—</span>}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Assiduidade com hora */}
@@ -504,39 +516,125 @@ export function Atuacoes() {
                 {slotDetalhe.evento && (
                   <div className="flex items-start gap-3">
                     <span className="text-xs font-medium text-accent-muted uppercase tracking-wider shrink-0 mt-0.5">Evento</span>
-                    <span className="text-sm text-accent-subtle text-right flex-1">{slotDetalhe.evento}</span>
+                    <span className="text-sm text-accent-subtle flex-1 text-right">{slotDetalhe.evento}</span>
                   </div>
                 )}
 
-                {/* Notas DJ */}
+                <div className="border-t border-border/40" />
+
+                {/* Observações (form inicial) */}
                 {slotDetalhe.notas?.trim() && (
-                  <div className="bg-surface-0 rounded-lg p-3 border border-border/40">
-                    <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider mb-1.5">Notas DJ</p>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider">Observações</p>
                     <p className="text-sm text-accent-subtle leading-relaxed whitespace-pre-wrap">{slotDetalhe.notas}</p>
                   </div>
                 )}
 
-                {/* Notas Gerente */}
+                {/* Nota do DJ */}
+                {av?.notas_dj?.trim() && (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider">Nota do DJ</p>
+                    <p className="text-sm text-accent-subtle leading-relaxed whitespace-pre-wrap">{av.notas_dj}</p>
+                  </div>
+                )}
+
+                {/* Nota do Operator */}
                 {av?.comentario?.trim() && (
-                  <div className="bg-surface-0 rounded-lg p-3 border border-border/40">
-                    <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider mb-1.5">Notas Gerente</p>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider">Nota do Operator</p>
                     <p className="text-sm text-accent-subtle leading-relaxed whitespace-pre-wrap">{av.comentario}</p>
                   </div>
                 )}
 
-                {/* Avaliação */}
+                {/* Nota do Manager (decisão validacoes_datas) */}
+                {val?.nota?.trim() && (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider">Nota do Manager</p>
+                    <p className="text-sm text-accent-subtle leading-relaxed whitespace-pre-wrap">{val.nota}</p>
+                  </div>
+                )}
+
+                {/* Auto-avaliação DJ */}
+                {av && [av.auto_nota_artistica, av.auto_nota_assiduidade, av.auto_nota_profissionalismo, av.auto_nota_adaptacao].some(v => v != null) && (
+                  <div className="flex flex-col gap-1.5 border border-border/40 rounded-lg p-3">
+                    <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider">Auto-avaliação DJ</p>
+                    {[
+                      { label: 'Artística',       val: av.auto_nota_artistica },
+                      { label: 'Assiduidade',     val: av.auto_nota_assiduidade },
+                      { label: 'Profissionalismo',val: av.auto_nota_profissionalismo },
+                      { label: 'Adaptação',       val: av.auto_nota_adaptacao },
+                    ].map(({ label, val }) => (
+                      <div key={label} className="flex items-center justify-between">
+                        <span className="text-xs text-accent-muted">{label}</span>
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star key={i} size={9} className={i < (val ?? 0) ? 'fill-blue-400 text-blue-400' : 'text-white/15'} />
+                            ))}
+                          </div>
+                          <span className="text-[11px] text-accent-subtle w-4 text-right tabular-nums">{val ?? '—'}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between border-t border-border/40 pt-1.5 mt-0.5">
+                      <span className="text-xs font-medium text-accent-muted">Total auto</span>
+                      <span className="text-sm font-bold text-blue-400 tabular-nums">
+                        {[av.auto_nota_artistica, av.auto_nota_assiduidade, av.auto_nota_profissionalismo, av.auto_nota_adaptacao].filter(v => v != null).reduce((a, b) => a + b, 0)} / 20
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Avaliação Operator */}
                 {av && total > 0 && (
-                  <div className="border-t border-border/40 pt-3 flex items-center justify-between">
-                    <span className="text-xs font-medium text-accent-muted uppercase tracking-wider">Avaliação Gestor</span>
+                  <div className="flex flex-col gap-1.5 border border-border/40 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider">Avaliação Operator</p>
+                      <div className="flex items-center gap-2">
+                        {av.gravado && <Lock size={10} className="text-status-confirmado" title="Avaliação gravada" />}
+                        {av.interesse > 0 && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-yellow-400" title="Interesse">
+                            <Star size={9} fill="currentColor" strokeWidth={0} /> {av.interesse}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {[
+                      { label: 'Artística',       val: av.nota_artistica },
+                      { label: 'Assiduidade',     val: av.nota_assiduidade },
+                      { label: 'Profissionalismo',val: av.nota_profissionalismo },
+                      { label: 'Adaptação',       val: av.nota_adaptacao },
+                    ].map(({ label, val }) => (
+                      <div key={label} className="flex items-center justify-between">
+                        <span className="text-xs text-accent-muted">{label}</span>
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star key={i} size={9} className={i < (val ?? 0) ? 'fill-yellow-400 text-yellow-400' : 'text-white/15'} />
+                            ))}
+                          </div>
+                          <span className="text-[11px] text-accent-subtle w-4 text-right tabular-nums">{val ?? '—'}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between border-t border-border/40 pt-1.5 mt-0.5">
+                      <span className="text-xs font-medium text-accent-muted">Total Operator</span>
+                      <span className="text-sm font-bold text-yellow-400 tabular-nums">{total} / 20</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* A minha avaliação (admin) */}
+                {av?.nota != null && (
+                  <div className="flex flex-col gap-1.5 border border-border/40 rounded-lg p-3">
+                    <p className="text-[10px] font-semibold text-accent-subtle/50 uppercase tracking-wider">A minha avaliação</p>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-accent tabular-nums">{total}/20</span>
-                      {av.interesse > 0 && (
-                        <span className="flex items-center gap-0.5 text-xs text-yellow-400">
-                          <Star size={12} fill="currentColor" strokeWidth={0} />
-                          {av.interesse}
-                        </span>
-                      )}
-                      {av.gravado && <Lock size={12} className="text-status-confirmado" title="Avaliação gravada" />}
+                      <div className="flex gap-0.5">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star key={i} size={14} className={i < (av.nota ?? 0) ? 'fill-emerald-400 text-emerald-400' : 'text-white/15'} />
+                        ))}
+                      </div>
+                      <span className="text-sm font-bold text-emerald-400 tabular-nums">{av.nota} / 5</span>
                     </div>
                   </div>
                 )}
