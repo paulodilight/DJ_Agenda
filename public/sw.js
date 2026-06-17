@@ -4,9 +4,9 @@
  *  - Assets estáticos (js/css/img/fontes): stale-while-revalidate.
  *  - Requests de API (Supabase / n8n) e não-GET: sempre rede, nunca cacheadas.
  */
-const VERSION = 'v1'
+const VERSION = 'v2'
 const CACHE = `lmd-dj-${VERSION}`
-const APP_SHELL = ['/', '/index.html', '/manifest.json', '/favicon.svg']
+const APP_SHELL = ['/', '/index.html', '/manifest.json', '/manifest-apoiot.json', '/favicon.svg']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
