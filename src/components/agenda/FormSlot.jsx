@@ -75,6 +75,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const [bloqueioIndisponivel, setBloqueioIndisponivel] = useState(null)
   const [avisoOptIn, setAvisoOptIn] = useState(null)
   const [verificacaoFeita, setVerificacaoFeita] = useState(false)
+  const [overrideRegras, setOverrideRegras] = useState(false)
   const [novoDJCriado, setNovoDJCriado] = useState(null)
   const [eventoAutoLink, setEventoAutoLink] = useState(false)
   const [aba, setAba] = useState(0)
@@ -128,6 +129,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       setBloqueioIndisponivel(null)
       setAvisoOptIn(null)
       setVerificacaoFeita(false)
+      setOverrideRegras(false)
       setNovoDJCriado(null)
       setEventoAutoLink(false)
       setAba(0)
@@ -357,7 +359,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
   const guardar = async (e) => {
     e.preventDefault()
-    if (conflitoCrossEspaco || bloqueioIndisponivel) return  // bloqueado — não deve chegar aqui mas por segurança
+    if (!overrideRegras && (conflitoCrossEspaco || bloqueioIndisponivel)) return
     setErro(null)
     setLoading(true)
     try {
@@ -553,15 +555,26 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
   return (
     <>
-    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-sm' : 'max-w-4xl'}>
+    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-sm' : 'max-w-6xl'}>
       <form onSubmit={guardar}>
         <div className="px-6 py-5 flex flex-col gap-4">
           {erro && <Alerta tipo="erro" mensagem={erro} />}
           {conflitoCrossEspaco && (
-            <Alerta tipo="erro" mensagem={`🚫 ${conflitoCrossEspaco}`} />
+            <Alerta tipo={overrideRegras ? 'aviso' : 'erro'} mensagem={`${overrideRegras ? '⚠️' : '🚫'} ${conflitoCrossEspaco}`} />
           )}
           {bloqueioIndisponivel && (
-            <Alerta tipo="erro" mensagem={`🚫 ${bloqueioIndisponivel}`} />
+            <Alerta tipo={overrideRegras ? 'aviso' : 'erro'} mensagem={`${overrideRegras ? '⚠️' : '🚫'} ${bloqueioIndisponivel}`} />
+          )}
+          {(conflitoCrossEspaco || bloqueioIndisponivel) && (
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={overrideRegras}
+                onChange={e => setOverrideRegras(e.target.checked)}
+                className="w-3.5 h-3.5 accent-amber-400 cursor-pointer"
+              />
+              <span className="text-xs text-amber-400/70">Ignorar validações (registo manual)</span>
+            </label>
           )}
           {avisoOptIn && (
             <Alerta tipo="aviso" mensagem={`⚠️ ${avisoOptIn}`} />
@@ -1047,10 +1060,10 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
               variante="primary"
               tamanho="sm"
               loading={loading}
-              disabled={!!conflitoCrossEspaco || !!bloqueioIndisponivel}
+              disabled={!overrideRegras && (!!conflitoCrossEspaco || !!bloqueioIndisponivel)}
               title={
-                conflitoCrossEspaco ? 'Resolve o conflito de Cliente antes de guardar'
-                : bloqueioIndisponivel ? 'DJ indisponível nesta data'
+                !overrideRegras && conflitoCrossEspaco ? 'Resolve o conflito de Cliente antes de guardar'
+                : !overrideRegras && bloqueioIndisponivel ? 'DJ indisponível nesta data'
                 : undefined
               }
             >
