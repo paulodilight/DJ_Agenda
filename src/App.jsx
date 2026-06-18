@@ -25,6 +25,7 @@ import { ApoioTecnico } from '@/pages/ApoioTecnico'
 import { DJConvidados } from '@/pages/DJConvidados'
 import { Artistas } from '@/pages/Artistas'
 import { ArtistaPerfil } from '@/pages/ArtistaPerfil'
+import { Club } from '@/pages/Club'
 import { ResetPassword } from '@/pages/ResetPassword'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { UndoProvider } from '@/contexts/UndoContext'
@@ -90,6 +91,7 @@ export default function App() {
             <Route path="colaboradores" element={<ContasColaboradores />} />
             <Route path="margens"       element={<ContasMargens />} />
           </Route>
+          <Route path="club" element={<Club />} />
           <Route path="configuracoes" element={<Configuracoes />} />
         </Route>
         {/* ── Área dos colaboradores (Apoio T) ── */}

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, MapPin, CalendarDays, Ban,
   Settings, LogOut, Mic2, Bell, Music2, Scale, Send, Wallet,
-  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw,
+  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw, Building2,
 } from 'lucide-react'
 import { useAuthStore, useMesStore, useAppStore } from '@/store'
 import { configuracoesApi } from '@/lib/api'
@@ -57,6 +57,7 @@ const navPrincipal = [
   { para: '/comunicacao',   icone: Send,            label: 'Comunicação' },
   { para: '/contas',        icone: Wallet,          label: 'Contas' },
   { para: '/apoio-tecnico', icone: Headphones,      label: 'Apoio T.' },
+  { para: '/club',          icone: Building2,        label: 'Club' },
 ]
 
 const navGestao = [
