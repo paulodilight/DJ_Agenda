@@ -55,6 +55,74 @@ function formatEuro(val) {
 }
 
 // ─────────────────────────────────────────────
+// Tab: A Pagar
+// ─────────────────────────────────────────────
+function TabAPagar({ aPagamento, aprovadas }) {
+  const agrupar = (slots) => {
+    const map = {}
+    for (const s of slots) {
+      const key = s.dj_id
+      if (!map[key]) map[key] = { nome: s.dj_nome ?? '—', slots: [] }
+      map[key].slots.push(s)
+    }
+    return Object.values(map)
+  }
+
+  const gruposAConfirmar = agrupar(aPagamento)
+  const gruposAprovadas  = agrupar(aprovadas)
+  const totalAprovadas   = aprovadas.reduce((a, s) => a + (s.valor ?? 0), 0)
+
+  if (!aPagamento.length && !aprovadas.length) return (
+    <div className="text-center py-12 text-white/30 text-sm">Nenhuma data pendente de confirmação</div>
+  )
+
+  return (
+    <div className="flex flex-col gap-6">
+
+      {/* Aprovadas pelo DJ */}
+      {gruposAprovadas.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-400/70">Aprovadas pelo DJ</p>
+            <span className="text-xs font-bold text-teal-400">{formatEuro(totalAprovadas)}</span>
+          </div>
+          {gruposAprovadas.map(g => (
+            <div key={g.nome} className="bg-teal-500/5 border border-teal-500/20 rounded-2xl p-4 flex flex-col gap-2">
+              <p className="text-sm font-bold text-white">{g.nome}</p>
+              {g.slots.map(s => (
+                <div key={s.id} className="flex items-center justify-between gap-2 pl-2 border-l border-teal-500/20">
+                  <p className="text-xs text-white/60">{formatData(s.data)} · {s.espaco_nome ?? '—'} · {s.hora_inicio?.slice(0,5)}</p>
+                  <span className="text-xs font-semibold text-teal-300 tabular-nums shrink-0">{formatEuro(s.valor)}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* A confirmar pelo DJ */}
+      {gruposAConfirmar.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-400/70">A confirmar pelo DJ</p>
+          {gruposAConfirmar.map(g => (
+            <div key={g.nome} className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex flex-col gap-2">
+              <p className="text-sm font-bold text-white">{g.nome}</p>
+              {g.slots.map(s => (
+                <div key={s.id} className="flex items-center justify-between gap-2 pl-2 border-l border-amber-500/20">
+                  <p className="text-xs text-white/60">{formatData(s.data)} · {s.espaco_nome ?? '—'} · {s.hora_inicio?.slice(0,5)}</p>
+                  <span className="text-xs font-semibold text-amber-300 tabular-nums shrink-0">{formatEuro(s.valor)}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
 // Tab: Em Análise
 // ─────────────────────────────────────────────
 function TabEmAnalise({ emAnalise, pendentesReg, onRefresh }) {
@@ -316,6 +384,8 @@ export function Pagamentos() {
   const [pedidos, setPedidos] = useState([])
   const [emAnalise, setEmAnalise] = useState([])
   const [pendentesReg, setPendentesReg] = useState([])
+  const [aPagamento, setAPagamento] = useState([])
+  const [aprovadas, setAprovadas] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
 
@@ -328,7 +398,7 @@ export function Pagamentos() {
     setErro(null)
     try {
       await classificarPendentes()
-      const [resPedidos, resAnalise, resPendentes] = await Promise.all([
+      const [resPedidos, resAnalise, resPendentes, resAPagar, resAprovadas] = await Promise.all([
         supabase
           .from('pedidos_pagamento')
           .select('*, djs(nome, foto_url)')
@@ -343,6 +413,16 @@ export function Pagamentos() {
           .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor')
           .eq('estado_pagamento', 'pendente_regularizacao')
           .order('data', { ascending: false }),
+        supabase
+          .from('agenda')
+          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor')
+          .eq('estado_pagamento', 'a_pagamento')
+          .order('data', { ascending: true }),
+        supabase
+          .from('agenda')
+          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor')
+          .eq('estado_pagamento', 'aprovada_pagamento')
+          .order('data', { ascending: true }),
       ])
       if (resPedidos.error) throw resPedidos.error
       if (resAnalise.error) throw resAnalise.error
@@ -350,6 +430,8 @@ export function Pagamentos() {
       setPedidos(resPedidos.data ?? [])
       setEmAnalise(resAnalise.data ?? [])
       setPendentesReg(resPendentes.data ?? [])
+      setAPagamento(resAPagar.data ?? [])
+      setAprovadas(resAprovadas.data ?? [])
     } catch (e) {
       setErro(e.message)
     } finally {
@@ -362,10 +444,12 @@ export function Pagamentos() {
   const pedidosEmPagamento = pedidos.filter(p => p.estado === 'em_pagamento')
   const pedidosPago        = pedidos.filter(p => p.estado === 'pago')
 
+  const aPagarCount       = aPagamento.length + aprovadas.length
   const analiseCount      = emAnalise.length + pendentesReg.length
   const emPagamentoCount  = pedidosEmPagamento.length
 
   const TABS = [
+    { label: 'A Pagar',      count: aPagarCount },
     { label: 'Em Análise',   count: analiseCount },
     { label: 'Em Pagamento', count: emPagamentoCount },
     { label: 'Histórico',    count: null },
@@ -422,8 +506,13 @@ export function Pagamentos() {
         <div className="text-center py-16 text-white/30 text-sm">A carregar…</div>
       ) : (
         <>
-          {/* Tab 0: Em Análise */}
+          {/* Tab 0: A Pagar */}
           {aba === 0 && (
+            <TabAPagar aPagamento={aPagamento} aprovadas={aprovadas} />
+          )}
+
+          {/* Tab 1: Em Análise */}
+          {aba === 1 && (
             <TabEmAnalise
               emAnalise={emAnalise}
               pendentesReg={pendentesReg}
@@ -431,8 +520,8 @@ export function Pagamentos() {
             />
           )}
 
-          {/* Tab 1: Em Pagamento */}
-          {aba === 1 && (
+          {/* Tab 2: Em Pagamento */}
+          {aba === 2 && (
             <div className="flex flex-col gap-3">
               {pedidosEmPagamento.length === 0 ? (
                 <div className="text-center py-12 text-white/30 text-sm">Nenhum pedido em pagamento</div>
@@ -442,8 +531,8 @@ export function Pagamentos() {
             </div>
           )}
 
-          {/* Tab 2: Histórico */}
-          {aba === 2 && (
+          {/* Tab 3: Histórico */}
+          {aba === 3 && (
             <div className="flex flex-col gap-2">
               {pedidosPago.length === 0 ? (
                 <div className="text-center py-12 text-white/30 text-sm">Sem histórico de pagamentos</div>
