@@ -1,8 +1,8 @@
 import { clsx } from 'clsx'
 import { useDraggable } from '@dnd-kit/core'
-import { Sparkles, Star } from 'lucide-react'
+import { Sparkles, Star, Check } from 'lucide-react'
 
-export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onToggleDestaque, dimmed = false, dragId, dragData, conflito = false, motivoConflito = null }) {
+export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onToggleDestaque, onConfirmar, dimmed = false, dragId, dragData, conflito = false, motivoConflito = null }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: dragId ?? 'chip-empty',
     disabled: !dragId,
@@ -153,15 +153,16 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
   )
 
   const temAccoes = (onSugerir || onToggleDestaque) && !isSemEfeito && !isLock && temDJ
+  const temConfirmar = !!onConfirmar && (estado === 'proposta' || estado === 'aceite' || estado === 'pré-confirmado')
 
-  if (!temAccoes) return chip
+  if (!temAccoes && !temConfirmar) return chip
 
   return (
     <div className="relative group/chip">
       {chip}
       <div className="absolute top-0.5 left-0.5 flex items-center gap-0.5">
         {/* Estrelinha marketing — sempre visível, activa/inactiva */}
-        {onToggleDestaque && (
+        {onToggleDestaque && !isSemEfeito && !isLock && temDJ && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleDestaque() }}
             title={isDestaque ? 'Remover destaque marketing' : 'Definir como destaque marketing'}
@@ -176,14 +177,24 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
           </button>
         )}
       </div>
-      {/* Sugerir DJ — canto direito, só no hover */}
-      {onSugerir && !isSemEfeito && !isLock && (
+      {/* Sugerir DJ — canto superior direito, só no hover */}
+      {onSugerir && !isSemEfeito && !isLock && temDJ && (
         <button
           onClick={(e) => { e.stopPropagation(); onSugerir() }}
           title="Sugerir DJ"
           className="absolute top-0.5 right-0.5 w-4 h-4 rounded flex items-center justify-center opacity-0 group-hover/chip:opacity-100 transition-opacity bg-black/30 hover:bg-black/60 text-accent-subtle hover:text-accent"
         >
           <Sparkles size={9} />
+        </button>
+      )}
+      {/* Confirmar — canto inferior direito, sempre visível */}
+      {temConfirmar && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onConfirmar() }}
+          title="Confirmar"
+          className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded flex items-center justify-center hover:bg-black/40 transition-colors text-status-confirmado/60 hover:text-status-confirmado"
+        >
+          <Check size={11} />
         </button>
       )}
     </div>

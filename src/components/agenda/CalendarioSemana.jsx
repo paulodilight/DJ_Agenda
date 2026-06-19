@@ -138,7 +138,7 @@ export function SlotChipOverlay({ slot }) {
  */
 export function CalendarioSemana({
   dias, espacos, agenda, bloqueios,
-  onClickSlot, onClickVazio, onToggleDestaque,
+  onClickSlot, onClickVazio, onToggleDestaque, onConfirmarSlot,
   semanaLabel, ocultarCabecalho = false,
   nomeEspaco = 'TODOS',
   conflictsIdx = new Set(),
@@ -319,6 +319,7 @@ export function CalendarioSemana({
                                   onClick={() => onClickSlot(slot)}
                                   onSugerir={() => setSugestaoCtx({ slot, espaco, turno: turno.id ? turno : null })}
                                   onToggleDestaque={onToggleDestaque ? () => onToggleDestaque(slot) : undefined}
+                                  onConfirmar={onConfirmarSlot ? () => onConfirmarSlot(slot) : undefined}
                                   dragId={`chip-${slot.id}`}
                                   dragData={{ slot }}
                                   conflito={conflictsIdx.has(slot.id)}

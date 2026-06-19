@@ -19,7 +19,7 @@ const CAT_CONVIDADO_EXT = 4  // DJ Convidado EXT
 
 export function DJCombobox({
   value, onChange, djs = [], label, placeholder = 'Pesquisar DJ…',
-  onCriado, onlyConvidados = false,
+  onCriado, onlyConvidados = false, onQueryChange,
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -31,10 +31,10 @@ export function DJCombobox({
   const djSel = djs.find((d) => d.id === value)
   const nomeSel = djSel ? (djSel.nome_artistico || djSel.nome) : ''
 
-  // Sincronizar query com o DJ seleccionado quando fecha
+  // Quando fecha: se há DJ seleccionado mostra o nome; se não há, mantém o texto digitado
   useEffect(() => {
-    if (!open) setQuery(nomeSel)
-  }, [open, nomeSel])
+    if (!open && value) setQuery(nomeSel)
+  }, [open, nomeSel, value])
 
   useEffect(() => {
     if (open) setQuery('')
@@ -67,6 +67,7 @@ export function DJCombobox({
         .from('djs')
         .insert({
           nome,
+          nome_artistico: nome,
           estado: 'activo',
           app_abas: onlyConvidados ? ['agenda', 'dados', 'club'] : null,
           qualidade_artistica: 0, assiduidade: 0, profissionalismo: 0, adaptacao_espaco: 0,
@@ -84,6 +85,7 @@ export function DJCombobox({
       }
 
       onChange(novoDJ.id)
+      onQueryChange?.('')
       setOpen(false)
       onCriado?.(novoDJ)
     } catch (e) {
@@ -101,17 +103,17 @@ export function DJCombobox({
         <input
           ref={inputRef}
           type="text"
-          value={open ? query : nomeSel}
+          value={open ? query : (value ? nomeSel : query)}
           placeholder={placeholder}
           onFocus={() => { setOpen(true); setQuery('') }}
-          onChange={(e) => { setQuery(e.target.value); if (!open) setOpen(true) }}
+          onChange={(e) => { const q = e.target.value; setQuery(q); onQueryChange?.(q); if (!open) setOpen(true) }}
           className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-accent placeholder:text-accent-subtle focus:outline-none focus:border-white/20 transition-colors"
         />
-        {value && !open && (
+        {(value || query) && !open && (
           <button
             type="button"
             tabIndex={-1}
-            onClick={() => { onChange(''); setQuery('') }}
+            onClick={() => { onChange(''); setQuery(''); onQueryChange?.('') }}
             title="Limpar"
             className="absolute right-2 top-1/2 -translate-y-1/2 text-accent-subtle hover:text-accent text-xs px-1"
           >✕</button>
@@ -128,7 +130,7 @@ export function DJCombobox({
             <button
               key={d.id}
               type="button"
-              onClick={() => { onChange(d.id); setOpen(false) }}
+              onClick={() => { onChange(d.id); onQueryChange?.(''); setOpen(false) }}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2 transition-colors"
             >
               <User size={12} className="text-accent-subtle shrink-0" />

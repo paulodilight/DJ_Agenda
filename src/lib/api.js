@@ -356,6 +356,44 @@ export const agendaApi = {
   },
 }
 
+// ─── Horas Extra de Atuação ───────────────────────────────────────────────────
+
+export const agendaHorasExtraApi = {
+  async listar(agendaId) {
+    const { data, error } = await supabase
+      .from('agenda_horas_extra')
+      .select('*')
+      .eq('agenda_id', agendaId)
+      .order('criado_em', { ascending: true })
+    if (error) throw error
+    return data ?? []
+  },
+
+  async criar({ agendaId, descricao, horas, valorHora }) {
+    const valorTotal = Math.round(Number(horas) * Number(valorHora) * 100) / 100
+    const { data, error } = await supabase
+      .from('agenda_horas_extra')
+      .insert({
+        agenda_id:   agendaId,
+        descricao:   descricao?.trim() || null,
+        horas:       Number(horas),
+        valor_hora:  Number(valorHora),
+        valor_total: valorTotal,
+        estado:      'pendente',
+        criado_por:  'admin',
+      })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async apagar(id) {
+    const { error } = await supabase.from('agenda_horas_extra').delete().eq('id', id)
+    if (error) throw error
+  },
+}
+
 // ─── Disponibilidades ────────────────────────────────────────────────────────
 
 export const disponibilidadesApi = {

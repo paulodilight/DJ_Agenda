@@ -1,6 +1,6 @@
 ﻿import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2, Send, UserCheck, MessageSquare, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2, Send, UserCheck, MessageSquare, RefreshCw, Download } from 'lucide-react'
 import { startOfWeek, addDays, addWeeks, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import {
@@ -467,6 +467,22 @@ export function Agenda() {
     finally { setSnapBusy(false) }
   }
 
+  const descarregarCheckpoint = async (snap) => {
+    setSnapBusy(true)
+    try {
+      const { data, error } = await supabase.from('snapshots').select('*').eq('id', snap.id).single()
+      if (error) throw error
+      const blob = new Blob([JSON.stringify(data.dados, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `checkpoint_${data.ano_mes}_${(data.label || 'auto').replace(/\s+/g, '_')}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) { setSnapMsg('Erro ao descarregar: ' + e.message) }
+    finally { setSnapBusy(false) }
+  }
+
   // ── Drag-and-drop ────────────────────────────────────────────────────────────
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -660,6 +676,21 @@ export function Agenda() {
   }
 
   const fecharModal = () => { setModalAberto(false); setSlotActual(null) }
+
+  const confirmarSlotRapido = async (slot) => {
+    if (!['proposta', 'aceite', 'pré-confirmado'].includes(slot.estado)) return
+    const novoEstado = 'confirmado'
+    try {
+      await agendaApi.mudarEstado(slot.id, novoEstado)
+      await supabase.from('agenda_historico').insert({
+        agenda_id: slot.id, tipo: 'estado',
+        descricao: `${slot.estado} → ${novoEstado}`,
+      })
+      recarregarSilencioso?.()
+    } catch (e) {
+      console.error('Erro ao confirmar slot:', e.message)
+    }
+  }
 
   // Toggle marketing_destaque: activa este slot e desactiva os outros do mesmo dia/espaço
   const toggleDestaque = async (slot) => {
@@ -1015,6 +1046,7 @@ export function Agenda() {
               onClickSlot={abrirEditarSlot}
               onClickVazio={abrirNovoSlot}
               onToggleDestaque={toggleDestaque}
+              onConfirmarSlot={confirmarSlotRapido}
               conflictsIdx={conflictsIdx}
               conflictsMap={conflictsMap}
               onSugestaoAplicada={() => { recarregar(); recarregarMes() }}
@@ -1113,6 +1145,11 @@ export function Agenda() {
                   title="Restaurar este momento"
                   className="flex items-center gap-1 px-2 py-1 rounded border border-border text-[11px] text-accent-muted hover:text-accent hover:border-white/20 disabled:opacity-40 transition-colors">
                   <RotateCcw size={12} /> Restaurar
+                </button>
+                <button onClick={() => descarregarCheckpoint(s)} disabled={snapBusy}
+                  title="Descarregar como ficheiro JSON"
+                  className="p-1 rounded text-accent-subtle hover:text-sky-400 transition-colors disabled:opacity-40">
+                  <Download size={13} />
                 </button>
                 <button onClick={() => apagarCheckpoint(s)} disabled={snapBusy}
                   title="Apagar checkpoint"

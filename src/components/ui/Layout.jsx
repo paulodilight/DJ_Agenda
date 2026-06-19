@@ -21,6 +21,7 @@ const ROTAS = [
   { path: '/atuacoes',      label: 'Atuações' },
   { path: '/comunicacao',   label: 'Comunicação' },
   { path: '/contas',        label: 'Contas' },
+  { path: '/pagamentos',    label: 'Pagamentos' },
   { path: '/djs',           label: 'DJs' },
   { path: '/convidados',    label: 'DJ Convidados' },
   { path: '/artistas',      label: 'Artistas' },
@@ -56,6 +57,7 @@ const navPrincipal = [
   { para: '/eventos',       icone: Star,            label: 'Eventos' },
   { para: '/comunicacao',   icone: Send,            label: 'Comunicação' },
   { para: '/contas',        icone: Wallet,          label: 'Contas' },
+  { para: '/pagamentos',    icone: Wallet,          label: 'Pagamentos' },
   { para: '/apoio-tecnico', icone: Headphones,      label: 'Apoio T.' },
   { para: '/club',          icone: Building2,        label: 'Club' },
 ]

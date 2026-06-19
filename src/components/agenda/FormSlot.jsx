@@ -4,7 +4,7 @@ import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
 import { Badge } from '@/components/ui/Badge'
-import { agendaApi, turnoValoresDiaApi } from '@/lib/api'
+import { agendaApi, agendaHorasExtraApi, turnoValoresDiaApi } from '@/lib/api'
 import { useUndo } from '@/contexts/UndoContext'
 import { supabase } from '@/lib/supabase'
 import { useDJs } from '@/hooks/useDJs'
@@ -20,7 +20,7 @@ import { DJCombobox, NovoDJLink } from './DJCombobox'
 import { supaEventosApi } from '@/lib/supaEventosApi'
 import { trocarDJ, trocarDJDireto, registarHistorico } from '@/lib/trocas'
 import { clsx } from 'clsx'
-import { CalendarPlus, Link2, Star, ArrowLeftRight, RotateCcw } from 'lucide-react'
+import { CalendarPlus, Link2, Star, ArrowLeftRight, RotateCcw, Plus, Trash2, Clock } from 'lucide-react'
 
 const ESTADO_OPCOES = [
   { value: 'proposta',        label: 'Proposta' },
@@ -61,7 +61,20 @@ const safeParse = (s, fb) => { try { return s ? JSON.parse(s) : fb } catch { ret
 const vazio = {
   dj_id: '', dj_externo: '', espaco_id: '', data: '', hora_inicio: '22:00', hora_fim: '02:00',
   valor: '', margem: '', estado: 'proposta', evento: '', notas: '', tipo_slot: '', subtipo_key: '',
+  transporte: '', extras: '', notas_contas: '', estado_pagamento: 'pendente', forma_pagamento: '',
 }
+
+const ESTADO_PAG_OPCOES = [
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'parcial',  label: 'Parcial' },
+  { value: 'pago',     label: 'Pago' },
+]
+const FORMA_PAG_OPCOES = [
+  { value: 'transferencia', label: 'Transferência' },
+  { value: 'dinheiro',      label: 'Dinheiro' },
+  { value: 'mbway',         label: 'MBWay' },
+  { value: 'outro',         label: 'Outro' },
+]
 
 export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = false, conflito = false }) {
   const [form, setForm] = useState(vazio)
@@ -77,9 +90,17 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const [verificacaoFeita, setVerificacaoFeita] = useState(false)
   const [overrideRegras, setOverrideRegras] = useState(false)
   const [novoDJCriado, setNovoDJCriado] = useState(null)
+  const [djConvidadoQuery, setDjConvidadoQuery] = useState('')
   const [eventoAutoLink, setEventoAutoLink] = useState(false)
   const [aba, setAba] = useState(0)
   const [avaliacao, setAvaliacao] = useState(null)
+
+  // ── Horas Extra ──
+  const [horasExtras, setHorasExtras]               = useState([])
+  const [horasExtraLoading, setHorasExtraLoading]   = useState(false)
+  const [novaHora, setNovaHora]                     = useState({ descricao: '', horas: '', valor_hora: '' })
+  const [novaHoraAberta, setNovaHoraAberta]         = useState(false)
+  const [novaHoraLoading, setNovaHoraLoading]       = useState(false)
 
   // ── Troca de DJ ──
   const [trocaAberta, setTrocaAberta]       = useState(false)
@@ -114,6 +135,11 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         estado: slot.estado ?? 'confirmado',
         dj_externo: !slot.dj_id && slot.dj_nome ? slot.dj_nome : '',
         margem: slot.margem ?? '',
+        transporte: slot.transporte ?? '',
+        extras: slot.extras ?? '',
+        notas_contas: slot.notas_contas ?? '',
+        estado_pagamento: slot.estado_pagamento ?? 'pendente',
+        forma_pagamento: slot.forma_pagamento ?? '',
       }
       // Se vem com subtipo_key mas sem tipo_slot, derivar tipo_slot do subtipo
       if (slot.subtipo_key && !slot.tipo_slot) {
@@ -131,8 +157,12 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       setVerificacaoFeita(false)
       setOverrideRegras(false)
       setNovoDJCriado(null)
+      setDjConvidadoQuery('')
       setEventoAutoLink(false)
       setAba(0)
+      setHorasExtras([])
+      setNovaHoraAberta(false)
+      setNovaHora({ descricao: '', horas: '', valor_hora: '' })
     }
     if (aberto && !slot) {
       setForm((f) => ({ ...vazio, ...f, estado: 'proposta' }))
@@ -141,6 +171,16 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       setAba(0)
     }
   }, [aberto, slot, simplificado])
+
+  // Carrega horas extras quando entra no separador Contas (aba 2)
+  useEffect(() => {
+    if (!aberto || !slot?.id || aba !== 2) return
+    setHorasExtraLoading(true)
+    agendaHorasExtraApi.listar(slot.id)
+      .then(data => setHorasExtras(data))
+      .catch(() => {})
+      .finally(() => setHorasExtraLoading(false))
+  }, [aberto, slot?.id, aba])
 
   // Carregar avaliação do gestor quando o modal abre com um slot existente
   useEffect(() => {
@@ -359,19 +399,47 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
   const guardar = async (e) => {
     e.preventDefault()
-    if (!overrideRegras && (conflitoCrossEspaco || bloqueioIndisponivel)) return
+    console.log('guardar:', { overrideRegras, conflitoCrossEspaco, bloqueioIndisponivel, conflito, conflitos })
+    if (!overrideRegras && (conflitoCrossEspaco || bloqueioIndisponivel || conflito || conflitos.length > 0)) return
     setErro(null)
     setLoading(true)
     try {
-      const isConvidado = !!form.dj_externo?.trim()
+      // Auto-criar DJ convidado se digitou nome mas não selecionou da lista
+      let djIdFinal = form.dj_id || null
+      if (!djIdFinal && djConvidadoQuery.trim().length >= 2) {
+        const nome = djConvidadoQuery.trim()
+        const existente = djsActivos.find(d =>
+          (d.nome_artistico || d.nome || '').toLowerCase() === nome.toLowerCase()
+        )
+        if (existente) {
+          djIdFinal = existente.id
+        } else {
+          const { data: novoDJ, error: erroCriar } = await supabase
+            .from('djs')
+            .insert({ nome, nome_artistico: nome, estado: 'activo', app_abas: ['agenda','dados','club'],
+              qualidade_artistica: 0, assiduidade: 0, profissionalismo: 0, adaptacao_espaco: 0,
+              prioridade_admin: 0, excluido_admin: false })
+            .select().single()
+          if (erroCriar) throw erroCriar
+          await supabase.from('dj_categorias').insert({ dj_id: novoDJ.id, categoria_id: 4 })
+          djIdFinal = novoDJ.id
+          setNovoDJCriado(novoDJ)
+        }
+      }
+      const isConvidado = !djIdFinal && !!form.dj_externo?.trim()
       const { subtipo_key: _sk, ...formData } = form
       const payload = {
         ...formData,
-        dj_id:     form.dj_id || null,
-        dj_nome:   isConvidado ? form.dj_externo.trim() : null,
-        espaco_id: form.espaco_id || null,
-        valor:     form.valor  === '' ? null : Number(form.valor),
-        margem:    form.margem === '' ? null : Number(form.margem),
+        dj_id:            djIdFinal,
+        dj_nome:          isConvidado ? form.dj_externo.trim() : null,
+        espaco_id:        form.espaco_id || null,
+        valor:            form.valor  === '' ? null : Number(form.valor),
+        margem:           form.margem === '' ? null : Number(form.margem),
+        transporte:       form.transporte === '' ? null : Number(form.transporte),
+        extras:           form.extras     === '' ? null : Number(form.extras),
+        notas_contas:     form.notas_contas?.trim() || null,
+        estado_pagamento: form.estado_pagamento || null,
+        forma_pagamento:  form.forma_pagamento  || null,
         tipo_slot: isConvidado ? 'convidado' : (form.tipo_slot || 'residente'),
         evento:    form.evento.trim() || null,
         notas:     form.notas.trim() || null,
@@ -383,12 +451,11 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         try {
           if (slot.estado !== form.estado)
             await registarHistorico(slot.id, 'estado', `${slot.estado} → ${form.estado}`)
-          const djIdNovo = form.dj_id || null
-          if (slot.dj_id !== djIdNovo) {
+          if (slot.dj_id !== djIdFinal) {
             const velho = djs.find(d => d.id === slot.dj_id)
-            const novo  = djs.find(d => d.id === djIdNovo)
+            const novo  = djs.find(d => d.id === djIdFinal)
             const nomeV = velho?.nome_artistico || velho?.nome || slot.dj_nome || 'Sem DJ'
-            const nomeN = novo?.nome_artistico  || novo?.nome  || form.dj_externo || 'Sem DJ'
+            const nomeN = novo?.nome_artistico  || novo?.nome  || form.dj_externo || djConvidadoQuery || 'Sem DJ'
             await registarHistorico(slot.id, 'dj', `DJ: ${nomeV} → ${nomeN}`)
           }
         } catch {}
@@ -398,6 +465,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       onGuardado()
       onFechar()
     } catch (e) {
+      console.error('FormSlot guardar erro:', e)
       setErro(e.message)
     } finally {
       setLoading(false)
@@ -555,8 +623,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
   return (
     <>
-    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-sm' : 'max-w-6xl'}>
-      <form onSubmit={guardar}>
+    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-2xl' : 'max-w-6xl'}>
+      <form onSubmit={guardar} noValidate>
         <div className="px-6 py-5 flex flex-col gap-4">
           {erro && <Alerta tipo="erro" mensagem={erro} />}
           {conflitoCrossEspaco && (
@@ -565,7 +633,15 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           {bloqueioIndisponivel && (
             <Alerta tipo={overrideRegras ? 'aviso' : 'erro'} mensagem={`${overrideRegras ? '⚠️' : '🚫'} ${bloqueioIndisponivel}`} />
           )}
-          {(conflitoCrossEspaco || bloqueioIndisponivel) && (
+          {conflito && verificacaoFeita && !bloqueioIndisponivel && !conflitoCrossEspaco && !avisoOptIn && conflitos.length === 0 && (
+            <Alerta tipo={overrideRegras ? 'aviso' : 'erro'} mensagem={`${overrideRegras ? '⚠️' : '🚫'} Conflito detectado nesta data`} />
+          )}
+          {conflitos.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {conflitos.map((c, i) => <Alerta key={i} tipo={overrideRegras ? 'aviso' : 'erro'} mensagem={`${overrideRegras ? '⚠️' : '🚫'} ${c}`} />)}
+            </div>
+          )}
+          {(conflitoCrossEspaco || bloqueioIndisponivel || conflito || conflitos.length > 0) && (
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -581,14 +657,6 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           )}
           {avisoMeta && (
             <Alerta tipo="aviso" mensagem={`⚠️ ${avisoMeta}`} />
-          )}
-          {conflito && verificacaoFeita && !bloqueioIndisponivel && !conflitoCrossEspaco && !avisoOptIn && conflitos.length === 0 && (
-            <Alerta tipo="aviso" mensagem="⚠️ Conflito detectado nesta data" />
-          )}
-          {conflitos.length > 0 && (
-            <div className="flex flex-col gap-1">
-              {conflitos.map((c, i) => <Alerta key={i} tipo="aviso" mensagem={c} />)}
-            </div>
           )}
 
           {/* Cabeçalho de contexto — sempre visível */}
@@ -629,7 +697,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           {/* ── Abas — só quando existe slot ── */}
           {slot && (
             <div className="flex gap-0 border-b border-border -mx-6 px-6">
-              {['Atuação', 'Notas & Avaliação', 'Contas', 'Histórico'].map((label, i) => (
+              {['Atuação', 'Notas & Avaliação', 'Contas', 'Histórico', ...(slot.estado_pagamento && slot.estado_pagamento !== 'pendente' ? ['Faturação'] : [])].map((label, i) => (
                 <button
                   key={i}
                   type="button"
@@ -651,19 +719,10 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           {(!slot || aba === 0) && (simplificado ? (
             /* ── MODO SIMPLIFICADO ── */
             <>
-              {/* Horário + Valor */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* Horário */}
+              <div className="grid grid-cols-2 gap-3">
                 <Input label="Início" value={form.hora_inicio} onChange={set('hora_inicio')} type="time" required />
                 <Input label="Fim" value={form.hora_fim} onChange={set('hora_fim')} type="time" required />
-                <Input
-                  label="Valor (€)"
-                  value={form.valor}
-                  onChange={set('valor')}
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  placeholder="—"
-                />
               </div>
 
               {/* Subtipo DJ — auto-preenche Valor e Categoria */}
@@ -694,10 +753,11 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 <DJCombobox
                   label="DJ convidado / externo"
                   value={form.dj_id}
-                  onChange={(id) => { setForm((f) => ({ ...f, dj_id: id, dj_externo: '' })); setNovoDJCriado(null) }}
+                  onChange={(id) => { setForm((f) => ({ ...f, dj_id: id, dj_externo: '' })); setNovoDJCriado(null); setDjConvidadoQuery('') }}
                   djs={djsActivos.filter((d) => (d.categorias ?? []).some((c) => [3,4,5].includes(c)) || true)}
                   onCriado={(dj) => setNovoDJCriado(dj)}
                   onlyConvidados
+                  onQueryChange={setDjConvidadoQuery}
                   placeholder="Pesquisar ou criar DJ convidado…"
                 />
               </div>
@@ -770,11 +830,10 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 </Select>
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <Input label="Data" value={form.data} onChange={set('data')} type="date" required className="col-span-1" />
                 <Input label="Início" value={form.hora_inicio} onChange={set('hora_inicio')} type="time" required />
                 <Input label="Fim" value={form.hora_fim} onChange={set('hora_fim')} type="time" required />
-                <Input label="Valor (€)" value={form.valor} onChange={set('valor')} type="number" min={0} step={0.01} placeholder="—" />
               </div>
 
               {/* Subtipo DJ — auto-preenche Valor e Categoria */}
@@ -963,11 +1022,211 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           )}
 
           {/* ── Aba 3: Contas ── */}
-          {slot && aba === 2 && (
-            <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
-              <span className="text-3xl text-accent-subtle">€</span>
-              <p className="text-sm font-semibold text-accent">Contas</p>
-              <p className="text-xs text-accent-subtle">Em breve</p>
+          {slot && aba === 2 && (() => {
+            const totalHorasExtra = horasExtras
+              .filter(h => h.estado === 'validado')
+              .reduce((s, h) => s + (h.valor_total ?? 0), 0)
+            const valorDJ    = form.valor    === '' ? 0 : Number(form.valor)    || 0
+            const transporte = form.transporte === '' ? 0 : Number(form.transporte) || 0
+            const extras     = form.extras     === '' ? 0 : Number(form.extras)     || 0
+            const totalCusto = valorDJ + transporte + extras + totalHorasExtra
+            const margem     = form.margem === '' ? 0 : Number(form.margem) || 0
+            return (
+              <div className="flex flex-col gap-5">
+                {/* Resumo financeiro */}
+                <div className="flex flex-col gap-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Valores</p>
+                  <div className="grid grid-cols-4 gap-3">
+                    <Input label="Valor DJ (€)" value={form.valor}
+                      onChange={set('valor')} type="number" min={0} step={0.01} placeholder="0" />
+                    <Input label="Margem (€)" value={form.margem}
+                      onChange={set('margem')} type="number" min={0} step={0.01} placeholder="0" />
+                    <Input label="Transporte (€)" value={form.transporte}
+                      onChange={set('transporte')} type="number" min={0} step={0.01} placeholder="0" />
+                    <Input label="Extras (€)" value={form.extras}
+                      onChange={set('extras')} type="number" min={0} step={0.01} placeholder="0" />
+                  </div>
+                  {/* Totais */}
+                  <div className="rounded-lg bg-surface-2 border border-border px-4 py-3 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between text-xs text-accent-subtle">
+                      <span>Custo total (DJ + transporte + extras + horas extra)</span>
+                      <span className="font-semibold text-accent">{formatarEuro(totalCusto)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-accent-subtle border-t border-border/50 pt-1.5 mt-0.5">
+                      <span>Margem (lucro)</span>
+                      <span className={clsx('font-semibold', margem > 0 ? 'text-status-confirmado' : 'text-accent')}>{formatarEuro(margem)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm border-t border-border/50 pt-2 mt-0.5">
+                      <span className="font-semibold text-accent">Total cliente</span>
+                      <span className="font-bold text-accent">{formatarEuro(totalCusto + margem)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Horas extras */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Horas extras</p>
+                    <button type="button" onClick={() => setNovaHoraAberta(v => !v)}
+                      className="flex items-center gap-1 text-[11px] text-accent-subtle hover:text-accent transition-colors">
+                      <Plus size={12} /> Adicionar
+                    </button>
+                  </div>
+
+                  {novaHoraAberta && (
+                    <div className="rounded-lg border border-border bg-surface-2 px-3 py-3 flex flex-col gap-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="col-span-3">
+                          <Input label="Descrição" value={novaHora.descricao}
+                            onChange={e => setNovaHora(h => ({ ...h, descricao: e.target.value }))}
+                            placeholder="Ex: 2h extra NYE" />
+                        </div>
+                        <Input label="Horas" value={novaHora.horas}
+                          onChange={e => setNovaHora(h => ({ ...h, horas: e.target.value }))}
+                          type="number" min={0} step={0.5} placeholder="0" />
+                        <Input label="€/hora" value={novaHora.valor_hora}
+                          onChange={e => setNovaHora(h => ({ ...h, valor_hora: e.target.value }))}
+                          type="number" min={0} step={1} placeholder={safeParse(config.contas_valor_hora_extra, 30)} />
+                        <div className="flex items-end">
+                          <div className="w-full rounded bg-surface-3 border border-border px-3 py-2 text-sm text-accent-muted text-center">
+                            {formatarEuro((Number(novaHora.horas)||0) * (Number(novaHora.valor_hora) || Number(safeParse(config.contas_valor_hora_extra, 30))))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button type="button" variante="ghost" tamanho="sm"
+                          onClick={() => { setNovaHoraAberta(false); setNovaHora({ descricao: '', horas: '', valor_hora: '' }) }}>
+                          Cancelar
+                        </Button>
+                        <Button type="button" variante="secondary" tamanho="sm" loading={novaHoraLoading}
+                          disabled={!novaHora.horas || Number(novaHora.horas) <= 0}
+                          onClick={async () => {
+                            setNovaHoraLoading(true)
+                            try {
+                              const vh = Number(novaHora.valor_hora) || Number(safeParse(config.contas_valor_hora_extra, 30))
+                              const nova = await agendaHorasExtraApi.criar({
+                                agendaId: slot.id,
+                                descricao: novaHora.descricao,
+                                horas: novaHora.horas,
+                                valorHora: vh,
+                              })
+                              setHorasExtras(hs => [...hs, nova])
+                              setNovaHoraAberta(false)
+                              setNovaHora({ descricao: '', horas: '', valor_hora: '' })
+                            } catch (err) {
+                              console.error(err)
+                            } finally {
+                              setNovaHoraLoading(false)
+                            }
+                          }}>
+                          Guardar hora extra
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {horasExtraLoading ? (
+                    <p className="text-xs text-accent-subtle py-2">A carregar…</p>
+                  ) : horasExtras.length === 0 ? (
+                    <p className="text-xs text-accent-subtle italic py-1">Sem horas extras registadas.</p>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {horasExtras.map(h => (
+                        <div key={h.id} className="flex items-center gap-2 rounded bg-surface-2 border border-border px-3 py-2">
+                          <Clock size={12} className="text-accent-subtle shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs text-accent">{h.descricao || `${h.horas}h extra`}</span>
+                            <span className="text-[10px] text-accent-subtle ml-2">{h.horas}h × {formatarEuro(h.valor_hora)} = {formatarEuro(h.valor_total)}</span>
+                          </div>
+                          <span className={clsx('text-[10px] px-1.5 py-0.5 rounded font-medium',
+                            h.estado === 'validado'  ? 'bg-status-confirmado/15 text-status-confirmado' :
+                            h.estado === 'recusado'  ? 'bg-red-500/15 text-red-400' :
+                            'bg-amber-400/15 text-amber-400'
+                          )}>
+                            {h.estado === 'validado' ? '✓ validado' : h.estado === 'recusado' ? '✗ recusado' : '⏳ pendente'}
+                          </span>
+                          {h.estado === 'pendente' && (
+                            <button type="button" title="Apagar"
+                              onClick={async () => {
+                                try {
+                                  await agendaHorasExtraApi.apagar(h.id)
+                                  setHorasExtras(hs => hs.filter(x => x.id !== h.id))
+                                } catch (err) { console.error(err) }
+                              }}
+                              className="text-accent-subtle hover:text-red-400 transition-colors ml-1">
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Pagamento */}
+                <div className="flex flex-col gap-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Pagamento</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Select label="Estado" value={form.estado_pagamento} onChange={set('estado_pagamento')}>
+                      {ESTADO_PAG_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </Select>
+                    <Select label="Forma" value={form.forma_pagamento} onChange={set('forma_pagamento')}>
+                      <option value="">—</option>
+                      {FORMA_PAG_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </Select>
+                  </div>
+                  <Textarea label="Notas financeiras" value={form.notas_contas}
+                    onChange={set('notas_contas')} placeholder="Referência de transferência, acordo especial…" />
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── Aba 5: Faturação (read-only) ── */}
+          {slot && aba === 4 && slot.estado_pagamento && slot.estado_pagamento !== 'pendente' && (
+            <div className="flex flex-col gap-4 py-1">
+              {/* Estado de pagamento */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-accent-subtle font-semibold uppercase tracking-wider">Estado de Pagamento</span>
+                <span className={clsx(
+                  'inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider',
+                  slot.estado_pagamento === 'pago'                    ? 'bg-green-500/15 text-green-300' :
+                  slot.estado_pagamento === 'em_analise'              ? 'bg-orange-500/15 text-orange-300' :
+                  slot.estado_pagamento === 'em_pagamento'            ? 'bg-blue-400/15 text-blue-300' :
+                  slot.estado_pagamento === 'a_pagamento'             ? 'bg-amber-400/15 text-amber-300' :
+                  slot.estado_pagamento === 'pendente_regularizacao'  ? 'bg-red-500/15 text-red-300' :
+                  'bg-white/8 text-white/50'
+                )}>
+                  {{
+                    pendente:               'Pendente',
+                    a_pagamento:            'A Pagamento',
+                    em_analise:             'Em Análise',
+                    aprovada_pagamento:     'Aprovada',
+                    em_pagamento:           'Em Pagamento',
+                    pago:                   'Pago',
+                    pendente_regularizacao: 'Pend. Regularização',
+                  }[slot.estado_pagamento] ?? slot.estado_pagamento}
+                </span>
+              </div>
+
+              {slot.motivo_discordancia && (
+                <div className="bg-surface-2 border border-border rounded-lg px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle mb-1">Motivo do DJ</p>
+                  <p className="text-xs text-accent-muted leading-relaxed">{slot.motivo_discordancia}</p>
+                </div>
+              )}
+
+              {slot.resposta_admin && (
+                <div className="bg-surface-2 border border-border rounded-lg px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle mb-1">Resposta Admin</p>
+                  <p className="text-xs text-accent-muted leading-relaxed">{slot.resposta_admin}</p>
+                </div>
+              )}
+
+              <p className="text-[11px] text-accent-subtle italic">
+                Para gerir este pagamento, acede à página{' '}
+                <a href="/pagamentos" className="text-accent underline underline-offset-2 hover:text-white transition-colors">Pagamentos</a>.
+              </p>
             </div>
           )}
 
@@ -1053,22 +1312,30 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
               </Button>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button type="button" variante="ghost" tamanho="sm" onClick={onFechar}>Cancelar</Button>
-            <Button
-              type="submit"
-              variante="primary"
-              tamanho="sm"
-              loading={loading}
-              disabled={!overrideRegras && (!!conflitoCrossEspaco || !!bloqueioIndisponivel)}
-              title={
-                !overrideRegras && conflitoCrossEspaco ? 'Resolve o conflito de Cliente antes de guardar'
-                : !overrideRegras && bloqueioIndisponivel ? 'DJ indisponível nesta data'
-                : undefined
-              }
-            >
-              Guardar
-            </Button>
+          <div className="flex flex-col gap-2 items-end">
+            {erro && (
+              <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-1.5 w-full text-left">
+                {erro}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button type="button" variante="ghost" tamanho="sm" onClick={onFechar}>Cancelar</Button>
+              <Button
+                type="submit"
+                variante="primary"
+                tamanho="sm"
+                loading={loading}
+                disabled={!overrideRegras && (!!conflitoCrossEspaco || !!bloqueioIndisponivel || conflito || conflitos.length > 0)}
+                title={
+                  !overrideRegras && conflitoCrossEspaco ? 'Resolve o conflito de Cliente antes de guardar'
+                  : !overrideRegras && bloqueioIndisponivel ? 'DJ indisponível nesta data'
+                  : !overrideRegras && (conflito || conflitos.length > 0) ? 'Existe conflito de agenda — activa "Ignorar validações" para forçar'
+                  : undefined
+                }
+              >
+                Guardar
+              </Button>
+            </div>
           </div>
         </div>
       </form>

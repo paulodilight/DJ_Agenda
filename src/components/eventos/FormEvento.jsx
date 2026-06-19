@@ -41,8 +41,24 @@ const VAZIO = {
   valor: '',
   valor_artistico: '',
   valor_apoio_tecnico: '',
+  margem: '',
+  transporte: '',
+  extras_contas: '',
+  estado_pagamento: '',
+  forma_pagamento: '',
+  notas_contas: '',
   tecnico_id: '',
 }
+
+const ESTADO_PAG_OPCOES = [
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'parcial',  label: 'Parcial' },
+  { value: 'pago',     label: 'Pago' },
+]
+const FORMA_PAG_OPCOES = [
+  { value: 'transferencia', label: 'Transferência' },
+  { value: 'dinheiro',      label: 'Dinheiro' },
+]
 
 const uidF = () => Math.random().toString(36).slice(2)
 const emptyItem = () => ({ _key: uidF(), descricao: '', unidades: 1, valor_unitario: '' })
@@ -187,7 +203,13 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         valor:               evento.valor               != null ? String(evento.valor)               : '',
         valor_artistico:     evento.valor_artistico     != null ? String(evento.valor_artistico)     : '',
         valor_apoio_tecnico: evento.valor_apoio_tecnico != null ? String(evento.valor_apoio_tecnico) : '',
-        notas_faturacao:     evento.notas_faturacao     ?? '',
+        margem:          evento.margem          != null ? String(evento.margem)          : '',
+        transporte:      evento.transporte      != null ? String(evento.transporte)      : '',
+        extras_contas:   evento.extras_contas   != null ? String(evento.extras_contas)   : '',
+        estado_pagamento: evento.estado_pagamento ?? '',
+        forma_pagamento:  evento.forma_pagamento  ?? '',
+        notas_contas:     evento.notas_contas     ?? '',
+        notas_faturacao:  evento.notas_faturacao  ?? '',
         xclusive:    evento.xclusive    ?? false,
         artista_id:  evento.artista_id  ?? '',
         tecnico_id:      evento.tecnico_id ?? '',
@@ -231,7 +253,13 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         valor:               form.valor               !== '' ? Number(form.valor)               : null,
         valor_artistico:     form.valor_artistico     !== '' ? Number(form.valor_artistico)     : null,
         valor_apoio_tecnico: form.valor_apoio_tecnico !== '' ? Number(form.valor_apoio_tecnico) : null,
-        notas_faturacao:     form.notas_faturacao?.trim() || null,
+        margem:        form.margem        !== '' ? Number(form.margem)        : null,
+        transporte:    form.transporte    !== '' ? Number(form.transporte)    : null,
+        extras_contas: form.extras_contas !== '' ? Number(form.extras_contas) : null,
+        estado_pagamento: form.estado_pagamento || null,
+        forma_pagamento:  form.forma_pagamento  || null,
+        notas_contas:     form.notas_contas?.trim() || null,
+        notas_faturacao:  form.notas_faturacao?.trim() || null,
         espaco_id:       form.espaco_id       || null,
         artista_id:      form.artista_id      || null,
         tecnico_id:      form.tecnico_id      || null,
@@ -328,6 +356,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             { id: 'geral',      label: 'Geral' },
             { id: 'tecnico',    label: 'Técnico & Notas' },
             { id: 'faturacao',  label: 'Faturação' },
+            { id: 'contas',     label: 'Contas' },
           ].map((aba) => (
             <button
               key={aba.id}
@@ -434,38 +463,24 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 />
               )}
 
-              {/* Valores — apoio técnico sempre visível; artístico só para tipos com artista */}
+              {/* Valor artístico — só para tipos com artista */}
               {(() => {
                 const tipoSel    = tipos.find(t => t.nome === form.tipo)
                 const temArtista = tipoSel?.tem_artista ?? false
                 const labelArt   = form.tipo ? `Valor ${form.tipo} (€)` : 'Valor Artístico (€)'
-                return (
-                  <div className={clsx(
-                    'grid gap-3 p-3 bg-surface-2/60 rounded-lg border border-border/50',
-                    temArtista ? 'grid-cols-2' : 'grid-cols-1 max-w-xs'
-                  )}>
-                    {temArtista && (
-                      <Field label={labelArt}>
-                        <input
-                          type="number" min="0" step="0.01"
-                          className={inputCls}
-                          value={form.valor_artistico}
-                          onChange={(e) => set('valor_artistico', e.target.value)}
-                          placeholder="0,00"
-                        />
-                      </Field>
-                    )}
-                    <Field label="Valor Apoio Técnico (€)">
+                return temArtista ? (
+                  <div className="grid grid-cols-1 max-w-xs gap-3 p-3 bg-surface-2/60 rounded-lg border border-border/50">
+                    <Field label={labelArt}>
                       <input
                         type="number" min="0" step="0.01"
                         className={inputCls}
-                        value={form.valor_apoio_tecnico}
-                        onChange={(e) => set('valor_apoio_tecnico', e.target.value)}
+                        value={form.valor_artistico}
+                        onChange={(e) => set('valor_artistico', e.target.value)}
                         placeholder="0,00"
                       />
                     </Field>
                   </div>
-                )
+                ) : null
               })()}
 
               {/* Técnico Responsável + Contacto */}
@@ -634,6 +649,92 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               })}
             </>
           )}
+
+          {/* ── Aba Contas ── */}
+          {abaActiva === 'contas' && (() => {
+            const vApoio  = form.valor_apoio_tecnico === '' ? 0 : Number(form.valor_apoio_tecnico) || 0
+            const vMargem = form.margem       === '' ? 0 : Number(form.margem)       || 0
+            const vTransp = form.transporte   === '' ? 0 : Number(form.transporte)   || 0
+            const vExtras = form.extras_contas === '' ? 0 : Number(form.extras_contas) || 0
+            const totalCli = vApoio + vMargem + vTransp + vExtras
+            const fmt = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v)
+            return (
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Valores</p>
+                  <div className="grid grid-cols-4 gap-3">
+                    <Field label="Apoio Técnico (€)">
+                      <input type="number" min="0" step="0.01" className={inputCls}
+                        value={form.valor_apoio_tecnico}
+                        onChange={(e) => set('valor_apoio_tecnico', e.target.value)}
+                        placeholder="0" />
+                    </Field>
+                    <Field label="Margem (€)">
+                      <input type="number" min="0" step="0.01" className={inputCls}
+                        value={form.margem}
+                        onChange={(e) => set('margem', e.target.value)}
+                        placeholder="0" />
+                    </Field>
+                    <Field label="Transporte (€)">
+                      <input type="number" min="0" step="0.01" className={inputCls}
+                        value={form.transporte}
+                        onChange={(e) => set('transporte', e.target.value)}
+                        placeholder="0" />
+                    </Field>
+                    <Field label="Extras (€)">
+                      <input type="number" min="0" step="0.01" className={inputCls}
+                        value={form.extras_contas}
+                        onChange={(e) => set('extras_contas', e.target.value)}
+                        placeholder="0" />
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-surface-3/40 border border-border/60 rounded-lg flex flex-col gap-1.5">
+                  {[
+                    { label: 'Apoio Técnico', v: vApoio },
+                    { label: 'Margem',        v: vMargem },
+                    { label: 'Transporte',    v: vTransp },
+                    { label: 'Extras',        v: vExtras },
+                  ].filter(r => r.v > 0).map(({ label, v }) => (
+                    <div key={label} className="flex justify-between text-xs text-accent-muted">
+                      <span>{label}</span><span className="tabular-nums">{fmt(v)}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-xs font-semibold text-accent border-t border-border/40 pt-1.5 mt-0.5">
+                    <span>Total cliente</span>
+                    <span className="tabular-nums">{fmt(totalCli)}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Pagamento</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Estado">
+                      <select className={inputCls} value={form.estado_pagamento}
+                        onChange={(e) => set('estado_pagamento', e.target.value)}>
+                        {ESTADO_PAG_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Forma">
+                      <select className={inputCls} value={form.forma_pagamento}
+                        onChange={(e) => set('forma_pagamento', e.target.value)}>
+                        <option value="">—</option>
+                        {FORMA_PAG_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                </div>
+
+                <Field label="Notas de contas">
+                  <textarea className={textareaCls} rows={3}
+                    value={form.notas_contas}
+                    onChange={(e) => set('notas_contas', e.target.value)}
+                    placeholder="Notas internas sobre pagamento, acordos, condições…" />
+                </Field>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Footer */}

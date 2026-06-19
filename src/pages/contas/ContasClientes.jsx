@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import {
-  Save, Search, X, Plus, Trash2, ChevronDown, ChevronRight,
-  MessageSquare, Link2, Check, Calendar, ExternalLink, Printer, AlertTriangle
+  Save, Search, X, Plus, Trash2, ChevronRight, ChevronsDown,
+  MessageSquare, Link2, Check, Calendar, ExternalLink, Printer, AlertTriangle,
 } from 'lucide-react'
 import { useMesStore } from '@/store'
 import { useEspacos } from '@/hooks/useEspacos'
@@ -296,6 +296,12 @@ function fmtDayNums(slots) {
 }
 
 function slotRate(slot, subtiposConfig, catTotals) {
+  if (slot.valor != null) {
+    return (Number(slot.valor)      || 0)
+         + (Number(slot.margem)     || 0)
+         + (Number(slot.transporte) || 0)
+         + (Number(slot.extras)     || 0)
+  }
   const tipo = mapTipoSlot(slot.tipo_slot)
   if (!tipo) return 0
   if (subtiposConfig?.length > 0) {
@@ -306,6 +312,12 @@ function slotRate(slot, subtiposConfig, catTotals) {
   }
   return catTotals?.[tipo]?.total ?? 0
 }
+
+const eventoRate = (ev) =>
+  (Number(ev.valor_apoio_tecnico) || 0)
+  + (Number(ev.margem)            || 0)
+  + (Number(ev.transporte)        || 0)
+  + (Number(ev.extras_contas)     || 0)
 
 const ADD_BTNS = [
   { label: '+ Aluguer', campo: 'equipamentos_alugado' },
@@ -514,7 +526,7 @@ function SecApoioTecnico({ eventos, annotatedIds, apoioOverride, onOverrideChang
                       </td>
                     </tr>
                     {paineis[evKey] && (
-                      <tr className="border-b border-border/10 bg-surface-0/35">
+                      <tr className="border-b border-white/4 bg-surface-0/35">
                         <td colSpan={3} className="px-5 py-3">
                           <ExpandAddPanel nome={ev.evento} onAddItem={onAddItem} />
                         </td>
@@ -548,7 +560,7 @@ function SecApoioTecnico({ eventos, annotatedIds, apoioOverride, onOverrideChang
 
                     {/* Painel add — apenas para eventos únicos (n=1) */}
                     {g.n === 1 && paineis[gKey] && (
-                      <tr className="border-b border-border/10 bg-surface-0/35">
+                      <tr className="border-b border-white/4 bg-surface-0/35">
                         <td colSpan={3} className="px-5 py-3">
                           <ExpandAddPanel nome={g.nome} onAddItem={onAddItem} />
                         </td>
@@ -557,7 +569,7 @@ function SecApoioTecnico({ eventos, annotatedIds, apoioOverride, onOverrideChang
 
                     {/* Sub-rows para grupos múltiplos — apenas informação, sem add */}
                     {g.n > 1 && gruposAbertos[g.nome] && g.items.map(ev => (
-                      <tr key={ev.id} className="border-b border-border/10 bg-surface-0/30">
+                      <tr key={ev.id} className="border-b border-white/4 bg-surface-0/30">
                         <td colSpan={3} className="py-1.5 pl-14 pr-3">
                           <div className="flex items-center gap-3">
                             <span className="w-2.5 h-px bg-border/20 shrink-0" />
@@ -679,7 +691,7 @@ function SecAtuacoesDJ({ slots, catTotals, subtiposConfig, totalDJs, onAddItem, 
               <td />
             </tr>
             {unico && paineis[djKey] && (
-              <tr className="border-b border-border/10 bg-surface-0/35">
+              <tr className="border-b border-white/4 bg-surface-0/35">
                 <td colSpan={5} className="px-5 py-3">
                   <ExpandAddPanel nome={dj.nome} onAddItem={onAddItem} />
                 </td>
@@ -704,7 +716,7 @@ function SecAtuacoesDJ({ slots, catTotals, subtiposConfig, totalDJs, onAddItem, 
           {residentes.length > 0 && (
             <>
               <tr onClick={() => setResidAberto(p => !p)}
-                className="border-b border-border/30 bg-surface-1/40 cursor-pointer hover:bg-surface-1/60 transition-colors">
+                className="border-b border-white/6 bg-surface-1/40 cursor-pointer hover:bg-surface-1/60 transition-colors">
                 <td className="py-1.5 pl-4 pr-2">
                   <div className="flex items-center gap-1.5">
                     <ChevronRight size={10} className={clsx('text-border/40 shrink-0 transition-transform', residAberto && 'rotate-90')} />
@@ -731,13 +743,13 @@ function SecAtuacoesDJ({ slots, catTotals, subtiposConfig, totalDJs, onAddItem, 
   )
 }
 
-function SecManualItems({ titulo, linhas, total, onChange, eventos, onSave, saving }) {
+function SecManualItems({ titulo, linhas, total, onChange, eventos, onSave, saving, noHeader }) {
   const addLinha = () => onChange([...linhas, emptyLinha()])
   const updLinha = (key, row) => onChange(linhas.map(r => r._key === key ? { ...row, dirty: true } : r))
   const remLinha = (key) => onChange(linhas.filter(r => r._key !== key))
   return (
     <div className="flex flex-col border border-white/8 rounded-lg overflow-hidden">
-      <DocSectionTitle titulo={titulo} onSave={onSave} saving={saving} />
+      {!noHeader && <DocSectionTitle titulo={titulo} onSave={onSave} saving={saving} />}
       <table className="w-full text-xs border-collapse">
         <thead><ColsHeader cols={[{ l: 'Item' }, { l: 'Unid.', center: true }, { l: 'V.Unit.', right: true }, { l: 'Marg.', right: true }, { l: 'Subtotal', right: true }, { l: '' }]} /></thead>
         <tbody>
@@ -771,9 +783,9 @@ function TabelaResumo({ categorias, total }) {
   const toggle = k => setExpandidos(p => ({ ...p, [k]: !p[k] }))
 
   return (
-    <table className="w-full text-xs border-collapse border-b border-border/30">
+    <table className="w-full text-xs border-collapse">
       <thead>
-        <tr className="border-b border-border/30 bg-surface-0/20">
+        <tr className="border-b border-white/6 bg-surface-0/20">
           <th className="py-2 pl-5 text-left text-xs font-bold text-white/70 uppercase tracking-widest">Categoria</th>
           <th className="py-2 px-3 text-center text-xs font-bold text-white/70 uppercase tracking-widest w-14">Qtd.</th>
           <th className="py-2 pr-5 text-right text-xs font-bold text-white/70 uppercase tracking-widest w-28">Subtotal</th>
@@ -811,7 +823,7 @@ function TabelaResumo({ categorias, total }) {
                 </tr>
               )}
               {expandidos[cat.key] && cat.detail == null && cat.sub?.map((s, i, arr) => (
-                <tr key={i} className={clsx('bg-surface-0/25', i < arr.length - 1 ? 'border-b border-border/8' : '')}>
+                <tr key={i} className={clsx('bg-surface-0/25', i < arr.length - 1 ? 'border-b border-white/4' : '')}>
                   <td className="py-1.5 pl-12 pr-2 text-[11px] text-accent-muted">{s.label}</td>
                   <td className="py-1.5 px-3 text-center text-[11px] text-accent-subtle/40 tabular-nums">{s.qtd || '—'}</td>
                   <td className="py-1.5 pr-5 text-right text-[11px] font-medium text-accent tabular-nums">{s.valor > 0 ? formatarEuro(s.valor) : '—'}</td>
@@ -851,233 +863,283 @@ function initCard(servicos) {
     while (rows.length < n) rows.push(emptyLinha())
     return rows
   }
-  const apoioEn = servicos.find(s => s.tipo === 'apoio_tecnico')
   const notasRows = servicos.filter(s => s.tipo === 'nota_auto')
   const notasMap = {}
   notasRows.forEach(r => { notasMap[r.descricao] = r.notas ?? '' })
-  const djImprimirRows = servicos.filter(s => s.tipo === 'dj_imprimir')
-  const djImprimirMap = Object.fromEntries(DJ_CAT_KEYS.map(k => [k, false]))
-  djImprimirRows.forEach(r => { if (r.descricao in djImprimirMap) djImprimirMap[r.descricao] = true })
+  const psRow = servicos.find(s => s.tipo === 'print_state')
+  const printState = psRow ? safeParse(psRow.notas, {}) : {}
 
   return {
     equipamentos_comprado: pad(servicos, 'equipamento_comprado', 0),
     equipamentos_alugado:  pad(servicos, 'equipamento_alugado', 0),
     musicos_bandas:        pad(servicos, 'musicos_bandas', 0),
     extras:                pad(servicos, 'extra'),
-    apoioOverride: apoioEn != null ? String(apoioEn.valor ?? '') : null,
-    apoioId: apoioEn?.id ?? null,
+    printState,
     notasAuto: notasMap,
-    djImprimir: djImprimirMap,
     dirty: false,
   }
 }
 
 // ── Card por Cliente ──────────────────────────────────────────────────────────
-function SpaceCard({ espaco, slots, eventos, agendTec, cardState, onCardChange, onSave, saving, catTotals, subtiposConfig }) {
-  const djCats = useMemo(() => CAT_DEFS.map(def => {
-    const catSlots = slots.filter(s => mapTipoSlot(s.tipo_slot) === def.key)
-    const djMap = {}
-    let billing = 0
-    catSlots.forEach(s => {
-      const rate = slotRate(s, subtiposConfig, catTotals)
-      billing += rate
-      const nome = s.dj_nome || s.djs?.nome_artistico || s.djs?.nome || 'DJ'
-      if (!djMap[nome]) djMap[nome] = { nome, slots: [], billing: 0 }
-      djMap[nome].slots.push(s)
-      djMap[nome].billing += rate
+const DJ_META = [
+  { key: 'residentes',    label: 'Residentes',    tipos: ['residente_anl', 'residente', 'residente_st'] },
+  { key: 'convidado_int', label: 'Convidados INT', tipos: ['convidado_int'] },
+  { key: 'convidado_ext', label: 'Convidados EXT', tipos: ['convidado_ext'] },
+  { key: 'premium',       label: 'Premium',        tipos: ['premium'] },
+]
+const PRINT_MAP = {
+  'prev':        { comAgenda: false, titulo: 'AGENDA PROPOSTA', docTipo: 'PREVISÃO'    },
+  'prev-agenda': { comAgenda: true,  titulo: 'AGENDA PROPOSTA', docTipo: 'PREVISÃO'    },
+  'conf':        { comAgenda: false, titulo: 'AGENDA FINAL',    docTipo: 'CONFIRMAÇÃO' },
+  'conf-agenda': { comAgenda: true,  titulo: 'AGENDA FINAL',    docTipo: 'CONFIRMAÇÃO' },
+}
+
+function PrintToggle({ k, isPrinted, togglePrint }) {
+  const on = isPrinted(k)
+  return (
+    <button onClick={e => { e.stopPropagation(); togglePrint(k) }}
+      title={on ? 'Excluir da impressão' : 'Incluir na impressão'}
+      className="relative shrink-0 p-1 rounded hover:bg-white/5 transition-colors">
+      <Printer size={11} className={on ? 'text-white/40' : 'text-white/15'} />
+      {!on && <X size={7} className="absolute bottom-0.5 right-0.5 text-red-400/80" />}
+    </button>
+  )
+}
+
+function SpaceCard({ espaco, slots, eventos, cardState, onCardChange, onSave, saving, catTotals, subtiposConfig, turnos, mes, layoutView }) {
+  // DJ hierarchy: meta-grupo (Residentes/Convidados) → turno → DJ
+  const djHier = useMemo(() => {
+    return DJ_META.map(meta => {
+      const turnosMap = {}
+      let metaBilling = 0
+      let metaN = 0
+      const daysSet = new Set()
+      slots.forEach(slot => {
+        const tipoKey = mapTipoSlot(slot.tipo_slot)
+        if (!meta.tipos.includes(tipoKey)) return
+        let turnoLabel
+        if (slot.turno_id) {
+          const t = turnos.find(t => t.id === slot.turno_id)
+          turnoLabel = t?.nome ?? `${slot.hora_inicio?.slice(0,5) ?? '?'}–${slot.hora_fim?.slice(0,5) ?? '?'}`
+        } else {
+          const h = [slot.hora_inicio?.slice(0,5), slot.hora_fim?.slice(0,5)].filter(Boolean).join('–')
+          turnoLabel = h || 'Sem horário'
+        }
+        const djNome = slot.dj_nome || slot.djs?.nome_artistico || slot.djs?.nome || 'DJ'
+        const rate = slotRate(slot, subtiposConfig, catTotals)
+        metaBilling += rate
+        metaN++
+        if (slot.data) daysSet.add(String(new Date(slot.data + 'T12:00:00').getDate()).padStart(2, '0'))
+        if (!turnosMap[turnoLabel]) turnosMap[turnoLabel] = { label: turnoLabel, billing: 0, djs: {} }
+        turnosMap[turnoLabel].billing += rate
+        if (!turnosMap[turnoLabel].djs[djNome]) turnosMap[turnoLabel].djs[djNome] = { nome: djNome, slots: [], billing: 0 }
+        turnosMap[turnoLabel].djs[djNome].slots.push(slot)
+        turnosMap[turnoLabel].djs[djNome].billing += rate
+      })
+      const days = [...daysSet].sort((a, b) => Number(a) - Number(b))
+      const turnosList = Object.values(turnosMap).map(t => ({ ...t, djs: Object.values(t.djs) }))
+      return { key: meta.key, label: meta.label, n: metaN, days, billing: metaBilling, turnos: turnosList }
+    }).filter(g => g.billing > 0)
+  }, [slots, turnos, subtiposConfig, catTotals])
+
+  // Build APOIO hierarchy: tipo → nome (merged)
+  const apoioHier = useMemo(() => {
+    const map = {}
+    eventos.forEach(ev => {
+      const tipo = ev.tipo ?? 'Sem tipo'
+      const nome = (ev.evento ?? 'Sem nome').trim()
+      const rate = eventoRate(ev)
+      if (!map[tipo]) map[tipo] = { tipo, billing: 0, grupos: {} }
+      map[tipo].billing += rate
+      if (!map[tipo].grupos[nome]) map[tipo].grupos[nome] = { nome, items: [], billing: 0 }
+      map[tipo].grupos[nome].items.push(ev)
+      map[tipo].grupos[nome].billing += rate
     })
-    return { ...def, n: catSlots.length, billing, djs: Object.values(djMap) }
-  }), [slots, subtiposConfig, catTotals])
+    return Object.values(map).map(t => {
+      const grupos = Object.values(t.grupos).map(g => {
+        const days = [...new Set(g.items.map(e => e.data_evento ? String(new Date(e.data_evento+'T12:00:00').getDate()).padStart(2,'0') : null).filter(Boolean))].sort((a,b)=>Number(a)-Number(b))
+        return { ...g, n: g.items.length, days }
+      })
+      const tipodays = [...new Set(grupos.flatMap(g => g.days))].sort((a,b)=>Number(a)-Number(b))
+      return { ...t, grupos, n: grupos.reduce((a,g)=>a+g.n,0), days: tipodays }
+    })
+  }, [eventos])
 
-  const apoioAuto = useMemo(() =>
-    eventos.reduce((a, e) => a + parseNum(e.valor_apoio_tecnico), 0),
-    [eventos])
-  const apoioValor = cardState.apoioOverride !== null ? parseNum(cardState.apoioOverride) : apoioAuto
-
-  // IDs de eventos com anotações de faturação (notas ou itens ligados)
-  const annotatedEventIds = useMemo(() => {
-    const ids = new Set()
-    eventos.forEach(ev => { if (ev.notas_faturacao?.trim()) ids.add(ev.id) })
-    ;[...cardState.equipamentos_comprado, ...cardState.equipamentos_alugado, ...cardState.extras]
-      .forEach(r => { if (r.evento_id) ids.add(r.evento_id) })
-    return ids
-  }, [eventos, cardState.equipamentos_comprado, cardState.equipamentos_alugado, cardState.extras])
-
-  const addToSection = useCallback((campo, descricao, unidades = 1, valorUnit = '', notas = '') => {
-    const nova = { ...emptyLinha(), descricao, unidades: Number(unidades) || 1, valor_unitario: String(valorUnit), notas }
-    onCardChange(espaco.id, { ...cardState, [campo]: [...cardState[campo], nova], dirty: true })
-  }, [cardState, espaco.id, onCardChange])
-
+  const totalDJs      = djHier.reduce((a, g) => a + g.billing, 0)
+  const totalDJsN     = djHier.reduce((a, g) => a + g.n, 0)
+  const totalApoio    = apoioHier.reduce((a, t) => a + t.billing, 0)
+  const totalMusicos  = cardState.musicos_bandas.reduce((a, r) => a + itemTotal(r), 0)
   const totalComprado = cardState.equipamentos_comprado.reduce((a, r) => a + itemTotal(r), 0)
-  const totalAlugado  = cardState.equipamentos_alugado.reduce((a, r)  => a + itemTotal(r), 0)
-  const totalMusicos  = cardState.musicos_bandas.reduce((a, r)        => a + itemTotal(r), 0)
-  const totalExtras   = cardState.extras.reduce((a, r)                => a + itemTotal(r), 0)
+  const totalAlugado  = cardState.equipamentos_alugado.reduce((a, r) => a + itemTotal(r), 0)
+  const totalExtras   = cardState.extras.reduce((a, r) => a + itemTotal(r), 0)
+  const avenca        = parseNum(espaco.valor_avenca)
+  const totalGeral    = avenca + totalDJs + totalMusicos + totalApoio + totalComprado + totalAlugado + totalExtras
 
-  const avenca = parseNum(espaco.valor_avenca)
-  const totalDJs = djCats.reduce((a, c) => a + c.billing, 0)
-  const totalGeral = avenca + totalDJs + totalMusicos + apoioValor + totalComprado + totalAlugado + totalExtras
+  const upd = (campo, val) => onCardChange(espaco.id, { ...cardState, [campo]: val, dirty: true })
 
-  const upd     = (campo, val) => onCardChange(espaco.id, { ...cardState, [campo]: val, dirty: true })
-  const updNota = (key, txt)   => onCardChange(espaco.id, { ...cardState, notasAuto: { ...cardState.notasAuto, [key]: txt }, dirty: true })
+  // Print state — opt-out: default=imprime, false=exclui
+  const ps = cardState.printState ?? {}
+  const isPrinted = (key) => {
+    const parts = key.split(':')
+    for (let i = 1; i <= parts.length; i++) {
+      if (ps[parts.slice(0, i).join(':')] === false) return false
+    }
+    return true
+  }
+  const togglePrint = (key) => {
+    const newPs = { ...ps }
+    if (newPs[key] === false) delete newPs[key]
+    else newPs[key] = false
+    onCardChange(espaco.id, { ...cardState, printState: newPs, dirty: true })
+  }
+  const toggle = (k) => <PrintToggle k={k} isPrinted={isPrinted} togglePrint={togglePrint} />
 
-  const subTotal = (arr) => arr.filter(r => itemTotal(r) > 0 && r.descricao?.trim())
-    .map(r => ({ label: r.descricao, qtd: Number(r.unidades), valor: itemTotal(r) }))
+  // Accordion states
+  const [artistasAberto, setArtistasAberto] = useState(false)
+  const [apoioAberto, setApoioAberto]       = useState(false)
+  const [avencaAberto, setAvencaAberto]     = useState(false)
+  const [extrasAberto, setExtrasAberto]     = useState(false)
+  const [alugadosAberto, setAlugadosAberto] = useState(false)
+  const [compradosAberto, setCompradosAberto] = useState(false)
+const [gruposAbertos, setGruposAbertos]   = useState({})
+  const [turnosAbertos, setTurnosAbertos]   = useState({})
+  const [apoioTiposAbertos, setApoioTiposAbertos]   = useState({})
+  const [apoioGruposAbertos, setApoioGruposAbertos] = useState({})
+  const togGrupo      = k => setGruposAbertos(p => ({ ...p, [k]: !p[k] }))
+  const togTurno      = k => setTurnosAbertos(p => ({ ...p, [k]: !p[k] }))
+  const togApoioTipo  = k => setApoioTiposAbertos(p => ({ ...p, [k]: !p[k] }))
+  const togApoioGrupo = k => setApoioGruposAbertos(p => ({ ...p, [k]: !p[k] }))
 
-  const avencaDetail = avenca > 0 ? (
-    <div className="flex items-center gap-3 px-5 py-2 text-xs bg-surface-0/20">
-      <span className="text-accent flex-1">{espaco.nome}</span>
-      {cardState.notasAuto['avenca']?.trim() && (
-        <span className="text-[11px] text-border/45 italic">{cardState.notasAuto['avenca']}</span>
-      )}
-      <span className="text-accent tabular-nums">{formatarEuro(avenca)}</span>
-    </div>
-  ) : null
+  const fmtE = v => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v)
 
-  const apoioDetail = (
-    <div className="bg-surface-0/10">
-      {eventos.map(ev => (
-        <InlineAddSection key={ev.id} nome={ev.evento || 'Apoio Técnico'} onAddItem={addToSection} className="py-1.5 px-5">
-          <span className="text-xs text-accent flex-1 min-w-0 truncate">{ev.evento || 'Sem nome'}</span>
-          <span className="text-[10px] text-border/40 shrink-0">{fmtDates([ev])}</span>
-          <BillingIcons ev={ev} cardState={cardState} />
-          <span className="text-xs text-accent tabular-nums shrink-0">
-            {parseNum(ev.valor_apoio_tecnico) > 0 ? formatarEuro(parseNum(ev.valor_apoio_tecnico)) : <span className="text-border/20">—</span>}
-          </span>
-        </InlineAddSection>
-      ))}
-      {eventos.length === 0 && <p className="py-3 pl-5 text-[11px] text-border/15 italic">Sem eventos</p>}
-      <div className="flex items-center justify-between gap-2 px-5 py-1.5 bg-surface-0/10">
-        <span className="text-[10px] text-accent-subtle/30 uppercase tracking-widest">override</span>
-        <div className="flex items-center gap-2">
-          {cardState.apoioOverride !== null && (
-            <button onClick={() => onCardChange(espaco.id, { ...cardState, apoioOverride: null, dirty: true })}
-              className="text-[10px] text-status-confirmado/50 hover:text-status-confirmado/70 transition-colors">repor auto</button>
-          )}
-          <input type="number" min="0" step="0.01"
-            value={cardState.apoioOverride ?? apoioAuto}
-            onChange={e => onCardChange(espaco.id, { ...cardState, apoioOverride: e.target.value, dirty: true })}
-            className="w-24 bg-surface-2 border border-border/25 rounded-lg px-2 py-1 text-xs text-accent text-right focus:outline-none focus:border-accent/30 transition-colors" />
+  const handlePrint = () => {
+    const { comAgenda, titulo: tituloDoc, docTipo } = PRINT_MAP[layoutView] ?? PRINT_MAP['prev']
+    const mesFmt = format(new Date(mes + '-02'), 'MMMM yyyy', { locale: pt })
+    const mesFmtCap = mesFmt.charAt(0).toUpperCase() + mesFmt.slice(1)
+
+    // Cabeçalho partilhado (logo + PREVISÃO/CONFIRMAÇÃO em destaque)
+    const initials = espaco.nome.split(' ').slice(0,2).map(w=>w[0]??'').join('').toUpperCase()
+    const logoHtml = espaco.logo_url
+      ? `<img src="${espaco.logo_url}" style="width:72px;height:72px;object-fit:contain;display:block;border:1px solid #eee;border-radius:4px" />`
+      : `<div style="background:#000;color:#fff;width:72px;height:72px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;box-sizing:border-box;border-radius:4px"><div style="font-size:14px;font-weight:900;letter-spacing:.04em">${initials}</div><div style="font-size:7px;letter-spacing:.1em;margin-top:4px;opacity:.6;text-transform:uppercase">${espaco.nome.split(' ').slice(1).join(' ')||espaco.nome}</div></div>`
+    const tipoCor = docTipo === 'CONFIRMAÇÃO' ? '#2563eb' : '#6b7280'
+    const pageHeader = (label) => `
+      <div style="display:flex;align-items:flex-start;gap:20px;margin-bottom:16px">
+        <div style="flex-shrink:0">${logoHtml}</div>
+        <div style="flex:1;padding-top:2px">
+          <div style="font-size:22px;font-weight:900;letter-spacing:.01em;line-height:1;margin-bottom:6px">${espaco.nome.toUpperCase()}</div>
+          <div style="font-size:16px;font-weight:900;letter-spacing:.14em;color:${tipoCor};text-transform:uppercase">${docTipo}</div>
+          <div style="font-size:10px;color:#888;margin-top:5px;text-transform:uppercase;letter-spacing:.06em">${mesFmtCap} · ${label}</div>
         </div>
       </div>
-    </div>
-  )
+      <hr style="border:none;border-top:1.5px solid #111;margin:0 0 18px">
+    `
 
-  const djDetail = djCats.some(c => c.n > 0) ? (
-    <div className="bg-surface-0/10">
-      {djCats.filter(c => c.n > 0).map(cat => (
-        <React.Fragment key={cat.key}>
-          <div className="flex items-center px-5 py-1 bg-surface-1/30 border-b border-border/15">
-            <span className="text-[10px] font-bold text-accent-subtle/70 uppercase tracking-widest flex-1">{cat.label}</span>
-            <span className="text-[11px] text-accent tabular-nums">{formatarEuro(cat.billing)}</span>
-          </div>
-          {cat.djs.map(dj => {
-            const dias = fmtDayNums(dj.slots)
-            return (
-              <InlineAddSection key={dj.nome} nome={dj.nome} onAddItem={addToSection} className="py-1.5 px-9">
-                <span className="text-xs text-accent flex-1">{dj.nome}{dias ? ` (Dias ${dias})` : ''}</span>
-                <span className="text-xs text-accent tabular-nums">{formatarEuro(dj.billing)}</span>
-              </InlineAddSection>
-            )
-          })}
-        </React.Fragment>
-      ))}
-    </div>
-  ) : null
+    // ARTISTAS: linha DJs sempre visível; grupos só se toggle ON (com DJs dentro)
+    const printedGrupos = djHier.filter(g => isPrinted(`artistas:${g.key}`))
+    const djTotalPrint = printedGrupos.reduce((a, g) => a + g.billing, 0)
+    const musicosPrint = totalMusicos > 0 && isPrinted('artistas:musicos')
+    const artistasTotal = djTotalPrint + (musicosPrint ? totalMusicos : 0)
+    const djsRow = totalDJs > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:12px;font-weight:600;color:#555"><span>DJs <span style="font-weight:normal">${totalDJsN}</span></span><span>${fmtE(totalDJs)}</span></div>` : ''
+    const grupRows = printedGrupos.map(g => {
+      const diasLabel = g.days.length > 0 ? ` <span style="font-weight:normal;font-size:11px;color:#999">(dias ${g.days.join(', ')})</span>` : ''
+      const djsHtml = g.turnos.flatMap(t => t.djs).map(dj =>
+        `<tr><td style="padding-left:20px">${dj.nome}${fmtDayNums(dj.slots) ? ` <span style="color:#999;font-size:11px">(Dias ${fmtDayNums(dj.slots)})</span>` : ''}</td><td class="r">${fmtE(dj.billing)}</td></tr>`
+      ).join('')
+      return `<div class="sub-sec"><div class="sub-hdr"><span>${g.label}${g.n > 0 ? ` <span style="font-weight:normal">${g.n}</span>` : ''}${diasLabel}</span><span>${fmtE(g.billing)}</span></div>${djsHtml ? `<table class="items"><tbody>${djsHtml}</tbody></table>` : ''}</div>`
+    }).join('')
+    const artistasSec = artistasTotal > 0 ? `<div class="sec"><div class="sec-hdr"><span>Artistas</span><span>${fmtE(artistasTotal)}</span></div>${djsRow}${grupRows}${musicosPrint ? `<div class="item-row"><span style="padding-left:12px">Músicos / Bandas</span><span>${fmtE(totalMusicos)}</span></div>` : ''}</div>` : ''
 
-  const musicosDetail = cardState.musicos_bandas.some(r => r.descricao?.trim()) ? (
-    <div className="bg-surface-0/10">
-      {cardState.musicos_bandas.filter(r => r.descricao?.trim()).map(r => (
-        <InlineAddSection key={r._key} nome={r.descricao} onAddItem={addToSection} className="py-1.5 px-5">
-          <span className="text-xs text-accent flex-1">{r.descricao}</span>
-          <span className="text-xs text-accent-subtle/40 tabular-nums">{Number(r.unidades)}x</span>
-          <span className="text-xs text-accent tabular-nums">{formatarEuro(itemTotal(r))}</span>
-        </InlineAddSection>
-      ))}
-    </div>
-  ) : null
+    // APOIO TÉCNICO: tipos sempre visíveis; grupos dentro seguem toggle
+    const apoioSecs = apoioHier.map(at => {
+      const printedGs = at.grupos.filter(g => isPrinted(`apoio:${at.tipo}:${g.nome}`))
+      const atBilling = printedGs.reduce((a, g) => a + g.billing, 0)
+      const diasAt = at.days.length > 0 ? ` <span style="font-weight:normal;font-size:11px;color:#999">(dias ${at.days.join(', ')})</span>` : ''
+      const rows = printedGs.map(g => {
+        const diasG = g.days.join(', ')
+        return `<tr><td>${g.nome}${g.n > 0 ? ` <span style="color:#999;font-size:11px">${g.n}×</span>` : ''}${diasG ? ` <span style="color:#999;font-size:11px">(Dias ${diasG})</span>` : ''}</td><td class="r">${fmtE(g.billing)}</td></tr>`
+      }).join('')
+      return `<div class="sec"><div class="sec-hdr"><span>Apoio Técnico · ${at.tipo}${at.n > 0 ? ` <span style="font-weight:normal">${at.n}</span>` : ''}${diasAt}</span><span>${fmtE(atBilling)}</span></div>${rows ? `<table class="items"><tbody>${rows}</tbody></table>` : ''}</div>`
+    }).join('')
 
-  const categorias = [
-    { key: 'djs',     label: 'Atuações DJ',               qtd: djCats.reduce((a,c) => a + c.n, 0),        valor: totalDJs,     detail: djDetail },
-    { key: 'musicos', label: 'Atuações Músicos / Bandas', qtd: subTotal(cardState.musicos_bandas).length, valor: totalMusicos, detail: musicosDetail },
-    { key: 'apoio',   label: 'Apoio Técnico',             qtd: eventos.length,                            valor: apoioValor,   detail: apoioDetail },
-    { key: 'equip_comprado', label: 'Equipamentos Comprado', qtd: subTotal(cardState.equipamentos_comprado).length, valor: totalComprado, sub: subTotal(cardState.equipamentos_comprado) },
-    { key: 'equip_alugado',  label: 'Equipamentos Alugado',  qtd: subTotal(cardState.equipamentos_alugado).length,  valor: totalAlugado,  sub: subTotal(cardState.equipamentos_alugado) },
-    { key: 'avenca',  label: 'Avenças',                  qtd: avenca > 0 ? 1 : 0,                       valor: avenca,       detail: avencaDetail },
-    { key: 'extras',         label: 'Extras',                qtd: subTotal(cardState.extras).length,                valor: totalExtras,   sub: subTotal(cardState.extras) },
-  ]
+    const avencaSec = avenca > 0 ? `<div class="sec"><div class="sec-hdr"><span>Avença</span><span>${fmtE(avenca)}</span></div></div>` : ''
+    const extrasSec = totalExtras  > 0 ? `<div class="sec"><div class="sec-hdr"><span>Extras</span><span>${fmtE(totalExtras)}</span></div></div>` : ''
+    const equipSec  = (totalComprado + totalAlugado) > 0 ? `<div class="sec"><div class="sec-hdr"><span>Equipamentos</span><span>${fmtE(totalComprado+totalAlugado)}</span></div>${totalAlugado>0?`<div class="item-row"><span style="padding-left:12px">Alugado</span><span>${fmtE(totalAlugado)}</span></div>`:''}${totalComprado>0?`<div class="item-row"><span style="padding-left:12px">Comprado</span><span>${fmtE(totalComprado)}</span></div>`:''}</div>` : ''
 
-  const dji = cardState.djImprimir ?? Object.fromEntries(DJ_CAT_KEYS.map(k => [k, false]))
-  const handlePrint = () => {
-    const mesFmt = format(new Date(mes + '-02'), 'MMMM yyyy', { locale: pt })
-    const fmtE = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v)
+    // Agenda (formato por data com semanas)
+    let agendaHtml = ''
+    if (comAgenda) {
+      const ss = [...slots].filter(s => s.tipo_slot).sort((a, b) => (a.data??'').localeCompare(b.data??'') || (a.hora_inicio??'').localeCompare(b.hora_inicio??''))
+      const byDate = {}
+      ss.forEach(s => { if (s.data) { if (!byDate[s.data]) byDate[s.data] = []; byDate[s.data].push(s) } })
+      const dates = Object.keys(byDate).sort()
+      if (dates.length > 0) {
+        const semOrd = ['1ª','2ª','3ª','4ª','5ª']
+        let lastWeek = null
+        const rows = dates.map(date => {
+          const d = new Date(date+'T12:00:00')
+          const dn = d.getDate()
+          const wk = Math.ceil(dn / 7)
+          let wRow = ''
+          if (wk !== lastWeek) { lastWeek = wk; wRow = `<tr class="week-sep"><td colspan="7">${semOrd[wk-1]??wk+'ª'} SEMANA</td></tr>` }
+          const dayName = d.toLocaleDateString('pt-PT',{weekday:'long'})
+          const dayNameCap = dayName.charAt(0).toUpperCase()+dayName.slice(1)
+          const ds = byDate[date]
+          const djN = s => s?.dj_nome || s?.djs?.nome_artistico || s?.djs?.nome || '—'
+          const hora = s => s ? `${(s.hora_inicio??'?').slice(0,5)}–${(s.hora_fim??'?').slice(0,5)}` : ''
+          const ev = eventos.find(e => e.data_evento === date)
+          return wRow + `<tr><td>${dayNameCap}</td><td class="num">${String(dn).padStart(2,'0')}</td><td>${djN(ds[0])}</td><td class="hora">${hora(ds[0])}</td><td>${ds[1]?djN(ds[1]):''}</td><td class="hora">${ds[1]?hora(ds[1]):''}</td><td class="ev">${ev?.evento??''}</td></tr>`
+        }).join('')
+        agendaHtml = `
+          <div style="page-break-before:always">
+            ${pageHeader('Programa de Actuações')}
+            <table class="agenda">
+              <thead><tr><th>DIA</th><th>#</th><th>DJ</th><th>HORA</th><th>DJ</th><th>HORA</th><th>EVENTO</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+            <div class="created">Created by PauloDiLight</div>
+          </div>`
+      }
+    }
 
-    const secs = [
-      avenca > 0 ? { titulo: 'Avenças', total: avenca, items: [] } : null,
-      apoioValor > 0 ? { titulo: 'Apoio Técnico', total: apoioValor, items: [] } : null,
-      totalDJs > 0 ? {
-        titulo: 'Atuações DJ', total: totalDJs,
-        items: djCats.filter(c => dji[c.key] && c.billing > 0)
-          .map(c => ({ label: c.label, qtd: c.n, valor: c.billing })),
-      } : null,
-      totalMusicos > 0 ? {
-        titulo: 'Atuações Músicos / Bandas', total: totalMusicos,
-        items: cardState.musicos_bandas.filter(r => r.imprimir && itemTotal(r) > 0)
-          .map(r => ({ label: r.descricao || 'Item', qtd: Number(r.unidades), valor: itemTotal(r) })),
-      } : null,
-      totalComprado > 0 ? {
-        titulo: 'Equipamentos Comprado', total: totalComprado,
-        items: cardState.equipamentos_comprado.filter(r => r.imprimir && itemTotal(r) > 0)
-          .map(r => ({ label: r.descricao || 'Item', qtd: Number(r.unidades), valor: itemTotal(r) })),
-      } : null,
-      totalAlugado > 0 ? {
-        titulo: 'Equipamentos Alugado', total: totalAlugado,
-        items: cardState.equipamentos_alugado.filter(r => r.imprimir && itemTotal(r) > 0)
-          .map(r => ({ label: r.descricao || 'Item', qtd: Number(r.unidades), valor: itemTotal(r) })),
-      } : null,
-      totalExtras > 0 ? {
-        titulo: 'Extras', total: totalExtras,
-        items: cardState.extras.filter(r => r.imprimir && itemTotal(r) > 0)
-          .map(r => ({ label: r.descricao || 'Item', qtd: Number(r.unidades), valor: itemTotal(r) })),
-      } : null,
-    ].filter(Boolean)
-
-    const secHtml = secs.map(s => `
-      <div class="sec">
-        <div class="sec-header">
-          <span>${s.titulo}</span>
-          <span>${fmtE(s.total)}</span>
-        </div>
-        ${s.items.length > 0 ? `<table class="items"><tbody>
-          ${s.items.map(it => `<tr><td>${it.label}</td><td class="r">${it.qtd}x</td><td class="r">${fmtE(it.valor)}</td></tr>`).join('')}
-        </tbody></table>` : ''}
-      </div>`).join('')
-
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-      <title>${espaco.nome} — ${mesFmt}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${espaco.nome}</title>
       <style>
-        body { font-family: Arial, sans-serif; font-size: 13px; color: #111; margin: 32px; }
-        h1 { font-size: 18px; margin: 0 0 4px; }
-        .sub { font-size: 12px; color: #555; margin-bottom: 24px; }
-        .sec { margin-bottom: 12px; }
-        .sec-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; background: #f0f0f0; padding: 6px 10px; border-radius: 4px; }
-        table.items { width: 100%; border-collapse: collapse; margin-top: 2px; }
-        table.items td { padding: 3px 10px; border-bottom: 1px solid #e8e8e8; font-size: 12px; }
-        .r { text-align: right; }
-        .total { display: flex; justify-content: space-between; font-weight: 900; font-size: 15px; border-top: 2px solid #111; padding-top: 10px; margin-top: 8px; }
-        @media print { body { margin: 16px; } }
+        body{font-family:Arial,sans-serif;font-size:13px;color:#111;margin:40px}
+        .sec{margin-bottom:10px}
+        .sec-hdr{display:flex;justify-content:space-between;font-weight:700;font-size:13px;background:#f0f0f0;padding:7px 10px;border-radius:4px}
+        .sub-sec{margin:2px 0}.sub-hdr{display:flex;justify-content:space-between;font-size:12px;font-weight:600;padding:4px 10px;background:#f8f8f8;border-left:3px solid #ddd}
+        table.items{width:100%;border-collapse:collapse}table.items td{padding:3px 10px;border-bottom:1px solid #eee;font-size:12px}
+        .item-row{display:flex;justify-content:space-between;padding:3px 10px;font-size:12px;border-bottom:1px solid #eee}
+        .total{display:flex;justify-content:space-between;font-weight:900;font-size:16px;border-top:2px solid #111;padding-top:10px;margin-top:8px}
+        .r{text-align:right}
+        table.agenda{width:100%;border-collapse:collapse;font-size:12px}
+        table.agenda th{background:#f0f0f0;padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #ccc;font-weight:700}
+        table.agenda td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:middle}
+        .num{font-weight:700;color:#333;width:28px}.hora{color:#1d4ed8;font-size:11px;white-space:nowrap}.ev{color:#888;font-size:11px}
+        .week-sep td{background:#f0f0f0;font-weight:700;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#555;padding:5px 8px;border-top:2px solid #ccc}
+        .created{margin-top:24px;font-size:10px;color:#aaa;text-align:right}
+        @media print{body{margin:20px}}
       </style>
     </head><body>
-      <h1>${espaco.nome}</h1>
-      <div class="sub">${mesFmt.charAt(0).toUpperCase() + mesFmt.slice(1)}</div>
-      ${secHtml}
-      <div class="total"><span>Total</span><span>${fmtE(totalGeral)}</span></div>
+      <div style="${comAgenda ? 'page-break-after:always' : ''}">
+        ${pageHeader(tituloDoc)}
+        ${artistasSec}${apoioSecs}${avencaSec}${extrasSec}${equipSec}
+        <div class="total"><span>Total</span><span>${fmtE(totalGeral)}</span></div>
+        <div class="created">Created by PauloDiLight</div>
+      </div>
+      ${agendaHtml}
     </body></html>`
-
     const w = window.open('', '_blank')
-    w.document.write(html)
-    w.document.close()
-    w.focus()
-    setTimeout(() => w.print(), 300)
+    if (!w) { alert('Permite popups neste site para imprimir.'); return }
+    try {
+      w.document.write(html)
+      w.document.close()
+      w.focus()
+      setTimeout(() => w.print(), 300)
+    } catch (e) {
+      console.error('Print error:', e)
+      alert('Erro ao imprimir: ' + e.message)
+    }
   }
 
   return (
@@ -1085,69 +1147,433 @@ function SpaceCard({ espaco, slots, eventos, agendTec, cardState, onCardChange, 
 
       {/* ══ Cabeçalho ══ */}
       <div className="flex items-center justify-between px-5 py-3.5 bg-surface-2 border-b border-border">
-        <div>
-          <p className="text-[10px] font-bold text-accent-subtle/50 uppercase tracking-widest mb-0.5">Total Contas</p>
+        <div className="flex items-center gap-5">
           <p className="text-sm font-bold text-accent">{espaco.nome.toUpperCase()}</p>
+          <span className="text-sm font-bold text-accent tabular-nums">{formatarEuro(totalGeral)}</span>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={handlePrint}
+            onClick={() => {
+              const allOpen = artistasAberto && apoioAberto && avencaAberto && extrasAberto && alugadosAberto && compradosAberto
+              const next = !allOpen
+              setArtistasAberto(next)
+              setApoioAberto(next)
+              setAvencaAberto(next)
+              setExtrasAberto(next)
+              setAlugadosAberto(next)
+              setCompradosAberto(next)
+              if (!next) setGruposAbertos({})
+            }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/50 text-accent-subtle hover:text-accent hover:border-border transition-colors text-xs">
-            <Printer size={12} />Imprimir
+            <ChevronsDown size={12} className={clsx('transition-transform', artistasAberto && apoioAberto && 'rotate-180')} />
+            {artistasAberto && apoioAberto && avencaAberto && extrasAberto && alugadosAberto && compradosAberto ? 'Recolher' : 'Expandir'}
+          </button>
+          <button onClick={handlePrint}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/50 text-accent-subtle hover:text-accent hover:border-border transition-colors text-xs">
+            <Printer size={12} /> Imprimir
           </button>
           <button onClick={() => onSave(espaco.id)} disabled={saving}
-            className={clsx(
-              'flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-40',
-              cardState.dirty
-                ? 'bg-status-confirmado/90 hover:bg-status-confirmado text-black shadow-lg'
-                : 'border border-border/50 text-accent-subtle hover:text-accent hover:border-border'
+            className={clsx('flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-40',
+              cardState.dirty ? 'bg-status-confirmado/90 hover:bg-status-confirmado text-black shadow-lg' : 'border border-border/50 text-accent-subtle hover:text-accent hover:border-border'
             )}>
             <Save size={12} />{saving ? 'A guardar…' : 'Guardar'}
           </button>
         </div>
       </div>
 
-      {/* ══ Tabela resumo ══ */}
-      <TabelaResumo categorias={categorias} total={totalGeral} />
+      {/* ══ ARTISTAS ══ */}
+      <div className="border-t border-white/15">
+        <div className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-white/3 transition-colors"
+          onClick={() => setArtistasAberto(p => !p)}>
+          <ChevronRight size={12} className={clsx('text-white/20 transition-transform shrink-0', artistasAberto && 'rotate-90')} />
+          <span className="text-sm font-semibold text-white/40 flex-1">ARTISTAS</span>
+          <span className="text-sm font-semibold text-white/80 tabular-nums">{formatarEuro(totalDJs + totalMusicos)}</span>
+        </div>
+        {artistasAberto && (
+          <div>
+            {/* DJs label — clique abre/fecha Residentes e Convidados */}
+            <div className="flex items-center gap-2 px-6 py-1.5 cursor-pointer hover:bg-white/2 transition-colors"
+              onClick={() => {
+                const allOpen = djHier.every(g => gruposAbertos[g.key])
+                if (allOpen) {
+                  setGruposAbertos({})
+                } else {
+                  const next = {}
+                  djHier.forEach(g => { next[g.key] = true })
+                  setGruposAbertos(next)
+                }
+              }}>
+              <ChevronRight size={10} className={clsx('text-white/20 transition-transform shrink-0', djHier.every(g => gruposAbertos[g.key]) && 'rotate-90')} />
+              <span className="text-[11px] font-semibold text-white/25 uppercase tracking-widest flex-1">
+                DJs {totalDJsN > 0 && <span className="font-normal text-white/20">{totalDJsN}</span>}
+              </span>
+              <span className="text-[11px] text-white/35 tabular-nums">{formatarEuro(totalDJs)}</span>
+            </div>
 
-      {/* ══ Equipamentos Comprado ══ */}
-      <div className="px-2 py-4 border-t border-border bg-surface-0/15">
-        <SecManualItems titulo="Equipamentos Comprado"
-          linhas={cardState.equipamentos_comprado} total={totalComprado}
-          onChange={val => upd('equipamentos_comprado', val)} eventos={eventos}
-          onSave={() => onSave(espaco.id)} saving={saving} />
+            {djHier.map(grupo => (
+              <div key={grupo.key}>
+                {/* Residentes / Convidados */}
+                <div className="flex items-center gap-2 px-6 py-2.5 cursor-pointer hover:bg-white/2 transition-colors"
+                  onClick={() => togGrupo(grupo.key)}>
+                  <ChevronRight size={10} className={clsx('text-white/20 transition-transform shrink-0', gruposAbertos[grupo.key] && 'rotate-90')} />
+                  <div className="flex-1 flex items-baseline gap-1.5 min-w-0">
+                    <span className="text-xs font-medium text-white/75">{grupo.label}</span>
+                    {grupo.n > 0 && <span className="text-[10px] text-white/35 tabular-nums">{grupo.n}</span>}
+                    {grupo.days.length > 0 && <span className="text-[10px] text-white/25 truncate">(dias {grupo.days.join(', ')})</span>}
+                  </div>
+                  {toggle(`artistas:${grupo.key}`)}
+                  <span className="text-xs text-white/65 tabular-nums">{formatarEuro(grupo.billing)}</span>
+                </div>
+                {gruposAbertos[grupo.key] && grupo.turnos.map(turno => {
+                  const tKey = `${grupo.key}:${turno.label}`
+                  return (
+                    <div key={turno.label}>
+                      {/* Turno — cinzento, sem linha separadora branca */}
+                      <div className="flex items-center gap-2 px-9 py-2 cursor-pointer hover:bg-white/2 transition-colors"
+                        onClick={() => togTurno(tKey)}>
+                        <ChevronRight size={8} className={clsx('text-white/15 transition-transform shrink-0', turnosAbertos[tKey] && 'rotate-90')} />
+                        <span className="text-[11px] text-white/30 flex-1">{turno.label}</span>
+                        {toggle(`artistas:${grupo.key}:${turno.label}`)}
+                        <span className="text-[11px] text-white/30 tabular-nums">{formatarEuro(turno.billing)}</span>
+                      </div>
+                      {/* DJs — sem toggle individual, sempre imprimíveis */}
+                      {turnosAbertos[tKey] && turno.djs.map(dj => (
+                        <div key={dj.nome} className="flex items-center gap-2 px-12 py-1.5">
+                          <span className="text-xs text-white/55 flex-1">{dj.nome}{fmtDayNums(dj.slots) ? ` (Dias ${fmtDayNums(dj.slots)})` : ''}</span>
+                          <span className="text-xs text-white/50 tabular-nums">{formatarEuro(dj.billing)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+            {djHier.length === 0 && <p className="px-6 py-3 text-xs text-white/15 italic">Sem atuações DJ</p>}
+
+            {/* Músicos / Bandas — mesmo formato que DJs, oculto se 0 */}
+            {totalMusicos > 0 && (
+              <div className="flex items-center gap-2 px-6 py-2.5">
+                <span className="text-xs font-medium text-white/75 flex-1">Músicos / Bandas</span>
+                {toggle('artistas:musicos')}
+                <span className="text-xs text-white/65 tabular-nums">{formatarEuro(totalMusicos)}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ══ Equipamentos Alugado ══ */}
-      <div className="px-2 py-4 border-t border-border bg-surface-0/15">
-        <SecManualItems titulo="Equipamentos Alugado"
-          linhas={cardState.equipamentos_alugado} total={totalAlugado}
-          onChange={val => upd('equipamentos_alugado', val)} eventos={eventos}
-          onSave={() => onSave(espaco.id)} saving={saving} />
+      {/* ══ APOIO TÉCNICO ══ */}
+      <div className="border-t border-white/15">
+        <div className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-white/3 transition-colors"
+          onClick={() => setApoioAberto(p => !p)}>
+          <ChevronRight size={12} className={clsx('text-white/20 transition-transform shrink-0', apoioAberto && 'rotate-90')} />
+          <span className="text-sm font-semibold text-white/40 flex-1">APOIO TÉCNICO</span>
+          <span className="text-sm font-semibold text-white/80 tabular-nums">{formatarEuro(totalApoio)}</span>
+        </div>
+        {apoioAberto && (
+          <div className="pb-1">
+            {apoioHier.length === 0 && <p className="px-6 py-3 text-xs text-white/15 italic">Sem eventos este mês</p>}
+            {apoioHier.map(tipo => (
+              <div key={tipo.tipo}>
+                <div className="flex items-center gap-2 px-6 py-2 cursor-pointer hover:bg-white/2 transition-colors"
+                  onClick={() => togApoioTipo(tipo.tipo)}>
+                  <ChevronRight size={10} className={clsx('text-white/15 transition-transform shrink-0', apoioTiposAbertos[tipo.tipo] && 'rotate-90')} />
+                  <div className="flex-1 flex items-baseline gap-1.5 min-w-0">
+                    <span className="text-[11px] font-medium text-white/40 uppercase tracking-widest">{tipo.tipo}</span>
+                    {tipo.n > 0 && <span className="text-[10px] text-white/25 tabular-nums">{tipo.n}</span>}
+                    {tipo.days.length > 0 && <span className="text-[10px] text-white/20 truncate">(dias {tipo.days.join(', ')})</span>}
+                  </div>
+                  {toggle(`apoio:${tipo.tipo}`)}
+                  <span className="text-[11px] text-white/45 tabular-nums">{formatarEuro(tipo.billing)}</span>
+                </div>
+                {apoioTiposAbertos[tipo.tipo] && tipo.grupos.map(g => {
+                  const gKey = `${tipo.tipo}:${g.nome}`
+                  return (
+                    <div key={g.nome}>
+                      <div className="flex items-center gap-2 px-9 py-2 cursor-pointer hover:bg-white/2 transition-colors"
+                        onClick={() => togApoioGrupo(gKey)}>
+                        <ChevronRight size={9} className={clsx('text-white/15 transition-transform shrink-0', apoioGruposAbertos[gKey] && 'rotate-90')} />
+                        <div className="flex-1 flex items-baseline gap-1.5 min-w-0">
+                          <span className="text-xs text-white/65">{g.nome}</span>
+                          {g.n > 0 && <span className="text-[10px] text-white/35 tabular-nums">{g.n}</span>}
+                          {g.days.length > 0 && <span className="text-[10px] text-white/25 truncate">(dias {g.days.join(', ')})</span>}
+                        </div>
+                        {toggle(`apoio:${tipo.tipo}:${g.nome}`)}
+                        <span className="text-xs text-white/55 tabular-nums">{formatarEuro(g.billing)}</span>
+                      </div>
+                      {apoioGruposAbertos[gKey] && g.items.map(ev => {
+                        const dt = ev.data_evento ? new Date(ev.data_evento+'T12:00:00').toLocaleDateString('pt-PT',{day:'2-digit',month:'short'}) : '—'
+                        return (
+                          <div key={ev.id} className="flex items-center gap-3 px-12 py-1.5">
+                            <span className="text-[11px] text-white/25 flex-1">{dt}</span>
+                            <span className="text-[11px] text-white/45 tabular-nums">{formatarEuro(eventoRate(ev))}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ══ Extras ══ */}
-      <div className="px-2 py-4 border-t border-border bg-surface-0/15">
-        <SecManualItems titulo="Extras"
-          linhas={cardState.extras} total={totalExtras}
-          onChange={val => upd('extras', val)} eventos={eventos}
-          onSave={() => onSave(espaco.id)} saving={saving} />
+      {/* ══ AVENÇA ══ mesmo nível que EXTRAS / EQUIPAMENTOS */}
+      {avenca > 0 && (
+        <div className="border-t border-white/15">
+          <div className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-white/3 transition-colors"
+            onClick={() => setAvencaAberto(p => !p)}>
+            <ChevronRight size={12} className={clsx('text-white/20 transition-transform shrink-0', avencaAberto && 'rotate-90')} />
+            <span className="text-sm font-semibold text-white/40 flex-1">AVENÇA</span>
+            <span className="text-sm font-semibold text-white/80 tabular-nums">{formatarEuro(avenca)}</span>
+          </div>
+          {avencaAberto && (
+            <div className="pb-3">
+              <div className="flex items-center justify-between px-9 py-1.5">
+                <span className="text-xs text-white/55">{espaco.nome}</span>
+                <span className="text-xs text-white/50 tabular-nums">{formatarEuro(avenca)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ EQUIPAMENTOS ALUGADOS ══ */}
+      <div className="border-t border-white/15">
+        <div className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-white/3 transition-colors"
+          onClick={() => setAlugadosAberto(p => !p)}>
+          <ChevronRight size={12} className={clsx('text-white/20 transition-transform shrink-0', alugadosAberto && 'rotate-90')} />
+          <span className="text-sm font-semibold text-white/40 flex-1">EQUIPAMENTOS ALUGADOS</span>
+          <span className="text-sm font-semibold text-white/80 tabular-nums">{formatarEuro(totalAlugado)}</span>
+        </div>
+        {alugadosAberto && (
+          <div className="px-4 pb-3">
+            <SecManualItems titulo="EQUIPAMENTOS ALUGADOS" noHeader
+              linhas={cardState.equipamentos_alugado} total={totalAlugado}
+              onChange={val => upd('equipamentos_alugado', val)} eventos={eventos} />
+          </div>
+        )}
+      </div>
+
+      {/* ══ EQUIPAMENTOS COMPRADOS ══ */}
+      <div className="border-t border-white/15">
+        <div className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-white/3 transition-colors"
+          onClick={() => setCompradosAberto(p => !p)}>
+          <ChevronRight size={12} className={clsx('text-white/20 transition-transform shrink-0', compradosAberto && 'rotate-90')} />
+          <span className="text-sm font-semibold text-white/40 flex-1">EQUIPAMENTOS COMPRADOS</span>
+          <span className="text-sm font-semibold text-white/80 tabular-nums">{formatarEuro(totalComprado)}</span>
+        </div>
+        {compradosAberto && (
+          <div className="px-4 pb-3">
+            <SecManualItems titulo="EQUIPAMENTOS COMPRADOS" noHeader
+              linhas={cardState.equipamentos_comprado} total={totalComprado}
+              onChange={val => upd('equipamentos_comprado', val)} eventos={eventos} />
+          </div>
+        )}
+      </div>
+
+      {/* ══ EXTRAS ══ */}
+      <div className="border-t border-white/15">
+        <div className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-white/3 transition-colors"
+          onClick={() => setExtrasAberto(p => !p)}>
+          <ChevronRight size={12} className={clsx('text-white/20 transition-transform shrink-0', extrasAberto && 'rotate-90')} />
+          <span className="text-sm font-semibold text-white/40 flex-1">EXTRAS</span>
+          <span className="text-sm font-semibold text-white/80 tabular-nums">{formatarEuro(totalExtras)}</span>
+        </div>
+        {extrasAberto && (
+          <div className="px-4 pb-3">
+            <SecManualItems titulo="EXTRAS" noHeader
+              linhas={cardState.extras} total={totalExtras}
+              onChange={val => upd('extras', val)} eventos={eventos} />
+          </div>
+        )}
       </div>
 
     </div>
   )
 }
 
+// ── Layout 2: Resumo + Agenda ─────────────────────────────────────────────────
+const ESTADO_COR = {
+  confirmado:      'text-status-confirmado',
+  presente:        'text-status-confirmado',
+  'pré-confirmado':'text-sky-400',
+  aceite:          'text-teal-400',
+  proposta:        'text-status-proposta',
+  cancelado:       'text-red-400',
+  faltou:          'text-red-400',
+  trocado:         'text-[#fc03c6]',
+  sem_efeito:      'text-accent-subtle/40',
+}
+function SpaceResumoAgenda({ espaco, slots, eventos, agendTec, cardState, catTotals, subtiposConfig, mes }) {
+  const totalDJs   = slots.filter(s => s.tipo_slot).reduce((a, s) => a + slotRate(s, subtiposConfig, catTotals), 0)
+  const apoioAuto  = eventos.reduce((a, e) => a + parseNum(e.valor_apoio_tecnico), 0)
+  const apoio      = cardState?.apoioOverride !== null ? parseNum(cardState?.apoioOverride) : apoioAuto
+  const comprado   = (cardState?.equipamentos_comprado ?? []).reduce((a, r) => a + itemTotal(r), 0)
+  const alugado    = (cardState?.equipamentos_alugado  ?? []).reduce((a, r) => a + itemTotal(r), 0)
+  const musicos    = (cardState?.musicos_bandas        ?? []).reduce((a, r) => a + itemTotal(r), 0)
+  const extras     = (cardState?.extras                ?? []).reduce((a, r) => a + itemTotal(r), 0)
+  const avenca     = parseNum(espaco.valor_avenca)
+  const totalGeral = avenca + totalDJs + musicos + apoio + comprado + alugado + extras
+
+  const slotsSorted = [...slots].sort((a, b) => a.data?.localeCompare(b.data) || a.hora_inicio?.localeCompare(b.hora_inicio))
+  const slotsComDJ  = slotsSorted.filter(s => s.tipo_slot)
+
+  const handlePrint = () => {
+    const fmtE = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v)
+    const mesFmt = mes ? format(new Date(mes + '-02'), 'MMMM yyyy', { locale: pt }) : ''
+    const resumoRows = [
+      { l: 'DJs', v: totalDJs },
+      { l: 'Apoio Técnico', v: apoio },
+      { l: 'Músicos / Bandas', v: musicos },
+      { l: 'Equipamentos', v: comprado + alugado },
+      { l: 'Extras', v: extras },
+      { l: 'Avença', v: avenca },
+    ].filter(r => r.v > 0)
+    const agendaRows = slotsComDJ.map(s => {
+      const nome = s.dj_nome || s.djs?.nome_artistico || s.djs?.nome || '—'
+      const v = Number(s.valor)||0, m = Number(s.margem)||0, tr = Number(s.transporte)||0, ex = Number(s.extras)||0
+      const dt = s.data ? new Date(s.data+'T12:00:00').toLocaleDateString('pt-PT',{day:'2-digit',month:'2-digit'}) : '—'
+      return `<tr><td>${dt}</td><td>${nome}</td><td>${s.tipo_slot||'—'}</td><td class="r">${v>0?fmtE(v):'—'}</td><td class="r">${m>0?fmtE(m):'—'}</td><td class="r">${tr>0?fmtE(tr):'—'}</td><td class="r">${ex>0?fmtE(ex):'—'}</td><td class="r"><b>${(v+m+tr+ex)>0?fmtE(v+m+tr+ex):'—'}</b></td><td>${s.estado_pagamento||'—'}</td></tr>`
+    }).join('')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${espaco.nome} — ${mesFmt}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:28px}
+      h1{font-size:17px;margin:0 0 2px}
+      .sub{font-size:11px;color:#555;margin-bottom:20px}
+      .resumo{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px}
+      .resumo-item{background:#f5f5f5;border-radius:6px;padding:8px 14px;min-width:120px}
+      .resumo-item .lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em}
+      .resumo-item .val{font-size:14px;font-weight:700;margin-top:2px}
+      .total-row{display:flex;justify-content:space-between;font-weight:900;font-size:15px;border-top:2px solid #111;padding:10px 0 20px}
+      table{width:100%;border-collapse:collapse;font-size:11px}
+      th{background:#f0f0f0;padding:5px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #ddd}
+      td{padding:4px 8px;border-bottom:1px solid #eee}
+      .r{text-align:right}
+      tfoot td{font-weight:700;border-top:2px solid #111;background:#f9f9f9}
+      @media print{body{margin:14px}}
+    </style></head><body>
+    <h1>${espaco.nome.toUpperCase()}</h1>
+    <p class="sub">${mesFmt} · ${slotsComDJ.length} atuações</p>
+    <div class="resumo">${resumoRows.map(r=>`<div class="resumo-item"><div class="lbl">${r.l}</div><div class="val">${fmtE(r.v)}</div></div>`).join('')}</div>
+    <div class="total-row"><span>Total Geral</span><span>${fmtE(totalGeral)}</span></div>
+    <table><thead><tr><th>Data</th><th>DJ</th><th>Tipo</th><th class="r">Valor</th><th class="r">Margem</th><th class="r">Transp.</th><th class="r">Extras</th><th class="r">Total Cliente</th><th>Estado Pag.</th></tr></thead>
+    <tbody>${agendaRows}</tbody>
+    <tfoot><tr><td colspan="3">Total</td>
+      <td class="r">${fmtE(slotsComDJ.reduce((a,s)=>a+(Number(s.valor)||0),0))}</td>
+      <td class="r">${fmtE(slotsComDJ.reduce((a,s)=>a+(Number(s.margem)||0),0))}</td>
+      <td class="r">${fmtE(slotsComDJ.reduce((a,s)=>a+(Number(s.transporte)||0),0))}</td>
+      <td class="r">${fmtE(slotsComDJ.reduce((a,s)=>a+(Number(s.extras)||0),0))}</td>
+      <td class="r">${fmtE(totalDJs)}</td><td></td></tr></tfoot>
+    </table></body></html>`
+    const w = window.open('','_blank'); w.document.write(html); w.document.close(); w.focus(); w.print()
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Resumo totais */}
+      <div className="bg-surface-1 border border-border/50 rounded-2xl overflow-hidden shadow-xl shadow-black/30">
+        <div className="px-5 py-3.5 bg-surface-2 border-b border-border flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold text-accent-subtle/50 uppercase tracking-widest mb-0.5">Resumo Financeiro</p>
+            <p className="text-sm font-bold text-accent">{espaco.nome.toUpperCase()}</p>
+          </div>
+          <button onClick={handlePrint}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/50 text-accent-subtle hover:text-accent hover:border-border transition-colors text-xs">
+            <Printer size={12} /> Imprimir
+          </button>
+        </div>
+        <div className="grid grid-cols-4 divide-x divide-border/30">
+          {[
+            { label: 'DJs', valor: totalDJs },
+            { label: 'Apoio Técnico', valor: apoio },
+            { label: 'Músicos / Bandas', valor: musicos },
+            { label: 'Equipamentos', valor: comprado + alugado },
+            { label: 'Extras', valor: extras },
+            { label: 'Avença', valor: avenca },
+          ].filter(r => r.valor > 0).map(r => (
+            <div key={r.label} className="px-4 py-3 flex flex-col gap-0.5">
+              <p className="text-[10px] text-accent-subtle uppercase tracking-widest">{r.label}</p>
+              <p className="text-sm font-semibold text-accent tabular-nums">{formatarEuro(r.valor)}</p>
+            </div>
+          ))}
+          <div className="px-4 py-3 flex flex-col gap-0.5 bg-surface-2/60 col-span-full flex-row items-center justify-between" style={{display:'flex',flexDirection:'row',alignItems:'center'}}>
+            <p className="text-xs font-bold text-accent-subtle uppercase tracking-widest">Total Geral</p>
+            <p className="text-lg font-bold text-status-confirmado tabular-nums">{formatarEuro(totalGeral)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabela agenda */}
+      <div className="bg-surface-1 border border-border/50 rounded-2xl overflow-hidden shadow-xl shadow-black/30">
+        <div className="px-5 py-3 bg-surface-2 border-b border-border">
+          <p className="text-[10px] font-bold text-accent-subtle/50 uppercase tracking-widest">Agenda · {slotsSorted.filter(s => s.tipo_slot).length} atuações</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-border/40 bg-surface-2/40">
+                {['Data', 'DJ', 'Tipo', 'Valor', 'Margem', 'Transp.', 'Extras', 'Total Cliente', 'Estado Pag.', 'Estado'].map(h => (
+                  <th key={h} className="px-3 py-2 text-left text-[10px] font-semibold text-accent-subtle/60 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {slotsSorted.filter(s => s.tipo_slot).map((s, i) => {
+                const nome  = s.dj_nome || s.djs?.nome_artistico || s.djs?.nome || '—'
+                const v     = Number(s.valor)     || 0
+                const m     = Number(s.margem)    || 0
+                const tr    = Number(s.transporte)|| 0
+                const ex    = Number(s.extras)    || 0
+                const total = v + m + tr + ex
+                const dt    = s.data ? new Date(s.data + 'T12:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) : '—'
+                const cor   = ESTADO_COR[s.estado] ?? 'text-accent-subtle'
+                return (
+                  <tr key={s.id} className={clsx('border-b border-border/20 hover:bg-surface-2/30 transition-colors', i % 2 === 0 ? '' : 'bg-surface-0/10')}>
+                    <td className="px-3 py-2 tabular-nums text-accent-subtle">{dt}</td>
+                    <td className="px-3 py-2 text-accent font-medium">{nome}</td>
+                    <td className="px-3 py-2 text-accent-subtle capitalize">{s.tipo_slot}</td>
+                    <td className="px-3 py-2 tabular-nums text-accent">{v > 0 ? formatarEuro(v) : '—'}</td>
+                    <td className="px-3 py-2 tabular-nums text-status-confirmado">{m > 0 ? formatarEuro(m) : '—'}</td>
+                    <td className="px-3 py-2 tabular-nums text-accent-subtle">{tr > 0 ? formatarEuro(tr) : '—'}</td>
+                    <td className="px-3 py-2 tabular-nums text-accent-subtle">{ex > 0 ? formatarEuro(ex) : '—'}</td>
+                    <td className="px-3 py-2 tabular-nums font-semibold text-accent">{total > 0 ? formatarEuro(total) : '—'}</td>
+                    <td className="px-3 py-2 capitalize text-accent-subtle">{s.estado_pagamento ?? '—'}</td>
+                    <td className={clsx('px-3 py-2 capitalize font-medium', cor)}>{s.estado ?? '—'}</td>
+                  </tr>
+                )
+              })}
+              {slotsSorted.filter(s => s.tipo_slot).length === 0 && (
+                <tr><td colSpan={10} className="px-3 py-6 text-center text-accent-subtle/40 italic">Sem atuações</td></tr>
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border/40 bg-surface-2/40">
+                <td colSpan={3} className="px-3 py-2 text-[10px] font-bold text-accent-subtle/60 uppercase tracking-wider">Total</td>
+                <td className="px-3 py-2 tabular-nums font-semibold text-accent">{formatarEuro(slotsSorted.filter(s=>s.tipo_slot).reduce((a,s)=>a+(Number(s.valor)||0),0))}</td>
+                <td className="px-3 py-2 tabular-nums font-semibold text-status-confirmado">{formatarEuro(slotsSorted.filter(s=>s.tipo_slot).reduce((a,s)=>a+(Number(s.margem)||0),0))}</td>
+                <td className="px-3 py-2 tabular-nums font-semibold text-accent-subtle">{formatarEuro(slotsSorted.filter(s=>s.tipo_slot).reduce((a,s)=>a+(Number(s.transporte)||0),0))}</td>
+                <td className="px-3 py-2 tabular-nums font-semibold text-accent-subtle">{formatarEuro(slotsSorted.filter(s=>s.tipo_slot).reduce((a,s)=>a+(Number(s.extras)||0),0))}</td>
+                <td className="px-3 py-2 tabular-nums font-bold text-accent">{formatarEuro(totalDJs)}</td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Dashboard resumo ──────────────────────────────────────────────────────────
-function Dashboard({ espacos, slots, eventos, agendTec, cards, catTotals, subtiposConfig }) {
+function Dashboard({ espacos, slots, eventos, cards, catTotals, subtiposConfig }) {
   const linhas = useMemo(() => espacos.map(esp => {
     const slotEsp  = slots.filter(s => s.espaco_id === esp.id)
     const evEsp    = eventos.filter(e => e.espaco_id === esp.id)
-    const techEsp  = agendTec.filter(a => a.espaco_id === esp.id)
     const card     = cards[esp.id]
     const djs      = slotEsp.reduce((sum, s) => sum + slotRate(s, subtiposConfig, catTotals), 0)
-    const apoioAuto = techEsp.reduce((a, t) => a + parseNum(t.valor), 0) + evEsp.reduce((a, e) => a + parseNum(e.valor_apoio_tecnico), 0)
-    const apoio    = card?.apoioOverride !== null ? parseNum(card?.apoioOverride) : apoioAuto
+    const apoio    = evEsp.reduce((a, e) => a + eventoRate(e), 0)
     const comprado = (card?.equipamentos_comprado ?? []).reduce((a, r) => a + parseNum(r.unidades) * parseNum(r.valor_unitario), 0)
     const alugado  = (card?.equipamentos_alugado  ?? []).reduce((a, r) => a + parseNum(r.unidades) * parseNum(r.valor_unitario), 0)
     const musicos  = (card?.musicos_bandas         ?? []).reduce((a, r) => a + parseNum(r.unidades) * parseNum(r.valor_unitario), 0)
@@ -1155,7 +1581,7 @@ function Dashboard({ espacos, slots, eventos, agendTec, cards, catTotals, subtip
     const avenca   = parseNum(esp.valor_avenca)
     const total    = avenca + djs + musicos + apoio + comprado + alugado + extras
     return { id: esp.id, nome: esp.nome.trim(), djs, avenca, musicos, apoio, comprado, alugado, extras, total }
-  }), [espacos, slots, eventos, agendTec, cards, catTotals, subtiposConfig])
+  }), [espacos, slots, eventos, cards, catTotals, subtiposConfig])
 
   const totalGeral = linhas.reduce((a, l) => a + l.total, 0)
 
@@ -1207,9 +1633,11 @@ export function ContasClientes() {
   const [cards, setCards]       = useState({})
   const [catTotals, setCatTotals]       = useState({})
   const [subtiposConfig, setSubtiposConfig] = useState([])
+  const [turnos, setTurnos]     = useState([])
   const [saving, setSaving]     = useState({})
   const [espacoAtivo, setEspacoAtivo] = useState(null)
   const [pesquisa, setPesquisa]       = useState('')
+  const [layoutView, setLayoutView]   = useState(() => localStorage.getItem('contasClientes_layout') ?? 'prev')
 
   const { dataInicio, dataFim, mes } = useMemo(() => {
     const [ano, mesN] = anoMes.split('-').map(Number)
@@ -1223,13 +1651,13 @@ export function ContasClientes() {
 
   const carregar = useCallback(async () => {
     setLoading(true)
-    const [sRes, eRes, tRes, cRes, cfgRes] = await Promise.all([
+    const [sRes, eRes, tRes, cRes, cfgRes, turnosRes] = await Promise.all([
       supabase.from('agenda')
-        .select('id, dj_id, espaco_id, turno_id, valor, estado, tipo_slot, dj_nome, hora_inicio, hora_fim, data, djs(nome, nome_artistico)')
+        .select('id, dj_id, espaco_id, turno_id, valor, margem, transporte, extras, estado, estado_pagamento, tipo_slot, dj_nome, hora_inicio, hora_fim, data, djs(nome, nome_artistico)')
         .gte('data', dataInicio).lte('data', dataFim)
         .not('estado', 'in', '("cancelado","faltou","sem_efeito")'),
       supabase.from('supa_eventos')
-        .select('id, espaco_id, evento, tipo, data_evento, hora_inicio, hora_fim, valor, valor_artistico, valor_apoio_tecnico, status, notas_faturacao')
+        .select('id, espaco_id, evento, tipo, data_evento, hora_inicio, hora_fim, valor, valor_artistico, valor_apoio_tecnico, margem, transporte, extras_contas, status, notas_faturacao')
         .gte('data_evento', dataInicio).lte('data_evento', dataFim)
         .neq('status', 'cancelado'),
       supabase.from('agendamentos_tecnicos')
@@ -1238,10 +1666,12 @@ export function ContasClientes() {
       supabase.from('contas_clientes')
         .select('*').eq('mes', mes),
       supabase.from('configuracoes').select('chave, valor'),
+      supabase.from('turnos_espaco').select('id, espaco_id, nome, ordem').order('ordem'),
     ])
-    if (!sRes.error) setSlots(sRes.data ?? [])
-    if (!eRes.error) setEventos(eRes.data ?? [])
-    if (!tRes.error) setAgendTec(tRes.data ?? [])
+    if (!sRes.error)      setSlots(sRes.data ?? [])
+    if (!eRes.error)      setEventos(eRes.data ?? [])
+    if (!tRes.error)      setAgendTec(tRes.data ?? [])
+    if (!turnosRes.error) setTurnos(turnosRes.data ?? [])
     if (!cfgRes.error) {
       const cfg = Object.fromEntries((cfgRes.data ?? []).map(r => [r.chave, r.valor]))
       const cats = safeParse(cfg.contas_categorias, [])
@@ -1286,13 +1716,6 @@ export function ContasClientes() {
 
       const inserts = []
 
-      // Apoio técnico override
-      if (card.apoioOverride !== null && card.apoioOverride !== '') {
-        inserts.push({ espaco_id: espacoId, mes, tipo: 'apoio_tecnico',
-          valor: parseNum(card.apoioOverride), unidades: 1, valor_unitario: parseNum(card.apoioOverride),
-          imprimir: false, margem_tipo: 'eur' })
-      }
-
       // Secções manuais
       const secoes = [
         { tipo: 'equipamento_comprado', linhas: card.equipamentos_comprado },
@@ -1302,7 +1725,7 @@ export function ContasClientes() {
       ]
       secoes.forEach(({ tipo, linhas }) => {
         linhas.forEach(r => {
-          if (r.evento_id) return // itens ligados a eventos são geridos pelo FormEvento
+          if (r.evento_id) return
           const val = itemTotal(r)
           if (val > 0 || r.descricao) inserts.push({
             espaco_id: espacoId, mes, tipo,
@@ -1318,15 +1741,14 @@ export function ContasClientes() {
         })
       })
 
-      // Imprimir DJ por categoria
-      const dji = card.djImprimir ?? {}
-      DJ_CAT_KEYS.forEach(cat => {
-        if (dji[cat]) inserts.push({
-          espaco_id: espacoId, mes, tipo: 'dj_imprimir',
-          descricao: cat, valor: 0, unidades: 1, valor_unitario: 0,
+      // Estado de impressão
+      if (card.printState && Object.keys(card.printState).length > 0) {
+        inserts.push({
+          espaco_id: espacoId, mes, tipo: 'print_state',
+          notas: JSON.stringify(card.printState), valor: 0, unidades: 1,
           imprimir: false, margem_tipo: 'eur',
         })
-      })
+      }
 
       // Notas auto-secções
       Object.entries(card.notasAuto).forEach(([key, txt]) => {
@@ -1399,6 +1821,24 @@ export function ContasClientes() {
           </button>
         ))}
 
+        {espacoAtivo !== null && (
+          <div className="ml-auto flex items-center gap-0.5 bg-surface-2 border border-border rounded p-0.5">
+            {[
+              { id: 'prev',        label: 'Previsão' },
+              { id: 'prev-agenda', label: 'Prev. + Agenda' },
+              { id: 'conf',        label: 'Confirmação' },
+              { id: 'conf-agenda', label: 'Conf. + Agenda' },
+            ].map(opt => (
+              <button key={opt.id}
+                onClick={() => { setLayoutView(opt.id); localStorage.setItem('contasClientes_layout', opt.id) }}
+                className={clsx('px-2.5 py-1 rounded text-[11px] transition-colors',
+                  layoutView === opt.id ? 'bg-surface-3 text-accent font-medium' : 'text-accent-subtle hover:text-accent'
+                )}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
         {espacoAtivo === null && (
           <div className="relative ml-auto">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent-subtle pointer-events-none" />
@@ -1419,21 +1859,23 @@ export function ContasClientes() {
       {/* Conteúdo */}
       <div className="flex-1 overflow-y-auto">
         {espacoAtivo === null && (
-          <Dashboard espacos={espacos} slots={slots} eventos={eventos} agendTec={agendTec} cards={cards} catTotals={catTotals} subtiposConfig={subtiposConfig} />
+          <Dashboard espacos={espacos} slots={slots} eventos={eventos} cards={cards} catTotals={catTotals} subtiposConfig={subtiposConfig} />
         )}
         {espacoAtivo !== null && espacoDetalhe && (
-          <div className="px-[60px] pt-[60px] pb-3">
+          <div className="px-[60px] pt-[60px] pb-8">
             <SpaceCard
               espaco={espacoDetalhe}
               slots={slots.filter(s => s.espaco_id === espacoAtivo)}
               eventos={eventosEspaco}
-              agendTec={agendTec.filter(a => a.espaco_id === espacoAtivo)}
               cardState={cards[espacoAtivo] ?? initCard([])}
               onCardChange={handleCardChange}
               onSave={handleSave}
               saving={!!saving[espacoAtivo]}
               catTotals={catTotals}
               subtiposConfig={subtiposConfig}
+              turnos={turnos.filter(t => t.espaco_id === espacoAtivo)}
+              mes={mes}
+              layoutView={layoutView}
             />
           </div>
         )}

@@ -508,6 +508,18 @@ export function Configuracoes() {
             />
             <span className="text-xs text-accent-muted">%</span>
           </div>
+          <div className="flex items-center gap-3 border-t border-border/40 pt-4 px-1">
+            <span className="text-xs text-accent flex-1">Valor hora extra (€/h)</span>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={config.contas_valor_hora_extra ?? '30'}
+              onChange={set('contas_valor_hora_extra')}
+              className="w-24 bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-right text-accent tabular-nums focus:outline-none focus:border-accent/40"
+            />
+            <span className="text-xs text-accent-muted">€/h</span>
+          </div>
         </CardBody>
       </Card>
 

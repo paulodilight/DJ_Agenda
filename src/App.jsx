@@ -15,6 +15,7 @@ import { Atuacoes } from '@/pages/Atuacoes'
 import { Equilibrio } from '@/pages/Equilibrio'
 import { Comunicacao } from '@/pages/Comunicacao'
 import { Contas } from '@/pages/Contas'
+import { Pagamentos } from '@/pages/Pagamentos'
 import { ContasDashboard } from '@/pages/contas/ContasDashboard'
 import { ContasDJs } from '@/pages/contas/ContasDJs'
 import { ContasClientes } from '@/pages/contas/ContasClientes'
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="colaboradores" element={<ContasColaboradores />} />
             <Route path="margens"       element={<ContasMargens />} />
           </Route>
+          <Route path="pagamentos" element={<Pagamentos />} />
           <Route path="club" element={<Club />} />
           <Route path="configuracoes" element={<Configuracoes />} />
         </Route>
