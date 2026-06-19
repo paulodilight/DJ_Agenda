@@ -233,6 +233,16 @@ export function Agenda() {
   const enviarManager = async () => {
     setEnviandoManager(true)
     try {
+      // Promover slots em 'aceite' para 'pré-confirmado' primeiro
+      let qAceite = supabase.from('agenda').select('id')
+        .eq('estado', 'aceite')
+        .gte('data', mesInicio).lte('data', mesFim)
+      if (filtroEspaco) qAceite = qAceite.eq('espaco_id', filtroEspaco)
+      const { data: idsAceite } = await qAceite
+      if (idsAceite?.length) {
+        await supabase.from('agenda').update({ estado: 'pré-confirmado' }).in('id', idsAceite.map(r => r.id))
+      }
+
       // Buscar IDs dos slots pré-confirmados para limpar decisões antigas
       let qIds = supabase.from('agenda').select('id')
         .eq('estado', 'pré-confirmado')
@@ -850,25 +860,22 @@ export function Agenda() {
               </button>
             )}
 
-            {nPreConf > 0 && (
+            {(nPreConf > 0 || nAceitacao > 0) && (
               <button
                 onClick={() => {
-                  const pendentes = nProposta + nAceitacao + nAlterar
+                  const pendentes = nProposta + nAlterar
                   if (pendentes > 0 && !window.confirm(
-                    `Ainda há ${pendentes} DJ${pendentes > 1 ? 's' : ''} sem resposta (proposta/aceitação/alterar).\n\nEnviar só os ${nPreConf} pré-confirmados ao manager na mesma?`
+                    `Ainda há ${pendentes} DJ${pendentes > 1 ? 's' : ''} sem resposta (proposta/alterar).\n\nEnviar ao manager na mesma?`
                   )) return
                   enviarManager()
                 }}
                 disabled={enviandoManager}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20"
-                title="Mover pré-confirmados para Validação (manager aprova)"
+                title="Mover pré-confirmados e aceites para Validação (manager aprova)"
               >
                 {enviandoManager ? <Loader2 size={13} className="animate-spin" /> : <UserCheck size={13} />}
                 Enviar ao manager
-                {(nProposta + nAceitacao + nAlterar) > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold" title="Há DJs com resposta pendente">!</span>
-                )}
-                <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">{nPreConf}</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">{nPreConf + nAceitacao}</span>
               </button>
             )}
 

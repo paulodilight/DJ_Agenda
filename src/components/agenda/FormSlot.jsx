@@ -1287,7 +1287,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 type="button" variante="ghost" tamanho="sm" onClick={confirmarAceite} loading={loading}
                 className="text-teal-400/80 hover:text-teal-400"
               >
-                Pré-confirmar
+                Enviar ao Manager
               </Button>
             )}
             {slot?.id && (
