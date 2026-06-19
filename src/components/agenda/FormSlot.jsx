@@ -25,7 +25,7 @@ import { CalendarPlus, Link2, Star, ArrowLeftRight, RotateCcw, Plus, Trash2, Clo
 const ESTADO_OPCOES = [
   { value: 'proposta',        label: 'Proposta' },
   { value: 'aceitação',       label: 'Aceitação DJ' },
-  { value: 'aceite',          label: 'Aguarda confirmação' },
+  { value: 'aceite',          label: 'Aguarda Confirmação Man' },
   { value: 'validação',       label: 'Validação' },
   { value: 'pré-confirmado',  label: 'Pré-confirmado' },
   { value: 'confirmado',      label: 'Confirmado' },
