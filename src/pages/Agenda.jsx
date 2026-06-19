@@ -175,7 +175,7 @@ export function Agenda() {
   const modoDistribuir = jaDistribuido ? 'ajustes' : 'completo'
 
   // ── Contadores para botões de envio em bulk ──────────────────────────────────
-  const { nProposta, nAceitacao, nAlterar, nPreConf, nConfirmado, nValidacao, nPresente, nTrocado, nAPedido, nSemDJ, nTotal } = useMemo(() => {
+  const { nProposta, nAceitacao, nAlterar, nPreConf, nAddAgenda, nConfirmado, nValidacao, nPresente, nTrocado, nAPedido, nSemDJ, nTotal } = useMemo(() => {
     const fonte = filtroEspaco
       ? agendaMes.filter(s => s.espaco_id === filtroEspaco)
       : agendaMes
@@ -186,6 +186,7 @@ export function Agenda() {
       nAlterar:    fonte.filter(s => s.estado === 'alterar').length,
       nValidacao:  fonte.filter(s => s.estado === 'validação').length,
       nPreConf:    fonte.filter(s => s.estado === 'pré-confirmado').length,
+      nAddAgenda:  fonte.filter(s => s.estado === 'add_agenda').length,
       nConfirmado: fonte.filter(s => s.estado === 'confirmado').length,
       nPresente:   fonte.filter(s => s.estado === 'presente').length,
       nTrocado:    fonte.filter(s => s.estado === 'trocado').length,
@@ -233,35 +234,22 @@ export function Agenda() {
   const enviarManager = async () => {
     setEnviandoManager(true)
     try {
-      // Promover slots em 'aceite' para 'pré-confirmado' primeiro
+      // Buscar slots em 'aceite'
       let qAceite = supabase.from('agenda').select('id')
         .eq('estado', 'aceite')
         .gte('data', mesInicio).lte('data', mesFim)
       if (filtroEspaco) qAceite = qAceite.eq('espaco_id', filtroEspaco)
-      const { data: idsAceite } = await qAceite
+      const { data: idsAceite, error: eAceite } = await qAceite
+      if (eAceite) throw eAceite
+
       if (idsAceite?.length) {
-        await supabase.from('agenda').update({ estado: 'pré-confirmado' }).in('id', idsAceite.map(r => r.id))
-      }
-
-      // Buscar IDs dos slots pré-confirmados para limpar decisões antigas
-      let qIds = supabase.from('agenda').select('id')
-        .eq('estado', 'pré-confirmado')
-        .gte('data', mesInicio).lte('data', mesFim)
-      if (filtroEspaco) qIds = qIds.eq('espaco_id', filtroEspaco)
-      const { data: ids, error: eIds } = await qIds
-      if (eIds) throw eIds
-
-      if (ids && ids.length > 0) {
-        const agendaIds = ids.map(r => r.id)
-        // Limpar decisões antigas para que o manager comece com "Aprovar"
+        const agendaIds = idsAceite.map(r => r.id)
         await supabase.from('validacoes_datas').delete().in('agenda_id', agendaIds)
-        // Mudar estado para validação
         const { error } = await supabase.from('agenda').update({ estado: 'validação' }).in('id', agendaIds)
         if (error) throw error
       }
 
       await Promise.all([recarregar(), recarregarMes()])
-      // Notificação N8N
       fetch('https://i4dj.app.n8n.cloud/webhook/dj-enviar-manager', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -269,6 +257,27 @@ export function Agenda() {
       }).catch(() => {})
     } catch (e) { alert('Erro ao enviar ao manager: ' + e.message) }
     finally { setEnviandoManager(false) }
+  }
+
+  const [enviandoPreConf, setEnviandoPreConf] = useState(false)
+  const enviarPreConfirmado = async () => {
+    setEnviandoPreConf(true)
+    try {
+      let q = supabase.from('agenda').select('id')
+        .eq('estado', 'pré-confirmado')
+        .gte('data', mesInicio).lte('data', mesFim)
+      if (filtroEspaco) q = q.eq('espaco_id', filtroEspaco)
+      const { data: ids, error: eIds } = await q
+      if (eIds) throw eIds
+
+      if (ids?.length) {
+        const { error } = await supabase.from('agenda').update({ estado: 'add_agenda' }).in('id', ids.map(r => r.id))
+        if (error) throw error
+      }
+
+      await Promise.all([recarregar(), recarregarMes()])
+    } catch (e) { alert('Erro ao enviar pré-confirmado: ' + e.message) }
+    finally { setEnviandoPreConf(false) }
   }
 
   const enviarConfirmados = async () => {
@@ -860,7 +869,7 @@ export function Agenda() {
               </button>
             )}
 
-            {(nPreConf > 0 || nAceitacao > 0) && (
+            {nAceitacao > 0 && (
               <button
                 onClick={() => {
                   const pendentes = nProposta + nAlterar
@@ -871,11 +880,24 @@ export function Agenda() {
                 }}
                 disabled={enviandoManager}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20"
-                title="Mover pré-confirmados e aceites para Validação (manager aprova)"
+                title="Mover aceites para Validação (manager aprova)"
               >
                 {enviandoManager ? <Loader2 size={13} className="animate-spin" /> : <UserCheck size={13} />}
                 Enviar ao manager
-                <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">{nPreConf + nAceitacao}</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">{nAceitacao}</span>
+              </button>
+            )}
+
+            {nPreConf > 0 && (
+              <button
+                onClick={enviarPreConfirmado}
+                disabled={enviandoPreConf}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-indigo-500/40 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20"
+                title="Enviar pré-confirmados ao DJ para confirmação final"
+              >
+                {enviandoPreConf ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                Enviar pré-confirmado
+                <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold">{nPreConf}</span>
               </button>
             )}
 

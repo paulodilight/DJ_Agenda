@@ -28,6 +28,7 @@ const ESTADO_OPCOES = [
   { value: 'aceite',          label: 'Aguarda Confirmação Man' },
   { value: 'validação',       label: 'Validação' },
   { value: 'pré-confirmado',  label: 'Pré-confirmado' },
+  { value: 'add_agenda',      label: 'Add Agenda' },
   { value: 'confirmado',      label: 'Confirmado' },
   { value: 'alterar',         label: 'Alterar' },
   { value: 'trocado',         label: 'Trocado' },
