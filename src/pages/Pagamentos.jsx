@@ -319,10 +319,47 @@ export function Pagamentos() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
 
+  const classificarPendentes = useCallback(async () => {
+    const hoje = new Date().toISOString().slice(0, 10)
+    const { data: pendentes } = await supabase
+      .from('agenda')
+      .select('id, data, hora_inicio')
+      .eq('estado_pagamento', 'pendente')
+      .in('estado', ['confirmado', 'presente'])
+      .lt('data', hoje)
+    if (!pendentes?.length) return
+
+    const ids = pendentes.map(s => s.id)
+    const { data: presencas } = await supabase
+      .from('presencas_djs')
+      .select('agenda_id, signed_at')
+      .in('agenda_id', ids)
+
+    const presencaMap = {}
+    for (const p of presencas ?? []) presencaMap[p.agenda_id] = p.signed_at
+
+    const comPresenca = [], semPresenca = []
+    for (const slot of pendentes) {
+      const signed = presencaMap[slot.id]
+      if (signed) {
+        const dSigned = new Date(signed)
+        const diaOk = dSigned.toISOString().slice(0, 10) === slot.data
+        const horaOk = dSigned.toTimeString().slice(0, 8) >= slot.hora_inicio
+        if (diaOk && horaOk) { comPresenca.push(slot.id); continue }
+      }
+      semPresenca.push(slot.id)
+    }
+    await Promise.all([
+      comPresenca.length && supabase.from('agenda').update({ estado_pagamento: 'a_pagamento' }).in('id', comPresenca),
+      semPresenca.length && supabase.from('agenda').update({ estado_pagamento: 'pendente_regularizacao' }).in('id', semPresenca),
+    ])
+  }, [])
+
   const carregar = useCallback(async () => {
     setCarregando(true)
     setErro(null)
     try {
+      await classificarPendentes()
       const [resPedidos, resAnalise, resPendentes] = await Promise.all([
         supabase
           .from('pedidos_pagamento')
