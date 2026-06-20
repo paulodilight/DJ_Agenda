@@ -175,7 +175,7 @@ export function Agenda() {
   const modoDistribuir = jaDistribuido ? 'ajustes' : 'completo'
 
   // ── Contadores para botões de envio em bulk ──────────────────────────────────
-  const { nProposta, nAceitacao, nAlterar, nPreConf, nAddAgenda, nConfirmado, nValidacao, nPresente, nTrocado, nAPedido, nSemDJ, nTotal } = useMemo(() => {
+  const { nProposta, nAceitacao, nAceite, nAlterar, nPreConf, nAddAgenda, nConfirmado, nValidacao, nPresente, nTrocado, nAPedido, nSemDJ, nTotal } = useMemo(() => {
     const fonte = filtroEspaco
       ? agendaMes.filter(s => s.espaco_id === filtroEspaco)
       : agendaMes
@@ -183,6 +183,7 @@ export function Agenda() {
     return {
       nProposta:   fonte.filter(s => s.estado === 'proposta').length,
       nAceitacao:  fonte.filter(s => s.estado === 'aceitação' || s.estado === 'aceite').length,
+      nAceite:     fonte.filter(s => s.estado === 'aceite').length,
       nAlterar:    fonte.filter(s => s.estado === 'alterar').length,
       nValidacao:  fonte.filter(s => s.estado === 'validação').length,
       nPreConf:    fonte.filter(s => s.estado === 'pré-confirmado').length,
@@ -869,7 +870,7 @@ export function Agenda() {
               </button>
             )}
 
-            {nAceitacao > 0 && (
+            {nAceite > 0 && (
               <button
                 onClick={() => {
                   const pendentes = nProposta + nAlterar
@@ -884,7 +885,7 @@ export function Agenda() {
               >
                 {enviandoManager ? <Loader2 size={13} className="animate-spin" /> : <UserCheck size={13} />}
                 Enviar ao manager
-                <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">{nAceitacao}</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">{nAceite}</span>
               </button>
             )}
 
