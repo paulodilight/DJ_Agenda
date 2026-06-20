@@ -1,6 +1,20 @@
 import { clsx } from 'clsx'
 import { useDraggable } from '@dnd-kit/core'
 import { Sparkles, Star, Check } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+
+function PagamentoBtn({ cor }) {
+  const navigate = useNavigate()
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); navigate('/pagamentos') }}
+      title="Ver pagamentos"
+      className={clsx('absolute bottom-0.5 left-1 text-[9px] font-bold leading-none hover:scale-125 transition-transform', cor)}
+    >
+      €
+    </button>
+  )
+}
 
 export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onToggleDestaque, onConfirmar, dimmed = false, dragId, dragData, conflito = false, motivoConflito = null }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -159,15 +173,8 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
   const temAccoes = (onSugerir || onToggleDestaque) && !isSemEfeito && !isLock && temDJ
   const temConfirmar = !!onConfirmar && (estado === 'proposta' || estado === 'aceite' || estado === 'pré-confirmado')
   const estadoPag = slot.estado_pagamento
-  const temPagamento = estadoPag && estadoPag !== 'pendente'
-  const corPag = {
-    a_pagamento:            'text-amber-400',
-    aprovada_pagamento:     'text-teal-400',
-    em_analise:             'text-orange-400',
-    em_pagamento:           'text-blue-400',
-    pago:                   'text-green-400',
-    pendente_regularizacao: 'text-red-400',
-  }[estadoPag] ?? 'text-white/40'
+  const corPag = estadoPag === 'a_pagamento' ? 'text-amber-400' : estadoPag === 'pago' ? 'text-green-400' : null
+  const temPagamento = !!corPag
 
   if (!temAccoes && !temConfirmar && !temPagamento) return chip
 
@@ -203,9 +210,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
       )}
       {/* Pagamento — canto inferior esquerdo */}
       {temPagamento && (
-        <span className={clsx('absolute bottom-0.5 left-1 text-[9px] font-bold leading-none pointer-events-none', corPag)}>
-          €
-        </span>
+        <PagamentoBtn cor={corPag} />
       )}
       {/* Confirmar — canto inferior direito, sempre visível */}
       {temConfirmar && (
