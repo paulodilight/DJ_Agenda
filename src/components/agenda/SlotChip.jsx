@@ -158,11 +158,21 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
 
   const temAccoes = (onSugerir || onToggleDestaque) && !isSemEfeito && !isLock && temDJ
   const temConfirmar = !!onConfirmar && (estado === 'proposta' || estado === 'aceite' || estado === 'pré-confirmado')
+  const estadoPag = slot.estado_pagamento
+  const temPagamento = estadoPag && estadoPag !== 'pendente'
+  const corPag = {
+    a_pagamento:            'text-amber-400',
+    aprovada_pagamento:     'text-teal-400',
+    em_analise:             'text-orange-400',
+    em_pagamento:           'text-blue-400',
+    pago:                   'text-green-400',
+    pendente_regularizacao: 'text-red-400',
+  }[estadoPag] ?? 'text-white/40'
 
-  if (!temAccoes && !temConfirmar) return chip
+  if (!temAccoes && !temConfirmar && !temPagamento) return chip
 
   return (
-    <div className="relative group/chip">
+    <div className="relative group/chip" style={!temAccoes && !temConfirmar ? { isolation: 'isolate' } : undefined}>
       {chip}
       <div className="absolute top-0.5 left-0.5 flex items-center gap-0.5">
         {/* Estrelinha marketing — sempre visível, activa/inactiva */}
@@ -190,6 +200,12 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
         >
           <Sparkles size={9} />
         </button>
+      )}
+      {/* Pagamento — canto inferior esquerdo */}
+      {temPagamento && (
+        <span className={clsx('absolute bottom-0.5 left-1 text-[9px] font-bold leading-none pointer-events-none', corPag)}>
+          €
+        </span>
       )}
       {/* Confirmar — canto inferior direito, sempre visível */}
       {temConfirmar && (
