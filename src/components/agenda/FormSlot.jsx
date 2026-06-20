@@ -773,6 +773,11 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 <Select label="Estado" value={form.estado} onChange={set('estado')} className={form.dj_externo?.trim() ? 'col-span-2' : ''}>
                   {ESTADO_OPCOES.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
                 </Select>
+                <Select label="Pagamento" value={form.estado_pagamento ?? 'pendente'} onChange={set('estado_pagamento')}>
+                  <option value="pendente">—</option>
+                  <option value="a_pagamento">A Pagar</option>
+                  <option value="pago">Pago</option>
+                </Select>
               </div>
 
               <div className="flex items-end gap-2">
@@ -883,6 +888,11 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 )}
                 <Select label="Estado" value={form.estado} onChange={set('estado')} className={form.dj_externo?.trim() ? 'col-span-2' : ''}>
                   {ESTADO_OPCOES.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+                </Select>
+                <Select label="Pagamento" value={form.estado_pagamento ?? 'pendente'} onChange={set('estado_pagamento')}>
+                  <option value="pendente">—</option>
+                  <option value="a_pagamento">A Pagar</option>
+                  <option value="pago">Pago</option>
                 </Select>
               </div>
 
