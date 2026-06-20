@@ -57,6 +57,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
   const isValidacao        = estado === 'validação'
   const isAceite           = estado === 'aceite'
   const isPreConf          = estado === 'pré-confirmado'
+  const isAddAgenda        = estado === 'add_agenda'
   const isTrocado          = estado === 'trocado'
   const isCancelado        = estado === 'cancelado' || estado === 'faltou'
   const isManualConfirmado = isManual && (estado === 'confirmado' || estado === 'presente')
@@ -103,6 +104,8 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
                               ? 'border-amber-400/40 bg-amber-500/[0.15] hover:bg-amber-500/25'
                               : isPreConf
                                 ? 'border-sky-400/40 bg-sky-500/[0.15] hover:bg-sky-500/25'
+                                : isAddAgenda
+                                  ? 'border-indigo-400/40 bg-indigo-500/[0.15] hover:bg-indigo-500/25'
                                 : isTrocado
                                   ? 'border-[#fc03c6]/30 bg-[#fc03c6]/[0.10] hover:bg-[#fc03c6]/15'
                                   : isCancelado
@@ -130,6 +133,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
         isAceite           ? 'font-semibold text-teal-400'            :
         isValidacao        ? 'font-semibold text-amber-400'           :
         isPreConf          ? 'font-semibold text-sky-400'             :
+        isAddAgenda        ? 'font-semibold text-indigo-400'          :
         isTrocado          ? 'font-semibold text-[#fc03c6]'           :
         isCancelado        ? 'font-semibold text-red-400'             :
         isManualConfirmado ? 'font-semibold text-status-confirmado'   :
