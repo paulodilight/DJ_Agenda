@@ -117,11 +117,23 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   // ── Histórico ──
   const [historico, setHistorico] = useState([])
 
+  // ── Presença DJ ──
+  const [presencaSignedAt, setPresencaSignedAt] = useState(null)
+
   const { djs } = useDJs()
   const { espacos } = useEspacos()
   const { bloqueios } = useBloqueios()
   const { agenda } = useAgenda()
   const config = useAppStore((s) => s.config)
+
+  useEffect(() => {
+    if (aberto && slot?.id) {
+      supabase.from('presencas_djs').select('signed_at').eq('agenda_id', slot.id).maybeSingle()
+        .then(({ data }) => setPresencaSignedAt(data?.signed_at ?? null))
+    } else {
+      setPresencaSignedAt(null)
+    }
+  }, [aberto, slot?.id])
 
   useEffect(() => {
     if (aberto && slot) {
@@ -677,6 +689,11 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 {!simplificado && form.valor !== '' && form.valor !== null && (
                   <p className="text-xs text-accent-muted mt-0.5">
                     {formatarEuro(Number(form.valor))}
+                  </p>
+                )}
+                {presencaSignedAt && (
+                  <p className="text-xs text-emerald-400 mt-0.5 font-medium">
+                    ✓ Assinado às {new Date(presencaSignedAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 )}
               </div>
