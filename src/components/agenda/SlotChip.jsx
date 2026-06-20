@@ -3,15 +3,15 @@ import { useDraggable } from '@dnd-kit/core'
 import { Sparkles, Star, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-function PagamentoBtn({ cor }) {
+function PagamentoBtn({ cor, label }) {
   const navigate = useNavigate()
   return (
     <button
       onClick={(e) => { e.stopPropagation(); navigate('/pagamentos') }}
       title="Ver pagamentos"
-      className={clsx('absolute bottom-0.5 left-1 text-[9px] font-bold leading-none hover:scale-125 transition-transform', cor)}
+      className={clsx('absolute bottom-1 left-1 right-1 text-[8px] font-bold leading-none px-1 py-0.5 rounded border text-center hover:brightness-125 transition-all', cor)}
     >
-      €
+      {label}
     </button>
   )
 }

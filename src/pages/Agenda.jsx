@@ -175,7 +175,7 @@ export function Agenda() {
   const modoDistribuir = jaDistribuido ? 'ajustes' : 'completo'
 
   // ── Contadores para botões de envio em bulk ──────────────────────────────────
-  const { nProposta, nAceitacao, nAceite, nAlterar, nPreConf, nAddAgenda, nConfirmado, nValidacao, nPresente, nTrocado, nAPedido, nSemDJ, nTotal } = useMemo(() => {
+  const { nProposta, nAceitacao, nAceite, nAlterar, nPreConf, nAddAgenda, nConfirmado, nValidacao, nPresente, nTrocado, nAPedido, nSemDJ, nTotal, nAPagamento, nPago } = useMemo(() => {
     const fonte = filtroEspaco
       ? agendaMes.filter(s => s.espaco_id === filtroEspaco)
       : agendaMes
@@ -188,6 +188,8 @@ export function Agenda() {
       nValidacao:  fonte.filter(s => s.estado === 'validação').length,
       nPreConf:    fonte.filter(s => s.estado === 'pré-confirmado').length,
       nAddAgenda:  fonte.filter(s => s.estado === 'add_agenda').length,
+      nAPagamento: fonte.filter(s => s.estado_pagamento === 'a_pagamento').length,
+      nPago:       fonte.filter(s => s.estado_pagamento === 'pago').length,
       nConfirmado: fonte.filter(s => s.estado === 'confirmado').length,
       nPresente:   fonte.filter(s => s.estado === 'presente').length,
       nTrocado:    fonte.filter(s => s.estado === 'trocado').length,
@@ -1018,6 +1020,8 @@ export function Agenda() {
             { n: nTrocado,    label: 'Trocado',     cor: 'text-pink-400' },
             { n: nAPedido,    label: 'A pedido',    cor: 'text-violet-400' },
             { n: nSemDJ,      label: 'Sem DJ',      cor: 'text-teal-400' },
+            { n: nAPagamento, label: 'A Pagar',     cor: 'text-amber-400' },
+            { n: nPago,       label: 'Pago',        cor: 'text-green-400' },
           ].filter(({ n }) => n > 0).map(({ n, label, cor }, i, arr) => (
             <span key={label} className="flex items-center gap-2">
               <span className="text-[11px] text-accent-subtle/60">{label} <span className={clsx('font-bold', cor)}>{n}</span></span>
