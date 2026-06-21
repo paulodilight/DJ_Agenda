@@ -154,26 +154,61 @@ export const espacosApi = {
 
 export const turnosApi = {
   async guardar(espacoId, turnos) {
-    // Apaga todos os turnos existentes e recria (upsert simples)
-    const { error: delErr } = await supabase
-      .from('turnos_espaco')
-      .delete()
-      .eq('espaco_id', espacoId)
-    if (delErr) throw delErr
+    // Fetch IDs currently in DB
+    const { data: existentes, error: fetchErr } = await supabase
+      .from('turnos_espaco').select('id').eq('espaco_id', espacoId)
+    if (fetchErr) throw fetchErr
+
+    const idsDb = new Set((existentes ?? []).map(t => t.id))
+    const idsRetidos = new Set(turnos.filter(t => t.id && idsDb.has(t.id)).map(t => t.id))
+
+    // Delete only turnos removed from the list (cascade cleans related tables)
+    const aApagar = [...idsDb].filter(id => !idsRetidos.has(id))
+    if (aApagar.length > 0) {
+      const { error } = await supabase.from('turnos_espaco').delete().in('id', aApagar)
+      if (error) throw error
+    }
 
     if (turnos.length === 0) return []
 
-    const { data, error } = await supabase
-      .from('turnos_espaco')
-      .insert(turnos.map((t, i) => ({
-        espaco_id: espacoId,
-        nome: t.nome,
-        dias_semana: t.dias_semana ?? [],
-        ordem: i,
-      })))
-      .select()
-    if (error) throw error
-    return data
+    const aAtualizar = turnos.filter(t => t.id && idsDb.has(t.id))
+    const aInserir   = turnos.filter(t => !t.id || !idsDb.has(t.id))
+
+    // Update existing (preserves IDs — agenda slots keep their turno_id)
+    if (aAtualizar.length > 0) {
+      const erros = await Promise.all(
+        aAtualizar.map(t =>
+          supabase.from('turnos_espaco')
+            .update({ nome: t.nome, dias_semana: t.dias_semana ?? [], ordem: turnos.indexOf(t) })
+            .eq('id', t.id)
+            .then(({ error }) => error)
+        )
+      )
+      const primeiro = erros.find(Boolean)
+      if (primeiro) throw primeiro
+    }
+
+    // Insert new turnos
+    const inseridos = new Map()
+    if (aInserir.length > 0) {
+      const { data, error } = await supabase
+        .from('turnos_espaco')
+        .insert(aInserir.map(t => ({
+          espaco_id: espacoId,
+          nome: t.nome,
+          dias_semana: t.dias_semana ?? [],
+          ordem: turnos.indexOf(t),
+        })))
+        .select()
+      if (error) throw error
+      ;(data ?? []).forEach((row, i) => inseridos.set(aInserir[i]._key, row))
+    }
+
+    // Return in original order with correct IDs
+    return turnos.map(t => {
+      if (t.id && idsDb.has(t.id)) return { id: t.id, espaco_id: espacoId, nome: t.nome, dias_semana: t.dias_semana ?? [], ordem: turnos.indexOf(t) }
+      return inseridos.get(t._key) ?? null
+    }).filter(Boolean)
   },
 }
 
