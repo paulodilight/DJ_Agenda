@@ -1,6 +1,6 @@
 ﻿import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2, Send, UserCheck, MessageSquare, RefreshCw, Download } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2, Send, UserCheck, MessageSquare, RefreshCw, Download, Lock, Unlock } from 'lucide-react'
 import { startOfWeek, addDays, addWeeks, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import {
@@ -55,6 +55,37 @@ export function Agenda() {
   const [distribuindo, setDistribuindo] = useState(false)
   const [redistribuindo, setRedistribuindo] = useState(false)
   const { pushUndo, executarUndo, podeDesfazer, executando: undoExec } = useUndo()
+
+  // ── disponibilidades abertas (contagem global) ──
+  const [dispInfo, setDispInfo] = useState({ total: 0, abertas: 0 })
+  const [togglingDisp, setTogglingDisp] = useState(false)
+
+  useEffect(() => {
+    supabase.from('djs').select('id, disponibilidades_abertas').eq('estado', 'activo')
+      .then(({ data }) => {
+        if (!data) return
+        const total = data.length
+        const abertas = data.filter(d => d.disponibilidades_abertas !== false).length
+        setDispInfo({ total, abertas })
+      })
+      .catch(() => {})
+  }, [])
+
+  const toggleDispGlobal = async () => {
+    setTogglingDisp(true)
+    const fechar = dispInfo.abertas > 0
+    try {
+      const { error } = await supabase.from('djs')
+        .update({ disponibilidades_abertas: !fechar })
+        .eq('estado', 'activo')
+      if (error) throw error
+      setDispInfo(prev => ({ ...prev, abertas: fechar ? 0 : prev.total }))
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setTogglingDisp(false)
+    }
+  }
 
   // Quando o mês global muda (pelo header), actualizar a referência da agenda
   useEffect(() => {
@@ -834,6 +865,20 @@ export function Agenda() {
             >
               <Save size={13} />
               Gravar
+            </button>
+            <button
+              onClick={toggleDispGlobal}
+              disabled={togglingDisp}
+              title={dispInfo.abertas > 0 ? `Fechar disponibilidades (${dispInfo.abertas} DJs com acesso)` : 'Abrir disponibilidades para todos os DJs'}
+              className={clsx(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs transition-colors disabled:opacity-50',
+                dispInfo.abertas > 0
+                  ? 'border-status-confirmado/40 bg-status-confirmado/10 text-status-confirmado hover:bg-status-confirmado/20'
+                  : 'border-status-cancelado/40 bg-status-cancelado/10 text-status-cancelado hover:bg-status-cancelado/20'
+              )}
+            >
+              {dispInfo.abertas > 0 ? <Unlock size={13} /> : <Lock size={13} />}
+              {dispInfo.abertas > 0 ? `Disp. (${dispInfo.abertas}/${dispInfo.total})` : 'Disp. fechadas'}
             </button>
           </div>
         </div>

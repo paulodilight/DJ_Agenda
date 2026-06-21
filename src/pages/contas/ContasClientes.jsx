@@ -930,14 +930,18 @@ function SpaceCard({ espaco, slots, eventos, cardState, onCardChange, onSave, sa
         metaBilling += rate
         metaN++
         if (slot.data) daysSet.add(String(new Date(slot.data + 'T12:00:00').getDate()).padStart(2, '0'))
-        if (!turnosMap[turnoLabel]) turnosMap[turnoLabel] = { label: turnoLabel, billing: 0, djs: {} }
+        if (!turnosMap[turnoLabel]) turnosMap[turnoLabel] = { label: turnoLabel, billing: 0, djs: {}, daysSet: new Set() }
         turnosMap[turnoLabel].billing += rate
+        if (slot.data) turnosMap[turnoLabel].daysSet.add(String(new Date(slot.data + 'T12:00:00').getDate()).padStart(2, '0'))
         if (!turnosMap[turnoLabel].djs[djNome]) turnosMap[turnoLabel].djs[djNome] = { nome: djNome, slots: [], billing: 0 }
         turnosMap[turnoLabel].djs[djNome].slots.push(slot)
         turnosMap[turnoLabel].djs[djNome].billing += rate
       })
       const days = [...daysSet].sort((a, b) => Number(a) - Number(b))
-      const turnosList = Object.values(turnosMap).map(t => ({ ...t, djs: Object.values(t.djs) }))
+      const turnosList = Object.values(turnosMap).map(t => {
+        const tDays = [...t.daysSet].sort((a, b) => Number(a) - Number(b))
+        return { label: t.label, billing: t.billing, djs: Object.values(t.djs), days: tDays }
+      })
       return { key: meta.key, label: meta.label, n: metaN, days, billing: metaBilling, turnos: turnosList }
     }).filter(g => g.billing > 0)
   }, [slots, turnos, subtiposConfig, catTotals])
@@ -1042,11 +1046,15 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
     const artistasTotal = djTotalPrint + (musicosPrint ? totalMusicos : 0)
     const djsRow = totalDJs > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:12px;font-weight:600;color:#555"><span>DJs <span style="font-weight:normal">${totalDJsN}</span></span><span>${fmtE(totalDJs)}</span></div>` : ''
     const grupRows = printedGrupos.map(g => {
-      const diasLabel = g.days.length > 0 ? ` <span style="font-weight:normal;font-size:11px;color:#999">(dias ${g.days.join(', ')})</span>` : ''
-      const djsHtml = g.turnos.flatMap(t => t.djs).map(dj =>
-        `<tr><td style="padding-left:20px">${dj.nome}${fmtDayNums(dj.slots) ? ` <span style="color:#999;font-size:11px">(Dias ${fmtDayNums(dj.slots)})</span>` : ''}</td><td class="r">${fmtE(dj.billing)}</td></tr>`
-      ).join('')
-      return `<div class="sub-sec"><div class="sub-hdr"><span>${g.label}${g.n > 0 ? ` <span style="font-weight:normal">${g.n}</span>` : ''}${diasLabel}</span><span>${fmtE(g.billing)}</span></div>${djsHtml ? `<table class="items"><tbody>${djsHtml}</tbody></table>` : ''}</div>`
+      const printedTurnos = g.turnos.filter(t => isPrinted(`artistas:${g.key}:${t.label}`))
+      const djsHtml = printedTurnos.map(t => {
+        const tLabel = t.days.length > 0 ? `${t.label} (${t.days.join(', ')})` : t.label
+        const djRows = t.djs.map(dj =>
+          `<tr><td style="padding-left:20px">${dj.nome}</td><td class="r">${fmtE(dj.billing)}</td></tr>`
+        ).join('')
+        return `<tr><td style="padding-left:10px;font-size:10px;color:#aaa;font-weight:600;padding-top:4px">${tLabel}</td><td class="r" style="font-size:10px;color:#aaa">${fmtE(t.billing)}</td></tr>${djRows}`
+      }).join('')
+      return `<div class="sub-sec"><div class="sub-hdr"><span>${g.label}${g.n > 0 ? ` <span style="font-weight:normal">${g.n}</span>` : ''}</span><span>${fmtE(g.billing)}</span></div>${djsHtml ? `<table class="items"><tbody>${djsHtml}</tbody></table>` : ''}</div>`
     }).join('')
     const artistasSec = artistasTotal > 0 ? `<div class="sec"><div class="sec-hdr"><span>Artistas</span><span>${fmtE(artistasTotal)}</span></div>${djsRow}${grupRows}${musicosPrint ? `<div class="item-row"><span style="padding-left:12px">Músicos / Bandas</span><span>${fmtE(totalMusicos)}</span></div>` : ''}</div>` : ''
 
@@ -1219,7 +1227,6 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
                   <div className="flex-1 flex items-baseline gap-1.5 min-w-0">
                     <span className="text-xs font-medium text-white/75">{grupo.label}</span>
                     {grupo.n > 0 && <span className="text-[10px] text-white/35 tabular-nums">{grupo.n}</span>}
-                    {grupo.days.length > 0 && <span className="text-[10px] text-white/25 truncate">(dias {grupo.days.join(', ')})</span>}
                   </div>
                   {toggle(`artistas:${grupo.key}`)}
                   <span className="text-xs text-white/65 tabular-nums">{formatarEuro(grupo.billing)}</span>
@@ -1232,7 +1239,10 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
                       <div className="flex items-center gap-2 px-9 py-2 cursor-pointer hover:bg-white/2 transition-colors"
                         onClick={() => togTurno(tKey)}>
                         <ChevronRight size={8} className={clsx('text-white/15 transition-transform shrink-0', turnosAbertos[tKey] && 'rotate-90')} />
-                        <span className="text-[11px] text-white/30 flex-1">{turno.label}</span>
+                        <span className="text-[11px] text-white/30 flex-1">
+                          {turno.label}
+                          {turno.days.length > 0 && <span className="text-[10px] text-white/20 ml-1.5">({turno.days.join(', ')})</span>}
+                        </span>
                         {toggle(`artistas:${grupo.key}:${turno.label}`)}
                         <span className="text-[11px] text-white/30 tabular-nums">{formatarEuro(turno.billing)}</span>
                       </div>

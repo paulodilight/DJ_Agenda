@@ -27,6 +27,8 @@ const DIAS = [
 
 const TIPO_OPCOES = ['club', 'bar', 'hotel', 'restaurante']
 
+const CAT_NOMES_RESIDENTES = ['DJ Residente', 'DJ Residente ANL', 'DJ Convidado INT']
+
 const novoTurno = () => ({
   _key: crypto.randomUUID(),
   nome: '',
@@ -87,6 +89,8 @@ export function EspacoPerfil() {
   const [adminDiaSemPref, setAdminDiaSemPref] = useState({})
   // { [dj_id]: { [turno_key]: quantidade_ideal } }
   const [turnoQtdPref, setTurnoQtdPref] = useState({})
+  // { [dj_id]: [categoria_id_str, ...] }
+  const [djCatsMap, setDjCatsMap] = useState({})
 
   const [categorias, setCategorias] = useState([])
   const [turnoCats, setTurnoCats] = useState({})        // { turnoKey: [categoria_id, ...] }
@@ -229,6 +233,21 @@ export function EspacoPerfil() {
       .then(({ data }) => setGrupos(data ?? [])).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    const ids = djs.filter(d => d.estado === 'activo' || d.estado === 'activo_ext').map(d => d.id)
+    if (!ids.length) return
+    supabase.from('dj_categorias').select('dj_id, categoria_id').in('dj_id', ids)
+      .then(({ data }) => {
+        const map = {}
+        ;(data ?? []).forEach(({ dj_id, categoria_id }) => {
+          if (!map[dj_id]) map[dj_id] = []
+          map[dj_id].push(String(categoria_id))
+        })
+        setDjCatsMap(map)
+      })
+      .catch(() => {})
+  }, [djs])
+
   const setField = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }))
 
   const handleLogoUpload = async (e) => {
@@ -356,10 +375,10 @@ export function EspacoPerfil() {
       turnosValidos.forEach((t) => {
         const turnoId = keyParaId[t._key]
         if (!turnoId) return
-        djsActivos.forEach((dj) => {
-          const peso = adminTurnoPref[dj.id]?.[t._key]
+        Object.entries(adminTurnoPref).forEach(([djId, pesos]) => {
+          const peso = pesos[t._key]
           if (peso != null && peso !== '') {
-            turnoPrefs.push({ espaco_id: id, dj_id: dj.id, turno_id: turnoId, peso: Number(peso) })
+            turnoPrefs.push({ espaco_id: id, dj_id: djId, turno_id: turnoId, peso: Number(peso) })
           }
         })
       })
@@ -370,11 +389,11 @@ export function EspacoPerfil() {
 
       // Guardar preferências admin × dia da semana
       const diaSemPrefs = []
-      djsActivos.forEach((dj) => {
+      Object.entries(adminDiaSemPref).forEach(([djId, dias]) => {
         DIAS.forEach((dia) => {
-          const peso = adminDiaSemPref[dj.id]?.[dia.idx]
+          const peso = dias[dia.idx]
           if (peso != null && peso !== '') {
-            diaSemPrefs.push({ espaco_id: id, dj_id: dj.id, dia_semana: dia.idx, peso: Number(peso) })
+            diaSemPrefs.push({ espaco_id: id, dj_id: djId, dia_semana: dia.idx, peso: Number(peso) })
           }
         })
       })
@@ -388,10 +407,10 @@ export function EspacoPerfil() {
       turnosValidos.forEach((t) => {
         const turnoId = keyParaId[t._key]
         if (!turnoId) return
-        djsActivos.forEach((dj) => {
-          const qtd = turnoQtdPref[dj.id]?.[t._key]
+        Object.entries(turnoQtdPref).forEach(([djId, qtds]) => {
+          const qtd = qtds[t._key]
           if (qtd != null && qtd !== '') {
-            qtdPrefs.push({ espaco_id: id, turno_id: turnoId, dj_id: dj.id, quantidade_ideal: Number(qtd) })
+            qtdPrefs.push({ espaco_id: id, turno_id: turnoId, dj_id: djId, quantidade_ideal: Number(qtd) })
           }
         })
       })
@@ -411,6 +430,13 @@ export function EspacoPerfil() {
   }
 
   const djsActivos = djs.filter((d) => d.estado === 'activo' || d.estado === 'activo_ext')
+
+  const catIdsResidentes = new Set(
+    categorias.filter(c => CAT_NOMES_RESIDENTES.includes(c.nome)).map(c => String(c.id))
+  )
+  const djsActivosResidentes = catIdsResidentes.size === 0
+    ? djsActivos
+    : djsActivos.filter(d => (djCatsMap[d.id] ?? []).some(id => catIdsResidentes.has(id)))
 
   if (loading) return <LoadingPage />
 
@@ -1011,7 +1037,7 @@ export function EspacoPerfil() {
                   Preferido = o motor favorece este DJ · Excluído = nunca atribui · Neutro = sem preferência
                 </p>
               </div>
-              {djsActivos.length > 0 && (
+              {djsActivosResidentes.length > 0 && (
                 <div className="flex items-center gap-1 shrink-0">
                   <span className="text-[10px] text-accent-subtle mr-1">Todos:</span>
                   {[
@@ -1023,7 +1049,7 @@ export function EspacoPerfil() {
                       key={op.value}
                       type="button"
                       onClick={() => setDjsPrefs(() =>
-                        Object.fromEntries(djsActivos.map((d) => [d.id, op.value]))
+                        Object.fromEntries(djsActivosResidentes.map((d) => [d.id, op.value]))
                       )}
                       className={clsx('px-2.5 py-1 rounded border text-[10px] font-semibold transition-colors', op.cor)}
                     >
@@ -1035,11 +1061,11 @@ export function EspacoPerfil() {
             </div>
           </CardHeader>
           <CardBody>
-            {djsActivos.length === 0 ? (
+            {djsActivosResidentes.length === 0 ? (
               <p className="text-xs text-accent-subtle italic">Sem DJs activos.</p>
             ) : (
               <div className="flex flex-col gap-0">
-                {djsActivos.map((dj) => {
+                {djsActivosResidentes.map((dj) => {
                     const pref = djsPrefs[dj.id] ?? 'neutro'
                     return (
                       <div key={dj.id} className="flex items-center justify-between gap-3 py-2 border-b border-border/30 last:border-0">
@@ -1092,7 +1118,7 @@ export function EspacoPerfil() {
         {/* ── Admin: Peso × Turno + Quantidade × Turno ── */}
         {(() => {
           const turnoActivo = turnos[turnoActivoIdx] ?? turnos[0]
-          if (!turnoActivo?.nome?.trim() || djsActivos.length === 0) return null
+          if (!turnoActivo?.nome?.trim() || djsActivosResidentes.length === 0) return null
           return (
             <Card>
               <CardHeader>
@@ -1116,7 +1142,7 @@ export function EspacoPerfil() {
                     </tr>
                   </thead>
                   <tbody>
-                    {djsActivos.map((dj) => {
+                    {djsActivosResidentes.map((dj) => {
                       const peso = adminTurnoPref[dj.id]?.[turnoActivo._key] ?? ''
                       const qtd  = turnoQtdPref[dj.id]?.[turnoActivo._key] ?? ''
                       return (
@@ -1181,7 +1207,7 @@ export function EspacoPerfil() {
                     </tr>
                   </thead>
                   <tbody>
-                    {djsActivos.map((dj) => (
+                    {djsActivosResidentes.map((dj) => (
                       <tr key={dj.id} className="border-b border-border/30 last:border-0 hover:bg-surface-2/30 transition-colors">
                         <td className="py-2 pr-4 text-accent-muted truncate max-w-[160px]">{dj.nome_artistico || dj.nome}</td>
                         {DIAS.map((dia) => {

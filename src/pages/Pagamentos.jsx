@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { clsx } from 'clsx'
-import { CheckCircle, ChevronDown, ChevronUp, AlertCircle, RefreshCw } from 'lucide-react'
+import { CheckCircle, ChevronDown, AlertCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+
+const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
 
 const FORMA_PAG_OPCOES = [
   { value: 'transferencia', label: 'Transferência' },
@@ -13,7 +15,7 @@ const FORMA_PAG_OPCOES = [
 
 const ESTADO_PAG_LABELS = {
   pendente:                'Pendente',
-  a_pagamento:             'A Pagamento',
+  a_pagamento:             'A Pagar',
   em_analise:              'Em Análise',
   aprovada_pagamento:      'Aprovada',
   em_pagamento:            'Em Pagamento',
@@ -22,18 +24,18 @@ const ESTADO_PAG_LABELS = {
 }
 
 const ESTADO_PAG_COR = {
-  pendente:               'bg-white/5 text-white/40',
-  a_pagamento:            'bg-amber-400/15 text-amber-300',
-  em_analise:             'bg-orange-500/20 text-orange-300',
-  aprovada_pagamento:     'bg-teal-400/15 text-teal-300',
-  em_pagamento:           'bg-blue-400/15 text-blue-300',
-  pago:                   'bg-green-500/15 text-green-300',
-  pendente_regularizacao: 'bg-red-500/15 text-red-300',
+  pendente:               'bg-white/5 text-white/40 border-white/10',
+  a_pagamento:            'bg-amber-400/15 text-amber-300 border-amber-400/25',
+  em_analise:             'bg-orange-500/20 text-orange-300 border-orange-400/25',
+  aprovada_pagamento:     'bg-teal-400/15 text-teal-300 border-teal-400/25',
+  em_pagamento:           'bg-blue-400/15 text-blue-300 border-blue-400/25',
+  pago:                   'bg-green-500/15 text-green-300 border-green-500/25',
+  pendente_regularizacao: 'bg-red-500/15 text-red-300 border-red-500/25',
 }
 
 function EstadoPill({ estado }) {
   return (
-    <span className={clsx('inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider', ESTADO_PAG_COR[estado] ?? 'bg-white/5 text-white/40')}>
+    <span className={clsx('inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border', ESTADO_PAG_COR[estado] ?? 'bg-white/5 text-white/40 border-white/10')}>
       {ESTADO_PAG_LABELS[estado] ?? estado}
     </span>
   )
@@ -41,7 +43,7 @@ function EstadoPill({ estado }) {
 
 function formatData(str) {
   if (!str) return '—'
-  try { return format(new Date(str.slice(0, 10) + 'T12:00'), 'dd MMM yyyy', { locale: pt }) } catch { return str }
+  try { return cap(format(new Date(str.slice(0, 10) + 'T12:00'), 'EEE d MMM', { locale: pt })) } catch { return str }
 }
 
 function formatDataHora(str) {
@@ -54,80 +56,88 @@ function formatEuro(val) {
   return Number(val).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
 }
 
-// ─────────────────────────────────────────────
-// Tab: A Pagar
-// ─────────────────────────────────────────────
-function TabAPagar({ aPagamento, aprovadas }) {
-  const agrupar = (slots) => {
-    const map = {}
-    for (const s of slots) {
-      const key = s.dj_id
-      if (!map[key]) map[key] = { nome: s.dj_nome ?? '—', slots: [] }
-      map[key].slots.push(s)
-    }
-    return Object.values(map)
-  }
+const djNome    = (s) => s?.djs?.nome    ?? s?.dj_nome    ?? null
+const espacoNome = (s) => s?.espacos?.nome ?? s?.espaco_nome ?? null
 
-  const gruposAConfirmar = agrupar(aPagamento)
-  const gruposAprovadas  = agrupar(aprovadas)
-  const totalAprovadas   = aprovadas.reduce((a, s) => a + (s.valor ?? 0), 0)
+const TH = 'px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider'
+const TD = 'px-4 py-2 text-xs'
 
-  if (!aPagamento.length && !aprovadas.length) return (
-    <div className="text-center py-12 text-white/30 text-sm">Nenhuma data pendente de confirmação</div>
-  )
-
+function TableWrap({ children }) {
   return (
-    <div className="flex flex-col gap-6">
-
-      {/* Aprovadas pelo DJ */}
-      {gruposAprovadas.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-400/70">Aprovadas pelo DJ</p>
-            <span className="text-xs font-bold text-teal-400">{formatEuro(totalAprovadas)}</span>
-          </div>
-          {gruposAprovadas.map(g => (
-            <div key={g.nome} className="bg-teal-500/5 border border-teal-500/20 rounded-2xl p-4 flex flex-col gap-2">
-              <p className="text-sm font-bold text-white">{g.nome}</p>
-              {g.slots.map(s => (
-                <div key={s.id} className="flex items-center justify-between gap-2 pl-2 border-l border-teal-500/20">
-                  <p className="text-xs text-white/60">{formatData(s.data)} · {s.espaco_nome ?? '—'} · {s.hora_inicio?.slice(0,5)}</p>
-                  <span className="text-xs font-semibold text-teal-300 tabular-nums shrink-0">{formatEuro(s.valor)}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* A confirmar pelo DJ */}
-      {gruposAConfirmar.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-400/70">A confirmar pelo DJ</p>
-          {gruposAConfirmar.map(g => (
-            <div key={g.nome} className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex flex-col gap-2">
-              <p className="text-sm font-bold text-white">{g.nome}</p>
-              {g.slots.map(s => (
-                <div key={s.id} className="flex items-center justify-between gap-2 pl-2 border-l border-amber-500/20">
-                  <p className="text-xs text-white/60">{formatData(s.data)} · {s.espaco_nome ?? '—'} · {s.hora_inicio?.slice(0,5)}</p>
-                  <span className="text-xs font-semibold text-amber-300 tabular-nums shrink-0">{formatEuro(s.valor)}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-
+    <div className="bg-surface-1 border border-border/60 rounded-2xl overflow-hidden">
+      <table className="w-full text-xs">{children}</table>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────
-// Tab: Em Análise
-// ─────────────────────────────────────────────
-function TabEmAnalise({ emAnalise, pendentesReg, onRefresh }) {
-  const [respostas, setRespostas] = useState({})
-  const [loading, setLoading] = useState({})
+function TableHead({ cols }) {
+  return (
+    <thead>
+      <tr className="bg-surface-0/50 border-b border-border/40 text-accent-subtle/60">
+        {cols.map(({ label, align = 'left' }) => (
+          <th key={label} className={clsx(TH, align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left')}>
+            {label}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  )
+}
+
+// ─── Tab: Pronto a Pagar ──────────────────────────────────────────────────────
+function TabProntoAPagar({ aPagamento, aprovadas }) {
+  if (!aPagamento.length && !aprovadas.length) return (
+    <div className="text-center py-12 text-white/30 text-sm">Nenhuma data pronta a pagar este mês</div>
+  )
+  const totalAprovadas = aprovadas.reduce((a, s) => a + (s.valor ?? 0), 0)
+  const totalAPagar    = aPagamento.reduce((a, s) => a + (s.valor ?? 0), 0)
+  const cols = [
+    { label: 'Data' }, { label: 'DJ' }, { label: 'Espaço' }, { label: 'Horário' },
+    { label: 'Estado', align: 'center' }, { label: 'Valor', align: 'right' },
+  ]
+  const slotRow = (s, last) => (
+    <tr key={s.id} className={clsx('border-b border-border/20 hover:bg-white/2 transition-colors', last && 'border-0')}>
+      <td className={`${TD} text-accent-muted tabular-nums whitespace-nowrap`}>{formatData(s.data)}</td>
+      <td className={`${TD} text-accent font-medium`}>{djNome(s) ?? '—'}</td>
+      <td className={`${TD} text-accent-muted`}>{espacoNome(s) ?? '—'}</td>
+      <td className={`${TD} text-accent-muted tabular-nums`}>{s.hora_inicio?.slice(0,5) ?? '—'}</td>
+      <td className={`${TD} text-center`}><EstadoPill estado={s.estado_pagamento} /></td>
+      <td className={clsx(`${TD} text-right font-semibold tabular-nums`, s.estado_pagamento === 'aprovada_pagamento' ? 'text-teal-300' : 'text-amber-300')}>{formatEuro(s.valor)}</td>
+    </tr>
+  )
+  return (
+    <TableWrap>
+      <TableHead cols={cols} />
+      <tbody>
+        {aprovadas.length > 0 && <>
+          <tr className="border-b border-teal-500/15">
+            <td colSpan={6} className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-teal-400/70 bg-teal-500/5">
+              Aprovadas pelo DJ · {formatEuro(totalAprovadas)}
+            </td>
+          </tr>
+          {aprovadas.map((s, i) => slotRow(s, i === aprovadas.length - 1 && !aPagamento.length))}
+        </>}
+        {aPagamento.length > 0 && <>
+          <tr className="border-b border-amber-500/15">
+            <td colSpan={6} className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-400/70 bg-amber-500/5">
+              A Confirmar pelo DJ · {formatEuro(totalAPagar)}
+            </td>
+          </tr>
+          {aPagamento.map((s, i) => slotRow(s, i === aPagamento.length - 1))}
+        </>}
+      </tbody>
+    </TableWrap>
+  )
+}
+
+// ─── Tab: Em Pagamento (pedidos + em_analise + pendente_reg) ─────────────────
+function TabEmPagamento({ pedidos, emAnalise, pendentesReg, onRefresh }) {
+  const [expandidos, setExpandidos]           = useState({})
+  const [slotsPorPedido, setSlotsPorPedido]   = useState({})
+  const [formas, setFormas]                   = useState({})
+  const [loadingPedido, setLoadingPedido]     = useState({})
+  const [loadingSlot, setLoadingSlot]         = useState({})
+  const [respostas, setRespostas]             = useState({})
 
   useEffect(() => {
     const init = {}
@@ -135,433 +145,468 @@ function TabEmAnalise({ emAnalise, pendentesReg, onRefresh }) {
     setRespostas(init)
   }, [emAnalise])
 
+  const togPedido = async (id) => {
+    if (!expandidos[id] && !slotsPorPedido[id]) {
+      const { data } = await supabase.from('agenda')
+        .select('id, espaco_nome, data, hora_inicio, valor, espacos!agenda_espaco_id_fkey(nome)')
+        .eq('pedido_pagamento_id', id).order('data', { ascending: true })
+      setSlotsPorPedido(s => ({ ...s, [id]: data ?? [] }))
+    }
+    setExpandidos(e => ({ ...e, [id]: !e[id] }))
+  }
+
+  const togAnalise = (id) => setExpandidos(e => ({ ...e, [`a_${id}`]: !e[`a_${id}`] }))
+
+  const marcarPago = async (e, pedido) => {
+    e.stopPropagation()
+    if (!confirm(`Marcar pedido de ${pedido.djs?.nome ?? 'DJ'} como pago?`)) return
+    const id = pedido.id
+    setLoadingPedido(l => ({ ...l, [id]: true }))
+    let slotsData = slotsPorPedido[id]
+    if (!slotsData) {
+      const { data } = await supabase.from('agenda').select('id').eq('pedido_pagamento_id', id)
+      slotsData = data ?? []
+    }
+    await supabase.from('pedidos_pagamento').update({
+      estado: 'pago', data_pagamento: new Date().toISOString(), notas: formas[id] ?? 'transferencia',
+    }).eq('id', id)
+    if (slotsData.length > 0) await supabase.from('agenda').update({ estado_pagamento: 'pago' }).eq('pedido_pagamento_id', id)
+    setLoadingPedido(l => ({ ...l, [id]: false }))
+    onRefresh()
+  }
+
   const guardarResposta = async (id) => {
-    setLoading(l => ({ ...l, [id]: 'guardar' }))
+    setLoadingSlot(l => ({ ...l, [id]: 'guardar' }))
     await supabase.from('agenda').update({ resposta_admin: respostas[id] }).eq('id', id)
-    setLoading(l => ({ ...l, [id]: null }))
+    setLoadingSlot(l => ({ ...l, [id]: null }))
     onRefresh()
   }
 
   const devolverPagamento = async (id) => {
-    if (!confirm('Devolver este slot para "A Pagamento"? A resposta será limpa.')) return
-    setLoading(l => ({ ...l, [id]: 'devolver' }))
+    if (!confirm('Devolver para "A Pagar"?')) return
+    setLoadingSlot(l => ({ ...l, [id]: 'devolver' }))
     await supabase.from('agenda').update({ estado_pagamento: 'a_pagamento', resposta_admin: null, motivo_discordancia: null }).eq('id', id)
-    setLoading(l => ({ ...l, [id]: null }))
+    setLoadingSlot(l => ({ ...l, [id]: null }))
     onRefresh()
   }
 
   const regularizar = async (id) => {
-    setLoading(l => ({ ...l, [id]: 'reg' }))
+    setLoadingSlot(l => ({ ...l, [id]: 'reg' }))
     await supabase.from('agenda').update({ estado_pagamento: 'a_pagamento' }).eq('id', id)
-    setLoading(l => ({ ...l, [id]: null }))
+    setLoadingSlot(l => ({ ...l, [id]: null }))
     onRefresh()
   }
 
+  if (!pedidos.length && !emAnalise.length && !pendentesReg.length) return (
+    <div className="text-center py-12 text-white/30 text-sm">Nenhum pagamento em processo este mês</div>
+  )
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      {/* Pedidos em pagamento */}
+      {pedidos.length > 0 && (
+        <TableWrap>
+          <TableHead cols={[
+            { label: 'Criado em' }, { label: 'DJ' }, { label: 'Total', align: 'right' },
+            { label: 'Estado', align: 'center' }, { label: '', align: 'right' },
+          ]} />
+          <tbody>
+            {pedidos.map((p, i) => (
+              <Fragment key={p.id}>
+                <tr onClick={() => togPedido(p.id)}
+                  className={clsx('border-b border-border/20 hover:bg-white/2 cursor-pointer transition-colors',
+                    expandidos[p.id] ? 'bg-white/2' : (i === pedidos.length - 1 && 'border-0')
+                  )}>
+                  <td className={`${TD} text-accent-muted tabular-nums whitespace-nowrap`}>{formatDataHora(p.criado_em)}</td>
+                  <td className={`${TD} text-accent font-medium`}>{p.djs?.nome ?? '—'}</td>
+                  <td className={`${TD} text-right font-semibold text-accent tabular-nums`}>{formatEuro(p.valor_total)}</td>
+                  <td className={`${TD} text-center`}><EstadoPill estado="em_pagamento" /></td>
+                  <td className={`${TD} text-right`}>
+                    <ChevronDown size={12} className={clsx('text-white/30 transition-transform inline-block', expandidos[p.id] && 'rotate-180')} />
+                  </td>
+                </tr>
+                {expandidos[p.id] && (
+                  <tr className={clsx('border-b border-border/20', i === pedidos.length - 1 && 'border-0')}>
+                    <td colSpan={5} className="px-4 pt-0 pb-3">
+                      <div className="flex flex-col gap-2 pt-3 border-t border-border/20">
+                        {(slotsPorPedido[p.id] ?? []).length > 0 && (
+                          <div className="flex flex-col gap-1">
+                            {slotsPorPedido[p.id].map(s => (
+                              <div key={s.id} className="flex items-center gap-3 px-3 py-1.5 bg-white/3 rounded border border-white/6 text-xs">
+                                <span className="text-accent-muted whitespace-nowrap">{formatData(s.data)}</span>
+                                <span className="text-accent-muted flex-1">{espacoNome(s) ?? '—'}</span>
+                                <span className="text-accent-muted tabular-nums">{s.hora_inicio?.slice(0,5) ?? ''}</span>
+                                <span className="text-accent tabular-nums font-medium">{formatEuro(s.valor)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 justify-end">
+                          <select value={formas[p.id] ?? 'transferencia'}
+                            onChange={e => { e.stopPropagation(); setFormas(f => ({ ...f, [p.id]: e.target.value })) }}
+                            className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs text-accent focus:outline-none">
+                            {FORMA_PAG_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                          <button type="button" disabled={loadingPedido[p.id]} onClick={e => marcarPago(e, p)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30 transition-colors disabled:opacity-40">
+                            <CheckCircle size={12} />
+                            {loadingPedido[p.id] ? 'A processar…' : 'Marcar como Pago'}
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </TableWrap>
+      )}
+
       {/* Em Análise */}
-      <div className="flex flex-col gap-3">
-        {emAnalise.length === 0 ? (
-          <div className="text-center py-12 text-white/30 text-sm">Nenhum slot em análise</div>
-        ) : emAnalise.map(slot => (
-          <div key={slot.id} className="bg-white/3 border border-white/8 rounded-2xl p-4 flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold text-white">{slot.dj_nome ?? '—'}</p>
-                <p className="text-xs text-white/50 mt-0.5">{formatData(slot.data)} · {slot.espaco_nome ?? '—'} · {slot.hora_inicio?.slice(0,5) ?? ''}</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-sm font-bold text-white/80">{formatEuro(slot.valor)}</span>
-                <EstadoPill estado="em_analise" />
-              </div>
-            </div>
-            {slot.motivo_discordancia && (
-              <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-orange-400/70 mb-1">Motivo do DJ</p>
-                <p className="text-xs text-orange-200">{slot.motivo_discordancia}</p>
-              </div>
-            )}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Resposta Admin</label>
-              <textarea
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-white/20 resize-none"
-                rows={2}
-                placeholder="Escrever resposta ao DJ…"
-                value={respostas[slot.id] ?? ''}
-                onChange={e => setRespostas(r => ({ ...r, [slot.id]: e.target.value }))}
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => guardarResposta(slot.id)}
-                disabled={!!loading[slot.id]}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/8 border border-white/12 text-white/70 hover:text-white hover:bg-white/12 transition-colors disabled:opacity-40"
-              >
-                {loading[slot.id] === 'guardar' ? 'A guardar…' : 'Guardar Resposta'}
-              </button>
-              <button
-                type="button"
-                onClick={() => devolverPagamento(slot.id)}
-                disabled={!!loading[slot.id]}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-400/15 border border-amber-400/25 text-amber-300 hover:bg-amber-400/25 transition-colors disabled:opacity-40"
-              >
-                {loading[slot.id] === 'devolver' ? 'A processar…' : 'Devolver a Pagamento'}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+      {emAnalise.length > 0 && (
+        <TableWrap>
+          <TableHead cols={[
+            { label: 'Data' }, { label: 'DJ' }, { label: 'Espaço' },
+            { label: 'Motivo' }, { label: 'Estado', align: 'center' }, { label: 'Valor', align: 'right' },
+          ]} />
+          <tbody>
+            {emAnalise.map((slot, i) => (
+              <Fragment key={slot.id}>
+                <tr onClick={() => togAnalise(slot.id)}
+                  className={clsx('border-b border-border/20 hover:bg-white/2 cursor-pointer transition-colors',
+                    expandidos[`a_${slot.id}`] ? 'bg-white/2' : (i === emAnalise.length - 1 && 'border-0')
+                  )}>
+                  <td className={`${TD} text-accent-muted tabular-nums whitespace-nowrap`}>{formatData(slot.data)}</td>
+                  <td className={`${TD} text-accent font-medium`}>{djNome(slot) ?? '—'}</td>
+                  <td className={`${TD} text-accent-muted`}>{espacoNome(slot) ?? '—'}</td>
+                  <td className={`${TD} text-accent-muted max-w-[180px] truncate`}>{slot.motivo_discordancia || '—'}</td>
+                  <td className={`${TD} text-center`}><EstadoPill estado="em_analise" /></td>
+                  <td className={`${TD} text-right font-semibold text-accent tabular-nums`}>{formatEuro(slot.valor)}</td>
+                </tr>
+                {expandidos[`a_${slot.id}`] && (
+                  <tr className={clsx('border-b border-border/20', i === emAnalise.length - 1 && 'border-0')}>
+                    <td colSpan={6} className="px-4 pt-0 pb-3">
+                      <div className="flex flex-col gap-2 pt-3 border-t border-border/20">
+                        {slot.motivo_discordancia && (
+                          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-orange-400/70 mb-1">Motivo do DJ</p>
+                            <p className="text-xs text-orange-200">{slot.motivo_discordancia}</p>
+                          </div>
+                        )}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Resposta Admin</label>
+                          <textarea rows={2} placeholder="Escrever resposta ao DJ…"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-white/20 resize-none"
+                            value={respostas[slot.id] ?? ''}
+                            onChange={e => setRespostas(r => ({ ...r, [slot.id]: e.target.value }))}
+                            onClick={e => e.stopPropagation()} />
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <button type="button" disabled={!!loadingSlot[slot.id]}
+                            onClick={e => { e.stopPropagation(); guardarResposta(slot.id) }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/8 border border-white/12 text-white/70 hover:text-white hover:bg-white/12 transition-colors disabled:opacity-40">
+                            {loadingSlot[slot.id] === 'guardar' ? 'A guardar…' : 'Guardar Resposta'}
+                          </button>
+                          <button type="button" disabled={!!loadingSlot[slot.id]}
+                            onClick={e => { e.stopPropagation(); devolverPagamento(slot.id) }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-400/15 border border-amber-400/25 text-amber-300 hover:bg-amber-400/25 transition-colors disabled:opacity-40">
+                            {loadingSlot[slot.id] === 'devolver' ? 'A processar…' : 'Devolver a Pagamento'}
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </TableWrap>
+      )}
 
-      {/* Pendentes de Regularização */}
+      {/* Pendente Regularização */}
       {pendentesReg.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Pendentes de Regularização</p>
-          {pendentesReg.map(slot => (
-            <div key={slot.id} className="bg-white/3 border border-red-500/20 rounded-2xl p-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-white">{slot.dj_nome ?? '—'}</p>
-                <p className="text-xs text-white/50 mt-0.5">{formatData(slot.data)} · {slot.espaco_nome ?? '—'}</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-sm font-bold text-white/70">{formatEuro(slot.valor)}</span>
-                <button
-                  type="button"
-                  onClick={() => regularizar(slot.id)}
-                  disabled={loading[slot.id] === 'reg'}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/15 border border-red-500/25 text-red-300 hover:bg-red-500/25 transition-colors disabled:opacity-40"
-                >
-                  {loading[slot.id] === 'reg' ? 'A processar…' : 'Regularizar'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <TableWrap>
+          <TableHead cols={[
+            { label: 'Data' }, { label: 'DJ' }, { label: 'Espaço' },
+            { label: 'Estado', align: 'center' }, { label: 'Valor', align: 'right' }, { label: '', align: 'right' },
+          ]} />
+          <tbody>
+            {pendentesReg.map((slot, i) => (
+              <tr key={slot.id} className={clsx('border-b border-border/20 hover:bg-white/2', i === pendentesReg.length - 1 && 'border-0')}>
+                <td className={`${TD} text-accent-muted tabular-nums whitespace-nowrap`}>{formatData(slot.data)}</td>
+                <td className={`${TD} text-accent font-medium`}>{djNome(slot) ?? '—'}</td>
+                <td className={`${TD} text-accent-muted`}>{espacoNome(slot) ?? '—'}</td>
+                <td className={`${TD} text-center`}><EstadoPill estado="pendente_regularizacao" /></td>
+                <td className={`${TD} text-right font-semibold text-accent tabular-nums`}>{formatEuro(slot.valor)}</td>
+                <td className={`${TD} text-right`}>
+                  <button type="button" disabled={loadingSlot[slot.id] === 'reg'} onClick={() => regularizar(slot.id)}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-red-500/15 border border-red-500/25 text-red-300 hover:bg-red-500/25 transition-colors disabled:opacity-40">
+                    {loadingSlot[slot.id] === 'reg' ? 'A processar…' : 'Regularizar'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableWrap>
       )}
     </div>
   )
 }
 
-// ─────────────────────────────────────────────
-// Card de pedido (Em Pagamento)
-// ─────────────────────────────────────────────
-function PedidoCard({ pedido, onRefresh }) {
-  const [slots, setSlots] = useState([])
-  const [slotsAbertos, setSlotsAbertos] = useState(false)
-  const [slotsCarregados, setSlotsCarregados] = useState(false)
-  const [forma, setForma] = useState('transferencia')
-  const [loading, setLoading] = useState(false)
+// ─── Tab: Pago ───────────────────────────────────────────────────────────────
+function TabPago({ pedidos }) {
+  if (!pedidos.length) return (
+    <div className="text-center py-12 text-white/30 text-sm">Sem pagamentos concluídos este mês</div>
+  )
+  return (
+    <TableWrap>
+      <TableHead cols={[
+        { label: 'Data Pag.' }, { label: 'DJ' }, { label: 'Forma' },
+        { label: 'Valor', align: 'right' }, { label: 'Estado', align: 'center' },
+      ]} />
+      <tbody>
+        {pedidos.map((p, i) => (
+          <tr key={p.id} className={clsx('border-b border-border/20 hover:bg-white/2', i === pedidos.length - 1 && 'border-0')}>
+            <td className={`${TD} text-accent-muted tabular-nums whitespace-nowrap`}>{p.data_pagamento ? formatDataHora(p.data_pagamento) : '—'}</td>
+            <td className={`${TD} text-accent font-medium`}>{p.djs?.nome ?? '—'}</td>
+            <td className={`${TD} text-accent-muted`}>{p.notas ?? '—'}</td>
+            <td className={`${TD} text-right font-semibold text-green-300 tabular-nums`}>{formatEuro(p.valor_total)}</td>
+            <td className={`${TD} text-center`}><EstadoPill estado="pago" /></td>
+          </tr>
+        ))}
+      </tbody>
+    </TableWrap>
+  )
+}
 
-  const carregarSlots = useCallback(async () => {
-    if (slotsCarregados) return
-    const { data } = await supabase
-      .from('agenda')
-      .select('id, dj_nome, espaco_nome, data, hora_inicio, valor, estado_pagamento')
-      .eq('pedido_pagamento_id', pedido.id)
-      .order('data', { ascending: true })
-    setSlots(data ?? [])
-    setSlotsCarregados(true)
-  }, [pedido.id, slotsCarregados])
+// ─── Tab: Todas ──────────────────────────────────────────────────────────────
+function TabTodas({ slots }) {
+  const [filtroNome, setFiltroNome] = useState('')
+  const [djSel, setDjSel]           = useState('')
+  const [filtroEspaco, setFiltroEspaco] = useState('')
 
-  const toggleSlots = () => {
-    if (!slotsAbertos && !slotsCarregados) carregarSlots()
-    setSlotsAbertos(v => !v)
-  }
-
-  const marcarPago = async () => {
-    if (!confirm(`Marcar pedido de ${pedido.djs?.nome ?? 'DJ'} como pago?`)) return
-    setLoading(true)
-    // Ensure slots are loaded
-    let slotsParaPagar = slots
-    if (!slotsCarregados) {
-      const { data } = await supabase
-        .from('agenda')
-        .select('id')
-        .eq('pedido_pagamento_id', pedido.id)
-      slotsParaPagar = data ?? []
-      setSlots(slotsParaPagar)
-      setSlotsCarregados(true)
+  const djs = useMemo(() => {
+    const map = {}
+    for (const s of slots) {
+      const nome = djNome(s)
+      if (s.dj_id && nome) map[s.dj_id] = nome
     }
-    // Update pedido
-    await supabase
-      .from('pedidos_pagamento')
-      .update({ estado: 'pago', data_pagamento: new Date().toISOString(), notas: forma })
-      .eq('id', pedido.id)
-    // Update all linked agenda slots
-    if (slotsParaPagar.length > 0) {
-      await supabase
-        .from('agenda')
-        .update({ estado_pagamento: 'pago' })
-        .eq('pedido_pagamento_id', pedido.id)
-    }
-    setLoading(false)
-    onRefresh()
-  }
+    return Object.entries(map).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [slots])
 
-  const nomeDJ = pedido.djs?.nome ?? '—'
-  const fotoDJ = pedido.djs?.foto_url
+  const espacos = useMemo(() => {
+    const set = new Set(slots.map(s => espacoNome(s)).filter(Boolean))
+    return [...set].sort()
+  }, [slots])
+
+  const filtrados = useMemo(() => slots.filter(s => {
+    if (djSel && s.dj_id !== djSel) return false
+    if (filtroNome.trim() && !(djNome(s) ?? '').toLowerCase().includes(filtroNome.toLowerCase())) return false
+    if (filtroEspaco && espacoNome(s) !== filtroEspaco) return false
+    return true
+  }), [slots, djSel, filtroNome, filtroEspaco])
+
+  const total = filtrados.reduce((a, s) => a + (s.valor ?? 0), 0)
 
   return (
-    <div className="bg-white/3 border border-white/8 rounded-2xl p-4 flex flex-col gap-3">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          {fotoDJ ? (
-            <img src={fotoDJ} alt={nomeDJ} className="w-9 h-9 rounded-full object-cover border border-white/10" />
-          ) : (
-            <div className="w-9 h-9 rounded-full bg-white/8 border border-white/10 flex items-center justify-center text-sm font-bold text-white/60">
-              {nomeDJ.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div>
-            <p className="text-sm font-semibold text-white">{nomeDJ}</p>
-            <p className="text-xs text-white/40 mt-0.5">Criado {formatDataHora(pedido.criado_em)}</p>
-          </div>
-        </div>
-        <div className="text-right shrink-0">
-          <p className="text-lg font-bold text-white">{formatEuro(pedido.valor_total)}</p>
-          <EstadoPill estado="em_pagamento" />
-        </div>
-      </div>
-
-      {/* Slots toggle */}
-      <button
-        type="button"
-        onClick={toggleSlots}
-        className="flex items-center justify-between w-full px-3 py-2 bg-white/4 rounded-lg border border-white/8 hover:bg-white/6 transition-colors"
-      >
-        <span className="text-xs text-white/60 font-medium">Ver slots incluídos</span>
-        {slotsAbertos ? <ChevronUp size={13} className="text-white/40" /> : <ChevronDown size={13} className="text-white/40" />}
-      </button>
-
-      {slotsAbertos && (
-        <div className="flex flex-col gap-1.5">
-          {slots.length === 0 ? (
-            <p className="text-xs text-white/30 text-center py-2">Sem slots</p>
-          ) : slots.map(s => (
-            <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-white/3 rounded-lg border border-white/6">
-              <div>
-                <p className="text-xs text-white/80">{formatData(s.data)} · {s.espaco_nome ?? '—'}</p>
-                <p className="text-[10px] text-white/40">{s.hora_inicio?.slice(0,5) ?? ''}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-white/70">{formatEuro(s.valor)}</span>
-                <EstadoPill estado={s.estado_pagamento} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Forma de pagamento + Marcar pago */}
-      <div className="flex items-center gap-2 pt-1 border-t border-white/6">
-        <select
-          value={forma}
-          onChange={e => setForma(e.target.value)}
-          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-white/20"
-        >
-          {FORMA_PAG_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-2 flex-wrap items-center">
+        <select value={djSel} onChange={e => { setDjSel(e.target.value); setFiltroNome('') }}
+          className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs text-accent focus:outline-none min-w-[160px]">
+          <option value="">Todos os DJs</option>
+          {djs.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
         </select>
-        <button
-          type="button"
-          onClick={marcarPago}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30 transition-colors disabled:opacity-40"
-        >
-          <CheckCircle size={13} />
-          {loading ? 'A processar…' : 'Marcar como Pago'}
-        </button>
+        <select value={filtroEspaco} onChange={e => setFiltroEspaco(e.target.value)}
+          className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs text-accent focus:outline-none min-w-[140px]">
+          <option value="">Todos os espaços</option>
+          {espacos.map(e => <option key={e} value={e}>{e}</option>)}
+        </select>
+        <input
+          type="text" placeholder="Pesquisar DJ…" value={filtroNome}
+          onChange={e => { setFiltroNome(e.target.value); setDjSel('') }}
+          className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs text-accent placeholder:text-accent-subtle/40 focus:outline-none flex-1 min-w-[140px]"
+        />
+        {filtrados.length > 0 && (
+          <span className="ml-auto text-xs text-accent-muted tabular-nums shrink-0">
+            {filtrados.length} data{filtrados.length !== 1 ? 's' : ''} · {formatEuro(total)}
+          </span>
+        )}
       </div>
+      {filtrados.length === 0 ? (
+        <div className="text-center py-12 text-white/30 text-sm">Sem datas com pagamentos</div>
+      ) : (
+        <TableWrap>
+          <TableHead cols={[
+            { label: 'Data' }, { label: 'DJ' }, { label: 'Espaço' }, { label: 'Horário' },
+            { label: 'Estado', align: 'center' }, { label: 'Valor', align: 'right' },
+          ]} />
+          <tbody>
+            {filtrados.map((s, i) => (
+              <tr key={s.id} className={clsx('border-b border-border/20 hover:bg-white/2 transition-colors', i === filtrados.length - 1 && 'border-0')}>
+                <td className={`${TD} text-accent-muted tabular-nums whitespace-nowrap`}>{formatData(s.data)}</td>
+                <td className={`${TD} text-accent font-medium`}>{djNome(s) ?? '—'}</td>
+                <td className={`${TD} text-accent-muted`}>{espacoNome(s) ?? '—'}</td>
+                <td className={`${TD} text-accent-muted tabular-nums`}>{s.hora_inicio?.slice(0,5) ?? '—'}</td>
+                <td className={`${TD} text-center`}><EstadoPill estado={s.estado_pagamento} /></td>
+                <td className={`${TD} text-right font-semibold text-accent tabular-nums`}>{formatEuro(s.valor)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </TableWrap>
+      )}
     </div>
   )
 }
 
-// ─────────────────────────────────────────────
-// Main page
-// ─────────────────────────────────────────────
+// ─── Página principal ─────────────────────────────────────────────────────────
 export function Pagamentos() {
-  const [aba, setAba] = useState(0)
-  const [pedidos, setPedidos] = useState([])
-  const [emAnalise, setEmAnalise] = useState([])
+  const [mes, setMes]               = useState(() => format(new Date(), 'yyyy-MM'))
+  const [aba, setAba]               = useState(0)
+  const [pedidosEm, setPedidosEm]   = useState([])
+  const [pedidosPago, setPedidosPago] = useState([])
+  const [emAnalise, setEmAnalise]   = useState([])
   const [pendentesReg, setPendentesReg] = useState([])
   const [aPagamento, setAPagamento] = useState([])
-  const [aprovadas, setAprovadas] = useState([])
+  const [aprovadas, setAprovadas]   = useState([])
+  const [todasDatas, setTodasDatas] = useState([])
   const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState(null)
+  const [erro, setErro]             = useState(null)
 
-  const classificarPendentes = useCallback(async () => {
-    await supabase.rpc('classificar_pagamentos', { p_dj_id: null })
-  }, [])
+  const { dataInicio, dataFim } = useMemo(() => {
+    const [ano, m] = mes.split('-').map(Number)
+    const inicio = new Date(ano, m - 1, 1)
+    const fim    = new Date(ano, m, 0)
+    return { dataInicio: format(inicio, 'yyyy-MM-dd'), dataFim: format(fim, 'yyyy-MM-dd') }
+  }, [mes])
+
+  const navMes = (dir) => {
+    const [ano, m] = mes.split('-').map(Number)
+    setMes(format(new Date(ano, m - 1 + dir, 1), 'yyyy-MM'))
+  }
+
+  const mesLabel = cap(format(new Date(mes + '-01T12:00'), 'MMMM yyyy', { locale: pt }))
 
   const carregar = useCallback(async () => {
     setCarregando(true)
     setErro(null)
     try {
-      await classificarPendentes()
-      const [resPedidos, resAnalise, resPendentes, resAPagar, resAprovadas] = await Promise.all([
-        supabase
-          .from('pedidos_pagamento')
+      await supabase.rpc('classificar_pagamentos', { p_dj_id: null })
+      const [resPedidosEm, resPedidosPago, resAnalise, resPendentes, resAPagar, resAprovadas, resDatas] = await Promise.all([
+        supabase.from('pedidos_pagamento')
           .select('*, djs(nome, foto_url)')
+          .eq('estado', 'em_pagamento')
+          .gte('criado_em', dataInicio).lte('criado_em', dataFim + 'T23:59:59')
           .order('criado_em', { ascending: false }),
-        supabase
-          .from('agenda')
-          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor, motivo_discordancia, resposta_admin')
+        supabase.from('pedidos_pagamento')
+          .select('*, djs(nome, foto_url)')
+          .eq('estado', 'pago')
+          .gte('data_pagamento', dataInicio).lte('data_pagamento', dataFim + 'T23:59:59')
+          .order('data_pagamento', { ascending: false }),
+        supabase.from('agenda')
+          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor, motivo_discordancia, resposta_admin, djs(nome), espacos!agenda_espaco_id_fkey(nome)')
           .eq('estado_pagamento', 'em_analise')
+          .gte('data', dataInicio).lte('data', dataFim)
           .order('data', { ascending: false }),
-        supabase
-          .from('agenda')
-          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor')
+        supabase.from('agenda')
+          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor, djs(nome), espacos!agenda_espaco_id_fkey(nome)')
           .eq('estado_pagamento', 'pendente_regularizacao')
+          .gte('data', dataInicio).lte('data', dataFim)
           .order('data', { ascending: false }),
-        supabase
-          .from('agenda')
-          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor')
+        supabase.from('agenda')
+          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor, estado_pagamento, djs(nome), espacos!agenda_espaco_id_fkey(nome)')
           .eq('estado_pagamento', 'a_pagamento')
+          .gte('data', dataInicio).lte('data', dataFim)
           .order('data', { ascending: true }),
-        supabase
-          .from('agenda')
-          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor')
+        supabase.from('agenda')
+          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor, estado_pagamento, djs(nome), espacos!agenda_espaco_id_fkey(nome)')
           .eq('estado_pagamento', 'aprovada_pagamento')
+          .gte('data', dataInicio).lte('data', dataFim)
           .order('data', { ascending: true }),
+        supabase.from('agenda')
+          .select('id, dj_id, dj_nome, espaco_nome, data, hora_inicio, valor, estado_pagamento, djs(nome), espacos!agenda_espaco_id_fkey(nome)')
+          .not('estado_pagamento', 'in', '("pendente")')
+          .gte('data', dataInicio).lte('data', dataFim)
+          .order('data', { ascending: false }),
       ])
-      if (resPedidos.error) throw resPedidos.error
-      if (resAnalise.error) throw resAnalise.error
-      if (resPendentes.error) throw resPendentes.error
-      setPedidos(resPedidos.data ?? [])
+      setPedidosEm(resPedidosEm.data ?? [])
+      setPedidosPago(resPedidosPago.data ?? [])
       setEmAnalise(resAnalise.data ?? [])
       setPendentesReg(resPendentes.data ?? [])
       setAPagamento(resAPagar.data ?? [])
       setAprovadas(resAprovadas.data ?? [])
+      setTodasDatas(resDatas.data ?? [])
     } catch (e) {
       setErro(e.message)
     } finally {
       setCarregando(false)
     }
-  }, [])
+  }, [dataInicio, dataFim])
 
   useEffect(() => { carregar() }, [carregar])
 
-  const pedidosEmPagamento = pedidos.filter(p => p.estado === 'em_pagamento')
-  const pedidosPago        = pedidos.filter(p => p.estado === 'pago')
-
-  const aPagarCount       = aPagamento.length + aprovadas.length
-  const analiseCount      = emAnalise.length + pendentesReg.length
-  const emPagamentoCount  = pedidosEmPagamento.length
-
   const TABS = [
-    { label: 'A Pagar',      count: aPagarCount },
-    { label: 'Em Análise',   count: analiseCount },
-    { label: 'Em Pagamento', count: emPagamentoCount },
-    { label: 'Histórico',    count: null },
+    { label: 'Pronto a Pagar', count: aPagamento.length + aprovadas.length },
+    { label: 'Em Pagamento',   count: pedidosEm.length + emAnalise.length + pendentesReg.length },
+    { label: 'Pago',           count: pedidosPago.length },
+    { label: 'Todas',          count: todasDatas.length },
   ]
 
   return (
-    <div className="p-6 max-w-3xl mx-auto flex flex-col gap-6">
+    <div className="p-6 flex flex-col gap-6 min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-white tracking-tight">Pagamentos</h2>
-        <button
-          type="button"
-          onClick={carregar}
-          className="p-1.5 rounded hover:bg-white/6 text-white/40 hover:text-white transition-colors"
-          title="Recarregar"
-        >
+        <button type="button" onClick={carregar}
+          className="p-1.5 rounded hover:bg-white/6 text-white/40 hover:text-white transition-colors" title="Recarregar">
           <RefreshCw size={14} className={carregando ? 'animate-spin' : ''} />
         </button>
       </div>
 
       {erro && (
         <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-xs text-red-300">
-          <AlertCircle size={14} />
-          {erro}
+          <AlertCircle size={14} />{erro}
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1.5">
-        {TABS.map((t, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => setAba(i)}
-            className={clsx(
-              'rounded-full px-3 py-1 text-xs font-bold transition-all flex items-center gap-1.5',
-              aba === i ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'
-            )}
-          >
-            {t.label}
-            {t.count != null && t.count > 0 && (
-              <span className={clsx(
-                'rounded-full px-1.5 py-0.5 text-[9px] font-bold',
-                aba === i ? 'bg-white/15 text-white' : 'bg-white/8 text-white/50'
-              )}>
-                {t.count}
-              </span>
-            )}
+      {/* Navegação mês + Tabs */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <button onClick={() => navMes(-1)}
+            className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
+            <ChevronLeft size={14} />
           </button>
-        ))}
+          <span className="text-sm font-bold text-accent capitalize min-w-[150px] text-center">{mesLabel}</span>
+          <button onClick={() => navMes(1)}
+            className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
+            <ChevronRight size={14} />
+          </button>
+        </div>
+        <div className="flex gap-1.5 flex-wrap">
+          {TABS.map((t, i) => (
+            <button key={i} type="button" onClick={() => setAba(i)}
+              className={clsx('rounded-full px-3 py-1 text-xs font-bold transition-all flex items-center gap-1.5',
+                aba === i ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white')}>
+              {t.label}
+              {t.count > 0 && (
+                <span className={clsx('rounded-full px-1.5 py-0.5 text-[9px] font-bold',
+                  aba === i ? 'bg-white/15 text-white' : 'bg-white/8 text-white/50')}>
+                  {t.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {carregando ? (
         <div className="text-center py-16 text-white/30 text-sm">A carregar…</div>
       ) : (
         <>
-          {/* Tab 0: A Pagar */}
-          {aba === 0 && (
-            <TabAPagar aPagamento={aPagamento} aprovadas={aprovadas} />
-          )}
-
-          {/* Tab 1: Em Análise */}
-          {aba === 1 && (
-            <TabEmAnalise
-              emAnalise={emAnalise}
-              pendentesReg={pendentesReg}
-              onRefresh={carregar}
-            />
-          )}
-
-          {/* Tab 2: Em Pagamento */}
-          {aba === 2 && (
-            <div className="flex flex-col gap-3">
-              {pedidosEmPagamento.length === 0 ? (
-                <div className="text-center py-12 text-white/30 text-sm">Nenhum pedido em pagamento</div>
-              ) : pedidosEmPagamento.map(p => (
-                <PedidoCard key={p.id} pedido={p} onRefresh={carregar} />
-              ))}
-            </div>
-          )}
-
-          {/* Tab 3: Histórico */}
-          {aba === 3 && (
-            <div className="flex flex-col gap-2">
-              {pedidosPago.length === 0 ? (
-                <div className="text-center py-12 text-white/30 text-sm">Sem histórico de pagamentos</div>
-              ) : pedidosPago.map(p => (
-                <div key={p.id} className="bg-white/3 border border-white/8 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    {p.djs?.foto_url ? (
-                      <img src={p.djs.foto_url} alt={p.djs?.nome} className="w-8 h-8 rounded-full object-cover border border-white/10" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-white/8 border border-white/10 flex items-center justify-center text-xs font-bold text-white/50">
-                        {(p.djs?.nome ?? '?').charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-sm font-semibold text-white">{p.djs?.nome ?? '—'}</p>
-                      <p className="text-xs text-white/40">
-                        Pago {p.data_pagamento ? formatDataHora(p.data_pagamento) : '—'}
-                        {p.notas ? ` · ${p.notas}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-green-300">{formatEuro(p.valor_total)}</p>
-                    <EstadoPill estado="pago" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {aba === 0 && <TabProntoAPagar aPagamento={aPagamento} aprovadas={aprovadas} />}
+          {aba === 1 && <TabEmPagamento pedidos={pedidosEm} emAnalise={emAnalise} pendentesReg={pendentesReg} onRefresh={carregar} />}
+          {aba === 2 && <TabPago pedidos={pedidosPago} />}
+          {aba === 3 && <TabTodas slots={todasDatas} />}
         </>
       )}
     </div>

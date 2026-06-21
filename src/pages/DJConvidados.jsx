@@ -16,8 +16,7 @@ import { clsx } from 'clsx'
 import { format, addMonths, startOfMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
 
-// Categorias de convidados
-const CAT_IDS_CONVIDADOS = [4, 5]
+const CAT_NOMES_RESIDENTES = ['DJ Residente', 'DJ Residente ANL', 'DJ Convidado INT']
 
 function gerarMeses() {
   const lista = []
@@ -136,11 +135,16 @@ export function DJConvidados() {
     }
   }
 
+  const catIdsResidentes = useMemo(
+    () => new Set(categorias.filter(c => CAT_NOMES_RESIDENTES.includes(c.nome)).map(c => String(c.id))),
+    [categorias]
+  )
+
   const djsFiltrados = useMemo(() => {
-    // Só convidados (cat 4 ou 5)
-    let lista = djs.filter(d =>
-      (djCatsMap[d.id] ?? []).some(id => CAT_IDS_CONVIDADOS.includes(Number(id)))
-    )
+    // Só convidados: DJs sem nenhuma categoria de residente
+    let lista = catIdsResidentes.size === 0
+      ? [...djs]
+      : djs.filter(d => !(djCatsMap[d.id] ?? []).map(String).some(id => catIdsResidentes.has(id)))
 
     // Estado
     if (filtroEstado === 'activos') {
@@ -176,7 +180,7 @@ export function DJConvidados() {
     }
 
     return lista
-  }, [djs, djCatsMap, filtroEstado, pesquisa, ordenacao, counts, interesseMap])
+  }, [djs, djCatsMap, catIdsResidentes, filtroEstado, pesquisa, ordenacao, counts, interesseMap])
 
   const mesCorrente = format(new Date(), 'yyyy-MM')
   const temFiltroActivo = filtroEstado || pesquisa || filtroMes !== mesCorrente
@@ -188,9 +192,7 @@ export function DJConvidados() {
         <div>
           <h1 className="text-base font-semibold text-accent">DJ Convidados</h1>
           <p className="text-xs text-accent-muted mt-0.5">
-            {djsFiltrados.length !== djs.filter(d => (djCatsMap[d.id] ?? []).some(id => CAT_IDS_CONVIDADOS.includes(Number(id)))).length
-              ? `${djsFiltrados.length} de ${djs.filter(d => (djCatsMap[d.id] ?? []).some(id => CAT_IDS_CONVIDADOS.includes(Number(id)))).length}`
-              : djsFiltrados.length} DJ{djsFiltrados.length !== 1 ? 's' : ''}
+            {djsFiltrados.length} DJ{djsFiltrados.length !== 1 ? 's' : ''}
           </p>
         </div>
         <Button variante="primary" tamanho="sm" onClick={abrirCriar}>

@@ -36,7 +36,9 @@ const ESTADO_OPCOES = [
   { value: 'presente',        label: 'Presente' },
   { value: 'faltou',          label: 'Faltou' },
   { value: 'cancelado',       label: 'Cancelado' },
-  { value: 'sem_efeito',      label: 'Sem Efeito' },
+  { value: 'sem_efeito',       label: 'Sem Efeito' },
+  { value: 'recusado_manager', label: 'Recusado Manager' },
+  { value: 'rever_dj',         label: 'Rever DJ' },
 ]
 
 const TIPO_SLOT_OPCOES = [
@@ -130,6 +132,11 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     if (aberto && slot?.id) {
       supabase.from('presencas_djs').select('signed_at').eq('agenda_id', slot.id).maybeSingle()
         .then(({ data }) => setPresencaSignedAt(data?.signed_at ?? null))
+      // Buscar estado fresco da BD — pode ter mudado remotamente (ex: manager aprovou)
+      supabase.from('agenda').select('estado, estado_pagamento').eq('id', slot.id).maybeSingle()
+        .then(({ data }) => {
+          if (data) setForm(f => ({ ...f, estado: data.estado, estado_pagamento: data.estado_pagamento ?? f.estado_pagamento }))
+        })
     } else {
       setPresencaSignedAt(null)
     }
@@ -520,8 +527,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const confirmarAceite = async () => {
     setLoading(true)
     try {
-      await agendaApi.mudarEstado(slot.id, 'pré-confirmado')
-      await registarHistorico(slot.id, 'estado', `${form.estado} → pré-confirmado`)
+      await agendaApi.mudarEstado(slot.id, 'validação')
+      await registarHistorico(slot.id, 'estado', `${form.estado} → validação`)
       onGuardado()
       onFechar()
     } catch (e) {

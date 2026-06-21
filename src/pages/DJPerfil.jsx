@@ -4,7 +4,7 @@ import {
   ArrowLeft, ArrowUp, ArrowDown, Printer,
   CalendarCheck, CalendarX, Plus, Trash2,
   Camera, Save, Check, Maximize2, Star,
-  Copy, Mail, X, ExternalLink,
+  Copy, Mail, X, ExternalLink, Lock, Unlock,
 } from 'lucide-react'
 import { useDJ, useDJs } from '@/hooks/useDJs'
 import { useAgenda } from '@/hooks/useAgenda'
@@ -245,6 +245,7 @@ export function DJPerfil() {
   const [erroAdd, setErroAdd]             = useState(null)
   const [sucessoAdd, setSucessoAdd]       = useState(false)
   const [filtroMesDisp, setFiltroMesDisp] = useState('todos')
+  const [togglingDisp, setTogglingDisp] = useState(false)
   const { pushUndo } = useUndo()
 
   // ── perfil ──
@@ -538,6 +539,23 @@ export function DJPerfil() {
       setDiasInput('')
     }
   }, [diasInput, mesDisp, datasCarrinho, disponivelAdd])
+
+  // ── toggle disponibilidades abertas para este DJ ──
+  const toggleDispAbertas = useCallback(async () => {
+    if (!dj) return
+    setTogglingDisp(true)
+    try {
+      const { error } = await supabase.from('djs')
+        .update({ disponibilidades_abertas: dj.disponibilidades_abertas === false ? true : false })
+        .eq('id', id)
+      if (error) throw error
+      recarregarDJ()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setTogglingDisp(false)
+    }
+  }, [dj, id, recarregarDJ])
 
   // ── guardar disponibilidades ──
   const guardarDisp = async () => {
@@ -1807,6 +1825,29 @@ LMD · XclusiveDJ`)
       {aba === 'disponibilidade' && (
         <div className="flex-1 overflow-auto">
           <div className="p-6 flex flex-col gap-5 max-w-2xl">
+
+            {/* ── Toggle disponibilidade ── */}
+            <div className="flex items-center justify-between px-1">
+              <p className="text-[11px] text-accent-subtle">
+                {dj?.disponibilidades_abertas === false
+                  ? 'App DJ: disponibilidade fechada para este DJ'
+                  : 'App DJ: disponibilidade aberta para este DJ'}
+              </p>
+              <button
+                onClick={toggleDispAbertas}
+                disabled={togglingDisp}
+                className={clsx(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] font-medium transition-colors disabled:opacity-50',
+                  dj?.disponibilidades_abertas === false
+                    ? 'bg-status-cancelado/10 text-status-cancelado border-status-cancelado/30 hover:bg-status-cancelado/20'
+                    : 'bg-status-confirmado/10 text-status-confirmado border-status-confirmado/30 hover:bg-status-confirmado/20'
+                )}
+              >
+                {dj?.disponibilidades_abertas === false
+                  ? <><Lock size={11} /> Fechada — clica para abrir</>
+                  : <><Unlock size={11} /> Aberta — clica para fechar</>}
+              </button>
+            </div>
 
             {/* ── Adicionar datas ── */}
             <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">

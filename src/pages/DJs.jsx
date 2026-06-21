@@ -8,6 +8,7 @@ import { Alerta } from '@/components/ui/Alerta'
 import { Badge } from '@/components/ui/Badge'
 import { FormDJ } from '@/components/djs/FormDJ'
 import { useDJs } from '@/hooks/useDJs'
+import { supabase } from '@/lib/supabase'
 import { djsApi, agendaApi, categoriasDjApi, djCategoriasApi } from '@/lib/api'
 import { formatarEuro, labelEstadoDJ } from '@/utils/formatacao'
 import { useUndo } from '@/contexts/UndoContext'
@@ -33,6 +34,8 @@ const ORDENACAO_OPCOES = [
   { value: 'datas_desc', label: 'Mais datas' },
 ]
 
+const CAT_NOMES_RESIDENTES = ['DJ Residente', 'DJ Residente ANL', 'DJ Convidado INT']
+
 export function DJs() {
   const navigate = useNavigate()
   const { djs, loading, erro, recarregar } = useDJs()
@@ -42,6 +45,7 @@ export function DJs() {
   const [apagando, setApagando]             = useState(null)
   const [counts, setCounts]                 = useState({})
   const [categorias, setCategorias]         = useState([])
+  const [dispsProxMes, setDispsProxMes]     = useState({})
 
   // Filtros
   const [pesquisa, setPesquisa]           = useState('')
@@ -53,9 +57,25 @@ export function DJs() {
   // djCatsMap: { dj_id: [categoria_id, ...] }
   const [djCatsMap, setDjCatsMap] = useState({})
 
+  const proxMes = format(addMonths(startOfMonth(new Date()), 1), 'yyyy-MM')
+  const proxMesLabel = format(new Date(proxMes + '-01'), 'MMM', { locale: pt })
+
   useEffect(() => {
     agendaApi.contarPorDJ(filtroMes).then(setCounts).catch(() => {})
   }, [filtroMes])
+
+  useEffect(() => {
+    const inicio = proxMes + '-01'
+    const fim = format(new Date(proxMes.split('-')[0], Number(proxMes.split('-')[1]), 0), 'yyyy-MM-dd')
+    supabase.from('disponibilidades')
+      .select('dj_id')
+      .gte('data', inicio).lte('data', fim)
+      .then(({ data }) => {
+        const map = {}
+        for (const r of data ?? []) map[r.dj_id] = (map[r.dj_id] ?? 0) + 1
+        setDispsProxMes(map)
+      })
+  }, [])
 
   useEffect(() => {
     categoriasDjApi.listar().then(setCategorias).catch(() => {})
@@ -98,8 +118,15 @@ export function DJs() {
     }
   }
 
+  const catIdsResidentes = useMemo(
+    () => new Set(categorias.filter(c => CAT_NOMES_RESIDENTES.includes(c.nome)).map(c => String(c.id))),
+    [categorias]
+  )
+
   const djsFiltrados = useMemo(() => {
-    let lista = [...djs]
+    let lista = catIdsResidentes.size === 0
+      ? [...djs]
+      : djs.filter(d => (djCatsMap[d.id] ?? []).map(String).some(id => catIdsResidentes.has(id)))
 
     // Estado
     if (filtroEstado === 'activos') {
@@ -108,7 +135,7 @@ export function DJs() {
       lista = lista.filter(d => d.estado === filtroEstado)
     }
 
-    // Categoria
+    // Categoria (sub-filtro dentro dos residentes)
     if (filtroCategoria)
       lista = lista.filter(d =>
         (djCatsMap[d.id] ?? []).map(String).includes(filtroCategoria)
@@ -137,7 +164,7 @@ export function DJs() {
     }
 
     return lista
-  }, [djs, filtroEstado, filtroCategoria, pesquisa, ordenacao, counts, djCatsMap])
+  }, [djs, filtroEstado, filtroCategoria, pesquisa, ordenacao, counts, djCatsMap, catIdsResidentes])
 
   const mesCorrente = format(new Date(), 'yyyy-MM')
   const temFiltroActivo = filtroEstado !== 'activo' || filtroCategoria || pesquisa || filtroMes !== mesCorrente
@@ -262,6 +289,7 @@ export function DJs() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-accent-muted">Nome artístico</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-accent-muted">Categoria</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-accent-muted">Estado</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted capitalize">Disps. {proxMesLabel}</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">Dist.</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">Total datas</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-accent-muted">
@@ -310,6 +338,12 @@ export function DJs() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-center">
+                      {dispsProxMes[dj.id]
+                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">{dispsProxMes[dj.id]} dias</span>
+                        : <span className="text-accent-subtle/30">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-center">
                       {dj.excluido_admin
                         ? <span className="text-[10px] text-status-cancelado bg-status-cancelado/10 border border-status-cancelado/20 rounded px-1.5 py-0.5">Excluído</span>
                         : <span className="text-[11px] text-accent-subtle tabular-nums">{dj.prioridade_admin ?? 5}</span>
@@ -353,7 +387,7 @@ export function DJs() {
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-border bg-surface-2/20">
-                <td colSpan={4} className="px-4 py-2.5 text-xs font-semibold text-accent-muted">
+                <td colSpan={5} className="px-4 py-2.5 text-xs font-semibold text-accent-muted">
                   Total ({djsFiltrados.length})
                 </td>
                 <td className="px-4 py-2.5 text-center tabular-nums text-xs font-semibold text-accent">
