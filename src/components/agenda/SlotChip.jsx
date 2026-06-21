@@ -9,7 +9,7 @@ function PagamentoBtn({ cor }) {
     <button
       onClick={(e) => { e.stopPropagation(); navigate('/pagamentos') }}
       title="Ver pagamentos"
-      className={clsx('absolute bottom-1 left-1 right-1 text-[8px] font-bold leading-none px-1 py-0.5 rounded border text-center hover:brightness-125 transition-all', cor)}
+      className={clsx('absolute bottom-1 left-1 text-[8px] font-bold leading-none px-0.5 py-0.5 rounded text-left hover:brightness-125 transition-all', cor)}
     >
       €
     </button>
@@ -181,9 +181,9 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
   const temAccoes = (onSugerir || onToggleDestaque) && !isSemEfeito && !isLock && temDJ
   const temConfirmar = !!onConfirmar && (estado === 'proposta' || estado === 'aceite' || estado === 'pré-confirmado')
   const estadoPag = slot.estado_pagamento
-  const corPag = estadoPag === 'a_pagamento'  ? 'text-orange-400 border-orange-400/40 bg-orange-400/10'
-               : estadoPag === 'em_pagamento' ? 'text-blue-400 border-blue-400/40 bg-blue-400/10'
-               : estadoPag === 'pago'         ? 'text-green-300 border-green-300/40 bg-green-300/10'
+  const corPag = estadoPag === 'a_pagamento'  ? 'text-orange-400'
+               : estadoPag === 'em_pagamento' ? 'text-blue-400'
+               : estadoPag === 'pago'         ? 'text-green-300'
                : null
   const temPagamento = !!corPag
 
