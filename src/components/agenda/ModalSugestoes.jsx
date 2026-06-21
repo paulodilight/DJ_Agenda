@@ -1,4 +1,5 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { getDay } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { agendaApi } from '@/lib/api'
 import { Modal } from '@/components/ui/Modal'
@@ -6,209 +7,257 @@ import { Button } from '@/components/ui/Button'
 import { formatarEuro } from '@/utils/formatacao'
 import { formatarData } from '@/utils/datas'
 import { clsx } from 'clsx'
-import { AlertCircle, CheckCircle2, Loader2, UserX, Sparkles } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Loader2, UserX, Sparkles, ShieldOff } from 'lucide-react'
 
 /**
  * Modal que analisa todos os DJs para um slot específico e sugere o melhor.
  *
+ * Scoring (F1–F5, acumulativo):
+ *  F1  DJ prefere este espaço: +20
+ *  F2  Média avaliações (0–10) × 3 → max 30; sem dados → 5×3=15
+ *  F3  Peso admin × turno (0–10) + peso admin × dia semana (0–10) → max 20
+ *  F4  Quantidade por turno: abaixo do ideal → +10
+ *  F5  Equilíbrio: −contagem_neste_espaço×5
+ *
  * Props:
  *  aberto       — boolean
- *  slot         — { id, data, espaco_id, turno_id, estado }
- *  espaco       — { id, nome, budget_max, tier_minimo }
+ *  slot         — { id, data, espaco_id, turno_id, dj_id?, dj_nome? }
+ *  espaco       — { id, nome }
  *  turno        — { id, nome } | null
  *  onFechar     — () => void
  *  onAplicado   — () => void  (chamado após atribuir DJ, para refresh)
  */
 export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplicado }) {
-  const [loading, setLoading]           = useState(false)
-  const [sugestoes, setSugestoes]       = useState([])   // [{ dj, score, destaques }]
-  const [excluidos, setExcluidos]       = useState([])   // [{ dj, razoes }]
-  const [conflitoDJActual, setConflitoDJActual] = useState(null) // { djNome, razoes } | null
-  const [aplicando, setAplicando]       = useState(null) // dj_id em curso
-  const [erro, setErro]                 = useState(null)
-  const [mostrarExcluidos, setMostrarExcluidos] = useState(false)
+  const [loading, setLoading]         = useState(false)
+  const [dadosBrutos, setDadosBrutos] = useState(null)   // cache dos dados fetchados
+  const [aplicando, setAplicando]     = useState(null)   // dj_id em curso
+  const [erro, setErro]               = useState(null)
+  const [ignorarValidacoes, setIgnorarValidacoes] = useState(false)
+  const [mostrarExcluidos, setMostrarExcluidos]   = useState(false)
 
   useEffect(() => {
     if (!aberto || !slot) return
+    setIgnorarValidacoes(false)
+    setMostrarExcluidos(false)
     analisar()
   }, [aberto, slot?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const analisar = async () => {
     setLoading(true)
     setErro(null)
-    setSugestoes([])
-    setExcluidos([])
-    setConflitoDJActual(null)
-    setMostrarExcluidos(false)
+    setDadosBrutos(null)
     try {
-      // ── Fetch paralelo de todos os dados necessários ─────────────────────────
+      const diaSemana = getDay(new Date(slot.data + 'T00:00:00'))
+      const anoMesPrefixo = slot.data.slice(0, 7)
+
       const [
         djsRes, dispRes, agendaDiaRes,
         espacoPrefRes, djPrefRes,
         turnoCategRes, djCategRes,
-        bloqueiosRes, priorRes,
-        contagemRes,
+        bloqueiosRes,
+        adminTurnoRes, adminDiaSemRes,
+        turnoQtdRes,
+        contagemEspacoRes, contagemTurnoRes,
+        avaliacoesRes,
       ] = await Promise.all([
-        // DJs activos (exclui administrativamente desactivados)
         supabase.from('djs')
-          .select('id, nome, nome_artistico, valor_sessao, prioridade_admin, tier_id')
-          .in('estado', ['activo', 'activo_ext'])
-          .neq('excluido_admin', true),
+          .select('id, nome, nome_artistico, valor_sessao, prioridade_admin, excluido_admin')
+          .in('estado', ['activo', 'activo_ext']),
 
-        // Disponibilidades nesta data
         supabase.from('disponibilidades')
           .select('dj_id, disponivel')
           .eq('data', slot.data),
 
-        // Agenda deste dia (todos os Clientes) — para cross-Cliente
         supabase.from('agenda')
           .select('dj_id, espaco_id')
           .eq('data', slot.data)
+          .not('dj_id', 'is', null)
           .neq('estado', 'cancelado')
           .neq('estado', 'sem_efeito')
           .neq('id', slot.id),
 
-        // Preferências do Cliente sobre DJs
         supabase.from('espaco_dj_preferencias')
-          .select('dj_id, tipo')
-          .eq('espaco_id', slot.espaco_id),
+          .select('dj_id, tipo').eq('espaco_id', slot.espaco_id),
 
-        // Preferências dos DJs sobre este Cliente
         supabase.from('dj_preferencias_espaco')
-          .select('dj_id, preferencia')
-          .eq('espaco_id', slot.espaco_id),
+          .select('dj_id, preferencia').eq('espaco_id', slot.espaco_id),
 
-        // Categorias requeridas pelo turno (se houver)
         turno?.id
           ? supabase.from('turno_categorias').select('categoria_id').eq('turno_id', turno.id)
           : Promise.resolve({ data: [] }),
 
-        // Categorias de todos os DJs
         supabase.from('dj_categorias').select('dj_id, categoria_id'),
 
-        // Bloqueios activos para este Cliente
         supabase.from('bloqueios')
-          .select('dj_id, tipo')
-          .eq('espaco_id', slot.espaco_id)
-          .eq('activo', true),
+          .select('dj_id, tipo').eq('espaco_id', slot.espaco_id).eq('activo', true),
 
-        // Peso admin por DJ neste Cliente+turno
+        // F3a: Admin × turno
         turno?.id
-          ? supabase.from('admin_dj_espaco_pref')
+          ? supabase.from('admin_dj_turno_pref')
               .select('dj_id, peso')
               .eq('espaco_id', slot.espaco_id)
               .eq('turno_id', turno.id)
           : Promise.resolve({ data: [] }),
 
-        // Contagem de slots do mês para cada DJ neste Cliente (espaçamento/score)
+        // F3b: Admin × dia semana
+        supabase.from('admin_dj_dia_semana_pref')
+          .select('dj_id, peso')
+          .eq('espaco_id', slot.espaco_id)
+          .eq('dia_semana', diaSemana),
+
+        // F4: Quantidade por turno × DJ
+        turno?.id
+          ? supabase.from('admin_turno_quantidade_pref')
+              .select('dj_id, quantidade_ideal')
+              .eq('espaco_id', slot.espaco_id)
+              .eq('turno_id', turno.id)
+          : Promise.resolve({ data: [] }),
+
+        // F5: Contagem neste espaço este mês
         supabase.from('agenda')
           .select('dj_id')
           .eq('espaco_id', slot.espaco_id)
-          .gte('data', slot.data.slice(0, 7) + '-01')
-          .lte('data', slot.data.slice(0, 7) + '-31')
+          .gte('data', anoMesPrefixo + '-01')
+          .lte('data', anoMesPrefixo + '-31')
+          .not('dj_id', 'is', null)
           .neq('estado', 'cancelado')
           .neq('id', slot.id),
+
+        // F4: Contagem neste turno este mês
+        turno?.id
+          ? supabase.from('agenda')
+              .select('dj_id')
+              .eq('espaco_id', slot.espaco_id)
+              .eq('turno_id', turno.id)
+              .gte('data', anoMesPrefixo + '-01')
+              .lte('data', anoMesPrefixo + '-31')
+              .not('dj_id', 'is', null)
+              .neq('estado', 'cancelado')
+              .neq('id', slot.id)
+          : Promise.resolve({ data: [] }),
+
+        // F2: Avaliações por DJ neste espaço (via join agenda)
+        supabase.from('avaliacoes_djs')
+          .select('nota, agenda!inner(dj_id)')
+          .eq('espaco_id', slot.espaco_id)
+          .not('nota', 'is', null),
       ])
 
-      const djs         = djsRes.data ?? []
-      const dispMapa    = Object.fromEntries((dispRes.data ?? []).map(d => [d.dj_id, d.disponivel]))
-      const agendaDia   = agendaDiaRes.data ?? []
-      const espacoPrefs = Object.fromEntries((espacoPrefRes.data ?? []).map(p => [p.dj_id, p.tipo]))
-      const djPrefs     = Object.fromEntries((djPrefRes.data ?? []).map(p => [p.dj_id, p.preferencia]))
-      const turnoCats   = new Set((turnoCategRes.data ?? []).map(c => c.categoria_id))
-      const djCats      = {}
+      const djs        = (djsRes.data ?? []).filter(d => !d.excluido_admin)
+      const dispMapa   = Object.fromEntries((dispRes.data ?? []).map(d => [d.dj_id, d.disponivel]))
+      const agendaDia  = agendaDiaRes.data ?? []
+      const espPrefs   = Object.fromEntries((espacoPrefRes.data ?? []).map(p => [p.dj_id, p.tipo]))
+      const djPrefs    = Object.fromEntries((djPrefRes.data ?? []).map(p => [p.dj_id, p.preferencia]))
+      const turnoCats  = new Set((turnoCategRes.data ?? []).map(c => c.categoria_id))
+      const djCats     = {}
       ;(djCategRes.data ?? []).forEach(c => {
         if (!djCats[c.dj_id]) djCats[c.dj_id] = new Set()
         djCats[c.dj_id].add(c.categoria_id)
       })
-      const bans        = new Set((bloqueiosRes.data ?? []).filter(b => b.tipo === 'BAN').map(b => b.dj_id))
-      const prioMap     = Object.fromEntries((priorRes.data ?? []).map(p => [p.dj_id, p.peso]))
-      const contagem    = {}
-      ;(contagemRes.data ?? []).filter(s => s.dj_id).forEach(s => {
-        contagem[s.dj_id] = (contagem[s.dj_id] ?? 0) + 1
+      const bans       = new Set((bloqueiosRes.data ?? []).filter(b => b.tipo === 'BAN').map(b => b.dj_id))
+      const adminTurno = Object.fromEntries((adminTurnoRes.data ?? []).map(p => [p.dj_id, p.peso]))
+      const adminDia   = Object.fromEntries((adminDiaSemRes.data ?? []).map(p => [p.dj_id, p.peso]))
+      const turnoQtd   = Object.fromEntries((turnoQtdRes.data ?? []).map(p => [p.dj_id, p.quantidade_ideal]))
+
+      const contagemEspaco = {}
+      ;(contagemEspacoRes.data ?? []).forEach(s => {
+        if (s.dj_id) contagemEspaco[s.dj_id] = (contagemEspaco[s.dj_id] ?? 0) + 1
+      })
+      const contagemTurno = {}
+      ;(contagemTurnoRes.data ?? []).forEach(s => {
+        if (s.dj_id) contagemTurno[s.dj_id] = (contagemTurno[s.dj_id] ?? 0) + 1
       })
 
-      // Sets para verificação rápida
-      const jaNesteEspaco = new Set(agendaDia.filter(s => s.espaco_id === slot.espaco_id && s.dj_id).map(s => s.dj_id))
+      // F2: Média avaliações por DJ
+      const avalSum   = {}
+      const avalCount = {}
+      ;(avaliacoesRes.data ?? []).forEach(({ nota, agenda }) => {
+        const djId = agenda?.dj_id
+        if (!djId || nota == null) return
+        avalSum[djId]   = (avalSum[djId]   ?? 0) + nota
+        avalCount[djId] = (avalCount[djId] ?? 0) + 1
+      })
+      const avalAvg = {}
+      for (const [djId, total] of Object.entries(avalSum)) {
+        avalAvg[djId] = total / avalCount[djId]
+      }
+
+      const jaNesteEspaco  = new Set(agendaDia.filter(s => s.espaco_id === slot.espaco_id && s.dj_id).map(s => s.dj_id))
       const jaNoutroEspaco = new Set(agendaDia.filter(s => s.espaco_id !== slot.espaco_id && s.dj_id).map(s => s.dj_id))
 
-      // ── Classificar DJs ──────────────────────────────────────────────────────
-      const disponiveis = []
-      const excluidosList = []
-
-      for (const dj of djs) {
-        const razoes = []
-
-        // Verificações de exclusão
-        if (bans.has(dj.id))
-          razoes.push('BAN neste Cliente')
-        if (espacoPrefs[dj.id] === 'excluido')
-          razoes.push('Excluído pelo Cliente')
-        if (djPrefs[dj.id] === 'recusa')
-          razoes.push('Recusa este Cliente')
-        if (dispMapa[dj.id] === false)
-          razoes.push('Indisponível nesta data')
-        if (jaNesteEspaco.has(dj.id))
-          razoes.push('Já atribuído neste Cliente neste dia')
-        if (jaNoutroEspaco.has(dj.id))
-          razoes.push('Já atribuído noutro Cliente neste dia')
-        if (espaco?.budget_max && (dj.valor_sessao ?? 0) > espaco.budget_max)
-          razoes.push(`Valor ${formatarEuro(dj.valor_sessao)} acima do budget`)
-        if (turnoCats.size > 0) {
-          const temCat = [...turnoCats].some(c => djCats[dj.id]?.has(c))
-          if (!temCat) razoes.push('Sem categoria compatível com o turno')
-        }
-
-        if (razoes.length > 0) {
-          excluidosList.push({ dj, razoes })
-          continue
-        }
-
-        // Score (mesmo algoritmo da distribuição automática)
-        const peso = prioMap[dj.id] ?? 10
-        let score = (dj.prioridade_admin ?? 5) * 2 + peso
-        if (espacoPrefs[dj.id] === 'preferido') score += 15
-        if (djPrefs[dj.id]    === 'prefere')    score += 10
-        score -= (contagem[dj.id] ?? 0) * 3
-        score -= Math.floor((dj.valor_sessao ?? 0) / 20)
-
-        // Destaques positivos para mostrar
-        const destaques = []
-        if (espacoPrefs[dj.id] === 'preferido') destaques.push('Preferido pelo Cliente')
-        if (djPrefs[dj.id]    === 'prefere')    destaques.push('Prefere este Cliente')
-        if (dispMapa[dj.id]   === true)          destaques.push('Disponibilidade confirmada')
-
-        disponiveis.push({ dj, score, destaques })
-      }
-
-      disponiveis.sort((a, b) => b.score - a.score)
-      setSugestoes(disponiveis)
-      setExcluidos(excluidosList)
-
-      // ── Conflito do DJ actualmente atribuído ─────────────────────────────────
-      if (slot.dj_id) {
-        const razoesActual = []
-        if (bans.has(slot.dj_id))
-          razoesActual.push('BAN neste Cliente')
-        if (espacoPrefs[slot.dj_id] === 'excluido')
-          razoesActual.push('Excluído pelo Cliente')
-        if (djPrefs[slot.dj_id] === 'recusa')
-          razoesActual.push('Recusa este Cliente')
-        if (dispMapa[slot.dj_id] === false)
-          razoesActual.push('Indisponível nesta data')
-        if (jaNesteEspaco.has(slot.dj_id))
-          razoesActual.push('Já atribuído neste Cliente neste dia')
-        if (jaNoutroEspaco.has(slot.dj_id))
-          razoesActual.push('Já atribuído noutro Cliente neste dia')
-        if (razoesActual.length > 0)
-          setConflitoDJActual({ djNome: slot.dj_nome, razoes: razoesActual })
-      }
+      setDadosBrutos({
+        djs, dispMapa, espPrefs, djPrefs, turnoCats, djCats,
+        bans, adminTurno, adminDia, turnoQtd,
+        contagemEspaco, contagemTurno, avalAvg,
+        jaNesteEspaco, jaNoutroEspaco,
+      })
     } catch (e) {
       setErro(e.message)
     } finally {
       setLoading(false)
     }
   }
+
+  // ── Classificação derivada dos dados brutos ─────────────────────────────
+  const { sugestoes, excluidos, conflitoDJActual } = useMemo(() => {
+    if (!dadosBrutos) return { sugestoes: [], excluidos: [], conflitoDJActual: null }
+
+    const {
+      djs, dispMapa, espPrefs, djPrefs, turnoCats, djCats,
+      bans, adminTurno, adminDia, turnoQtd,
+      contagemEspaco, contagemTurno, avalAvg,
+      jaNesteEspaco, jaNoutroEspaco,
+    } = dadosBrutos
+
+    const classifDJ = (dj) => {
+      const violacoes = []
+
+      if (bans.has(dj.id))               violacoes.push('BAN neste Cliente')
+      if (espPrefs[dj.id] === 'excluido') violacoes.push('Excluído pelo Cliente')
+      if (djPrefs[dj.id]  === 'recusa')   violacoes.push('Recusa este Cliente')
+      if (dispMapa[dj.id] === false)      violacoes.push('Indisponível nesta data')
+      if (jaNesteEspaco.has(dj.id))       violacoes.push('Já atribuído neste Cliente hoje')
+      if (jaNoutroEspaco.has(dj.id))      violacoes.push('Conflito físico: já noutro Cliente hoje')
+      if (turnoCats.size > 0) {
+        const temCat = [...turnoCats].some(c => djCats[dj.id]?.has(c))
+        if (!temCat) violacoes.push('Sem categoria compatível com o turno')
+      }
+
+      // Scoring F1–F5
+      const f1 = djPrefs[dj.id] === 'prefere' ? 20 : 0
+      const f2 = (avalAvg[dj.id] ?? 5) * 3
+      const f3 = (adminTurno[dj.id] ?? 0) + (adminDia[dj.id] ?? 0)
+      const qtdIdeal = turnoQtd[dj.id] ?? 0
+      const f4 = qtdIdeal > 0 && (contagemTurno[dj.id] ?? 0) < qtdIdeal ? 10 : 0
+      const f5 = -(contagemEspaco[dj.id] ?? 0) * 5
+      const score = f1 + f2 + f3 + f4 + f5
+
+      const destaques = []
+      if (espPrefs[dj.id] === 'preferido') destaques.push('Preferido pelo Cliente')
+      if (djPrefs[dj.id]  === 'prefere')   destaques.push('Prefere este Cliente')
+      if (dispMapa[dj.id] === true)         destaques.push('Disponibilidade confirmada')
+      if (f3 > 0)                           destaques.push(`Admin +${f3} pts`)
+
+      return { dj, score, destaques, violacoes }
+    }
+
+    const todas = djs.map(classifDJ)
+    todas.sort((a, b) => b.score - a.score)
+
+    const sugestoes = todas.filter(e => e.violacoes.length === 0 || ignorarValidacoes)
+    const excluidos  = ignorarValidacoes ? [] : todas.filter(e => e.violacoes.length > 0)
+
+    // Conflito do DJ actualmente atribuído
+    let conflitoDJActual = null
+    if (slot?.dj_id) {
+      const entDJ = todas.find(e => e.dj.id === slot.dj_id)
+      if (entDJ?.violacoes.length > 0) {
+        conflitoDJActual = { djNome: slot.dj_nome ?? entDJ.dj.nome_artistico, razoes: entDJ.violacoes }
+      }
+    }
+
+    return { sugestoes, excluidos, conflitoDJActual }
+  }, [dadosBrutos, ignorarValidacoes, slot?.dj_id, slot?.dj_nome])
 
   const aplicar = async (dj) => {
     setAplicando(dj.id)
@@ -258,6 +307,16 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
             </div>
           )}
 
+          {/* Aviso modo override */}
+          {!loading && ignorarValidacoes && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded border border-amber-500/40 bg-amber-500/10">
+              <ShieldOff size={12} className="text-amber-400 shrink-0" />
+              <p className="text-[10px] text-amber-400">
+                Validações ignoradas — todos os DJs visíveis independentemente de restrições
+              </p>
+            </div>
+          )}
+
           {/* Erro */}
           {erro && !loading && (
             <div className="flex items-center gap-2 text-red-400 text-sm py-4">
@@ -267,13 +326,21 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
           )}
 
           {/* Sem DJs disponíveis */}
-          {!loading && !erro && sugestoes.length === 0 && (
+          {!loading && !erro && dadosBrutos && sugestoes.length === 0 && (
             <div className="flex flex-col items-center gap-2 py-8 text-accent-subtle">
               <UserX size={24} className="opacity-40" />
               <p className="text-sm font-medium text-accent">Sem DJs disponíveis</p>
               <p className="text-xs text-center text-accent-subtle">
                 Todos os DJs activos estão excluídos ou indisponíveis para esta data.
               </p>
+              {!ignorarValidacoes && (
+                <button
+                  onClick={() => setIgnorarValidacoes(true)}
+                  className="mt-1 text-xs text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
+                >
+                  <ShieldOff size={11} /> Ignorar validações
+                </button>
+              )}
             </div>
           )}
 
@@ -281,21 +348,24 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
           {!loading && sugestoes.length > 0 && (
             <div className="flex flex-col gap-1.5">
               <p className="text-[10px] font-semibold text-accent-subtle uppercase tracking-wider mb-1">
-                {sugestoes.length} DJ{sugestoes.length !== 1 ? 's' : ''} disponíve{sugestoes.length !== 1 ? 'is' : 'l'} — ordenados por prioridade
+                {sugestoes.length} DJ{sugestoes.length !== 1 ? 's' : ''} — ordenados por prioridade
               </p>
-              {sugestoes.map(({ dj, score, destaques }, idx) => (
+              {sugestoes.map(({ dj, score, destaques, violacoes }, idx) => (
                 <div
                   key={dj.id}
                   className={clsx(
                     'flex items-center gap-3 px-3 py-2.5 rounded border transition-colors',
-                    idx === 0
-                      ? 'border-status-confirmado/30 bg-status-confirmado/[0.07]'
-                      : 'border-border bg-surface-2 hover:bg-surface-3'
+                    violacoes.length > 0
+                      ? 'border-amber-500/30 bg-amber-500/[0.06]'
+                      : idx === 0
+                        ? 'border-status-confirmado/30 bg-status-confirmado/[0.07]'
+                        : 'border-border bg-surface-2 hover:bg-surface-3'
                   )}
                 >
                   {/* Posição */}
                   <span className={clsx(
                     'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
+                    violacoes.length > 0  ? 'bg-amber-500/20 text-amber-400' :
                     idx === 0 ? 'bg-status-confirmado/20 text-status-confirmado' :
                     idx === 1 ? 'bg-white/10 text-accent-muted' :
                                 'bg-surface-3 text-accent-subtle'
@@ -307,6 +377,7 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
                   <div className="flex-1 min-w-0">
                     <p className={clsx(
                       'text-sm font-semibold truncate',
+                      violacoes.length > 0 ? 'text-amber-400' :
                       idx === 0 ? 'text-accent' : 'text-accent-muted'
                     )}>
                       {dj.nome_artistico || dj.nome}
@@ -317,10 +388,14 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
                           {formatarEuro(dj.valor_sessao)}
                         </span>
                       )}
-                      {destaques.map((d, i) => (
+                      {violacoes.map((v, i) => (
+                        <span key={i} className="text-[10px] text-amber-400/80 flex items-center gap-0.5">
+                          <AlertCircle size={8} />{v}
+                        </span>
+                      ))}
+                      {violacoes.length === 0 && destaques.map((d, i) => (
                         <span key={i} className="text-[10px] text-status-confirmado/80 flex items-center gap-0.5">
-                          <CheckCircle2 size={9} />
-                          {d}
+                          <CheckCircle2 size={9} />{d}
                         </span>
                       ))}
                     </div>
@@ -333,12 +408,12 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
 
                   {/* Botão Atribuir */}
                   <Button
-                    variante={idx === 0 ? 'primary' : 'secondary'}
+                    variante={violacoes.length > 0 ? 'secondary' : idx === 0 ? 'primary' : 'secondary'}
                     tamanho="sm"
                     loading={aplicando === dj.id}
                     disabled={!!aplicando}
                     onClick={() => aplicar(dj)}
-                    className="shrink-0 text-xs px-2.5 py-1"
+                    className={clsx('shrink-0 text-xs px-2.5 py-1', violacoes.length > 0 && 'opacity-70 hover:opacity-100')}
                   >
                     Atribuir
                   </Button>
@@ -363,7 +438,7 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
                   {excluidos.map(({ dj, razoes }) => {
                     const bloqueioAbsoluto =
                       razoes.includes('Indisponível nesta data') ||
-                      razoes.includes('Já atribuído noutro Cliente neste dia')
+                      razoes.includes('Conflito físico: já noutro Cliente hoje')
                     return (
                       <div key={dj.id} className="flex items-center gap-2 px-3 py-2 rounded border border-border/40 bg-surface-1/50">
                         <UserX size={12} className="text-accent-subtle/50 shrink-0" />
@@ -393,15 +468,28 @@ export function ModalSugestoes({ aberto, slot, espaco, turno, onFechar, onAplica
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-border flex items-center justify-between">
-          <button
-            onClick={analisar}
-            disabled={loading}
-            className="text-[10px] text-accent-subtle hover:text-accent transition-colors flex items-center gap-1"
-          >
-            <Sparkles size={10} />
-            Reanalisar
-          </button>
+        <div className="px-6 py-3 border-t border-border flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={analisar}
+              disabled={loading}
+              className="text-[10px] text-accent-subtle hover:text-accent transition-colors flex items-center gap-1 disabled:opacity-40"
+            >
+              <Sparkles size={10} />
+              Reanalisar
+            </button>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={ignorarValidacoes}
+                onChange={(e) => setIgnorarValidacoes(e.target.checked)}
+                className="accent-amber-400 w-3 h-3"
+              />
+              <span className="text-[10px] text-accent-subtle">
+                Ignorar validações <span className="text-accent-subtle/50">(registo manual)</span>
+              </span>
+            </label>
+          </div>
           <Button variante="ghost" tamanho="sm" onClick={onFechar}>Fechar</Button>
         </div>
       </div>

@@ -81,6 +81,12 @@ export function EspacoPerfil() {
   const [djsPrefs, setDjsPrefs] = useState({})
   // { [dj_id]: 1-5 } — interesse do gestor via Operator app
   const [djsInteresse, setDjsInteresse] = useState({})
+  // { [dj_id]: { [turno_key]: peso 0-10 } }
+  const [adminTurnoPref, setAdminTurnoPref] = useState({})
+  // { [dj_id]: { [dia_semana 0-6]: peso 0-10 } }
+  const [adminDiaSemPref, setAdminDiaSemPref] = useState({})
+  // { [dj_id]: { [turno_key]: quantidade_ideal } }
+  const [turnoQtdPref, setTurnoQtdPref] = useState({})
 
   const [categorias, setCategorias] = useState([])
   const [turnoCats, setTurnoCats] = useState({})        // { turnoKey: [categoria_id, ...] }
@@ -173,6 +179,41 @@ export function EspacoPerfil() {
       })
       setDjsPrefs(prefsMap)
       setDjsInteresse(interesseMap)
+
+      // Carregar preferências admin (peso por turno, peso por dia, quantidade por turno)
+      try {
+        const turnoIdParaKey = {}
+        turnosCarregados.forEach(t => { turnoIdParaKey[t.id] = t._key })
+
+        const [adminTurnoData, adminDiaSemData, turnoQtdData] = await Promise.all([
+          supabase.from('admin_dj_turno_pref').select('dj_id, turno_id, peso').eq('espaco_id', id),
+          supabase.from('admin_dj_dia_semana_pref').select('dj_id, dia_semana, peso').eq('espaco_id', id),
+          supabase.from('admin_turno_quantidade_pref').select('turno_id, dj_id, quantidade_ideal').eq('espaco_id', id),
+        ])
+
+        const adminTurnoMap = {}
+        ;(adminTurnoData.data ?? []).forEach(({ dj_id, turno_id, peso }) => {
+          const key = turnoIdParaKey[turno_id] ?? turno_id
+          if (!adminTurnoMap[dj_id]) adminTurnoMap[dj_id] = {}
+          adminTurnoMap[dj_id][key] = peso
+        })
+        setAdminTurnoPref(adminTurnoMap)
+
+        const adminDiaSemMap = {}
+        ;(adminDiaSemData.data ?? []).forEach(({ dj_id, dia_semana, peso }) => {
+          if (!adminDiaSemMap[dj_id]) adminDiaSemMap[dj_id] = {}
+          adminDiaSemMap[dj_id][dia_semana] = peso
+        })
+        setAdminDiaSemPref(adminDiaSemMap)
+
+        const turnoQtdMap = {}
+        ;(turnoQtdData.data ?? []).forEach(({ turno_id, dj_id, quantidade_ideal }) => {
+          const key = turnoIdParaKey[turno_id] ?? turno_id
+          if (!turnoQtdMap[dj_id]) turnoQtdMap[dj_id] = {}
+          turnoQtdMap[dj_id][key] = quantidade_ideal
+        })
+        setTurnoQtdPref(turnoQtdMap)
+      } catch { /* silencioso */ }
     } catch (e) {
       setErro(e.message)
     } finally {
@@ -309,6 +350,55 @@ export function EspacoPerfil() {
         .filter(([, tipo]) => tipo === 'preferido' || tipo === 'excluido')
         .map(([dj_id, tipo]) => ({ dj_id, tipo }))
       await espacoDjPreferenciasApi.guardar(id, prefsList)
+
+      // Guardar preferências admin × turno
+      const turnoPrefs = []
+      turnosValidos.forEach((t) => {
+        const turnoId = keyParaId[t._key]
+        if (!turnoId) return
+        djsActivos.forEach((dj) => {
+          const peso = adminTurnoPref[dj.id]?.[t._key]
+          if (peso != null && peso !== '') {
+            turnoPrefs.push({ espaco_id: id, dj_id: dj.id, turno_id: turnoId, peso: Number(peso) })
+          }
+        })
+      })
+      if (turnoPrefs.length > 0) {
+        await supabase.from('admin_dj_turno_pref')
+          .upsert(turnoPrefs, { onConflict: 'espaco_id,dj_id,turno_id' })
+      }
+
+      // Guardar preferências admin × dia da semana
+      const diaSemPrefs = []
+      djsActivos.forEach((dj) => {
+        DIAS.forEach((dia) => {
+          const peso = adminDiaSemPref[dj.id]?.[dia.idx]
+          if (peso != null && peso !== '') {
+            diaSemPrefs.push({ espaco_id: id, dj_id: dj.id, dia_semana: dia.idx, peso: Number(peso) })
+          }
+        })
+      })
+      if (diaSemPrefs.length > 0) {
+        await supabase.from('admin_dj_dia_semana_pref')
+          .upsert(diaSemPrefs, { onConflict: 'espaco_id,dj_id,dia_semana' })
+      }
+
+      // Guardar quantidade ideal por turno × DJ
+      const qtdPrefs = []
+      turnosValidos.forEach((t) => {
+        const turnoId = keyParaId[t._key]
+        if (!turnoId) return
+        djsActivos.forEach((dj) => {
+          const qtd = turnoQtdPref[dj.id]?.[t._key]
+          if (qtd != null && qtd !== '') {
+            qtdPrefs.push({ espaco_id: id, turno_id: turnoId, dj_id: dj.id, quantidade_ideal: Number(qtd) })
+          }
+        })
+      })
+      if (qtdPrefs.length > 0) {
+        await supabase.from('admin_turno_quantidade_pref')
+          .upsert(qtdPrefs, { onConflict: 'espaco_id,turno_id,dj_id' })
+      }
 
       setSucesso(true)
       setTimeout(() => setSucesso(false), 3000)
@@ -998,6 +1088,127 @@ export function EspacoPerfil() {
             )}
           </CardBody>
         </Card>
+
+        {/* ── Admin: Peso × Turno + Quantidade × Turno ── */}
+        {(() => {
+          const turnoActivo = turnos[turnoActivoIdx] ?? turnos[0]
+          if (!turnoActivo?.nome?.trim() || djsActivos.length === 0) return null
+          return (
+            <Card>
+              <CardHeader>
+                <div>
+                  <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">
+                    Admin: Prioridade por Turno
+                    <span className="ml-2 normal-case font-medium text-accent">— {turnoActivo.nome}</span>
+                  </p>
+                  <p className="text-xs text-accent-subtle mt-1">
+                    Peso (0–10) favorece o DJ neste turno · Qtd/mês = vezes ideais que o DJ actua neste turno por mês
+                  </p>
+                </div>
+              </CardHeader>
+              <CardBody>
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 pr-4 font-medium text-accent-muted">DJ</th>
+                      <th className="text-center px-3 py-2 font-medium text-accent-muted border-l border-border/40 w-28">Peso (0–10)</th>
+                      <th className="text-center px-3 py-2 font-medium text-accent-muted border-l border-border/40 w-28">Qtd / mês</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {djsActivos.map((dj) => {
+                      const peso = adminTurnoPref[dj.id]?.[turnoActivo._key] ?? ''
+                      const qtd  = turnoQtdPref[dj.id]?.[turnoActivo._key] ?? ''
+                      return (
+                        <tr key={dj.id} className="border-b border-border/30 last:border-0 hover:bg-surface-2/30 transition-colors">
+                          <td className="py-2 pr-4 text-accent-muted">{dj.nome_artistico || dj.nome}</td>
+                          <td className="px-3 py-1.5 border-l border-border/40">
+                            <input
+                              type="number" min={0} max={10} step={1}
+                              value={peso}
+                              onChange={(e) => setAdminTurnoPref(prev => ({
+                                ...prev,
+                                [dj.id]: { ...(prev[dj.id] ?? {}), [turnoActivo._key]: e.target.value },
+                              }))}
+                              placeholder="—"
+                              className="w-full bg-surface-2 border border-border rounded px-2 py-1 text-xs text-center text-accent focus:outline-none focus:border-white/20"
+                            />
+                          </td>
+                          <td className="px-3 py-1.5 border-l border-border/40">
+                            <input
+                              type="number" min={0} step={1}
+                              value={qtd}
+                              onChange={(e) => setTurnoQtdPref(prev => ({
+                                ...prev,
+                                [dj.id]: { ...(prev[dj.id] ?? {}), [turnoActivo._key]: e.target.value },
+                              }))}
+                              placeholder="—"
+                              className="w-full bg-surface-2 border border-border rounded px-2 py-1 text-xs text-center text-accent focus:outline-none focus:border-white/20"
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </CardBody>
+            </Card>
+          )
+        })()}
+
+        {/* ── Admin: Peso × Dia da Semana ── */}
+        {djsActivos.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div>
+                <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Admin: Prioridade por Dia da Semana</p>
+                <p className="text-xs text-accent-subtle mt-1">
+                  Peso (0–10) por dia da semana · aplica-se independentemente do turno
+                </p>
+              </div>
+            </CardHeader>
+            <CardBody>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse min-w-[520px]">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 pr-4 font-medium text-accent-muted min-w-[130px]">DJ</th>
+                      {DIAS.map((dia) => (
+                        <th key={dia.idx} className="text-center px-1 py-2 font-medium text-accent-muted border-l border-border/40 w-14">
+                          {dia.curto}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {djsActivos.map((dj) => (
+                      <tr key={dj.id} className="border-b border-border/30 last:border-0 hover:bg-surface-2/30 transition-colors">
+                        <td className="py-2 pr-4 text-accent-muted truncate max-w-[160px]">{dj.nome_artistico || dj.nome}</td>
+                        {DIAS.map((dia) => {
+                          const val = adminDiaSemPref[dj.id]?.[dia.idx] ?? ''
+                          return (
+                            <td key={dia.idx} className="px-1 py-1.5 border-l border-border/40">
+                              <input
+                                type="number" min={0} max={10} step={1}
+                                value={val}
+                                onChange={(e) => setAdminDiaSemPref(prev => ({
+                                  ...prev,
+                                  [dj.id]: { ...(prev[dj.id] ?? {}), [dia.idx]: e.target.value },
+                                }))}
+                                placeholder="—"
+                                className="w-12 bg-surface-2 border border-border rounded px-1 py-1 text-xs text-center text-accent focus:outline-none focus:border-white/20"
+                              />
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardBody>
+          </Card>
+        )}
       </div>
     </form>
   )
