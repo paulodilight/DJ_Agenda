@@ -3,7 +3,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { Sparkles, Star, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-function PagamentoBtn({ cor, label }) {
+function PagamentoBtn({ cor }) {
   const navigate = useNavigate()
   return (
     <button
@@ -11,7 +11,7 @@ function PagamentoBtn({ cor, label }) {
       title="Ver pagamentos"
       className={clsx('absolute bottom-1 left-1 right-1 text-[8px] font-bold leading-none px-1 py-0.5 rounded border text-center hover:brightness-125 transition-all', cor)}
     >
-      {label}
+      €
     </button>
   )
 }
@@ -73,6 +73,8 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
   const isPreConf          = estado === 'pré-confirmado'
   const isAddAgenda        = estado === 'add_agenda'
   const isTrocado          = estado === 'trocado'
+  const isRecusadoManager  = estado === 'recusado_manager'
+  const isReverDj          = estado === 'rever_dj'
   const isCancelado        = estado === 'cancelado' || estado === 'faltou'
   const isManualConfirmado = isManual && (estado === 'confirmado' || estado === 'presente')
   const isDestaque         = !!slot.marketing_destaque
@@ -108,7 +110,11 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
                       ? 'border-gold-400/60 bg-status-confirmado/[0.13] hover:bg-status-confirmado/22'
                       : isAlterar
                         ? 'border-rose-400/40 bg-rose-500/[0.15] hover:bg-rose-500/25'
-                        : isProposta
+                        : isRecusadoManager
+                          ? 'border-red-500/40 bg-red-500/[0.15] hover:bg-red-500/25'
+                          : isReverDj
+                            ? 'border-amber-400/40 bg-amber-500/[0.15] hover:bg-amber-500/25'
+                            : isProposta
                           ? 'border-status-proposta/40 bg-status-proposta/[0.17] hover:bg-status-proposta/25'
                           : isAceitacao
                             ? 'border-orange-400/40 bg-orange-500/[0.15] hover:bg-orange-500/25'
@@ -142,6 +148,8 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
         isGold             ? 'font-semibold text-gold-300'            :
         isGoldConfirmado   ? 'font-semibold text-status-confirmado'   :
         isAlterar          ? 'font-semibold text-rose-400'            :
+        isRecusadoManager  ? 'font-semibold text-red-400'             :
+        isReverDj          ? 'font-semibold text-amber-400'           :
         isProposta         ? 'font-semibold text-status-proposta'     :
         isAceitacao        ? 'font-semibold text-orange-400'          :
         isAceite           ? 'font-semibold text-teal-400'            :
@@ -173,7 +181,10 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
   const temAccoes = (onSugerir || onToggleDestaque) && !isSemEfeito && !isLock && temDJ
   const temConfirmar = !!onConfirmar && (estado === 'proposta' || estado === 'aceite' || estado === 'pré-confirmado')
   const estadoPag = slot.estado_pagamento
-  const corPag = estadoPag === 'a_pagamento' ? 'text-amber-400' : estadoPag === 'pago' ? 'text-green-400' : null
+  const corPag = estadoPag === 'a_pagamento'  ? 'text-orange-400 border-orange-400/40 bg-orange-400/10'
+               : estadoPag === 'em_pagamento' ? 'text-blue-400 border-blue-400/40 bg-blue-400/10'
+               : estadoPag === 'pago'         ? 'text-green-300 border-green-300/40 bg-green-300/10'
+               : null
   const temPagamento = !!corPag
 
   if (!temAccoes && !temConfirmar && !temPagamento) return chip
