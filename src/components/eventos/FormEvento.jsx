@@ -16,6 +16,7 @@ const STATUS_OPTS = [
   { value: 'pré-confirmado',   label: 'Pré-confirmado' },
   { value: 'confirmado',       label: 'Confirmado' },
   { value: 'trocado',          label: 'Trocado' },
+  { value: 'preview_man',      label: 'Preview Manager' },
   { value: 'cancelado',        label: 'Cancelado' },
   { value: 'a_pedido',         label: 'A pedido' },
 ]
