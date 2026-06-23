@@ -13,12 +13,12 @@ const useMostrarChrome = () => {
   const calc = () =>
     typeof window === 'undefined'
       ? true
-      : !(window.innerWidth > window.innerHeight && window.innerWidth < 768)
+      : !(window.innerWidth > window.innerHeight)
   const [mostrar, setMostrar] = useState(calc)
   useEffect(() => {
     const fn = () => setMostrar(calc())
     window.addEventListener('resize', fn)
-    window.addEventListener('orientationchange', fn)
+    window.addEventListener('orientationchange', () => setTimeout(fn, 100))
     return () => { window.removeEventListener('resize', fn); window.removeEventListener('orientationchange', fn) }
   }, [])
   return mostrar
