@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, ClipboardList, Camera, ChevronRight, MapPin, CalendarClock, Wrench, LayoutList, PenLine } from 'lucide-react'
+import { ClipboardList, Camera, ChevronRight, CalendarClock, Wrench, LayoutList, PenLine, AlertTriangle } from 'lucide-react'
 import { useColaboradorStore } from '@/store'
 import { colaboradorApi } from '@/lib/colaboradorApi'
 import { Avatar } from '@/components/colaborador/Avatar'
@@ -174,6 +174,24 @@ export function ColaboradorDashboard() {
             <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} />
           </div>
         )}
+
+        {/* Próxima tarefa */}
+        <div className="mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2 flex items-center gap-1.5">
+            <ClipboardList size={11} />
+            Próxima tarefa
+          </p>
+          <p className="text-sm text-accent-subtle">Sem tarefas pendentes.</p>
+        </div>
+
+        {/* Próxima ocorrência */}
+        <div className="mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2 flex items-center gap-1.5">
+            <AlertTriangle size={11} />
+            Próxima ocorrência
+          </p>
+          <p className="text-sm text-accent-subtle">Sem ocorrências registadas.</p>
+        </div>
       </div>
 
       {/* ── Centro: avatar ── */}
@@ -192,8 +210,7 @@ export function ColaboradorDashboard() {
       {/* ── Direita: navegação ── */}
       <div className="order-3 flex flex-col gap-3">
         <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2">As minhas páginas</p>
-        <CardNav to="/apoiot/agenda"  Icone={LayoutList}    rotulo="Agenda" />
-        <CardNav to="/apoiot/eventos" Icone={CalendarDays}  rotulo="Eventos" />
+        <CardNav to="/apoiot/agenda"      Icone={LayoutList}    rotulo="Agenda" />
       </div>
 
       {eventoAberto && (

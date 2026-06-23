@@ -212,7 +212,47 @@ function VistaMes({ anoMes, dias, eventosPorDia, lmdPorDia, meusIds, espacosIdx,
 }
 
 // ── Vista Semana ──────────────────────────────────────────────────────────────
-function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick }) {
+function PillLmdCard({ lmdIds, tecnicos, tecCorMap }) {
+  if (!lmdIds || lmdIds.length === 0) return null
+  return (
+    <div className="shrink-0 flex flex-col gap-0.5 px-1 pb-0.5">
+      {lmdIds.map(tid => {
+        const tec = tecnicos.find(t => t.id === tid)
+        if (!tec) return null
+        const cor = tecCorMap[tid]
+        return (
+          <div key={tid} className="rounded border border-red-400/20 bg-red-400/[0.07] px-1.5 py-1 flex items-center gap-1">
+            <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', cor?.dot ?? 'bg-red-400')} />
+            <span className={clsx('text-[10px] font-semibold truncate', cor?.text ?? 'text-red-400')}>{tec.nome.split(' ')[0]}</span>
+            <span className="text-[9px] text-red-400/70 ml-auto shrink-0">10:00–19:00</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function PillFolgaCard({ folgaIds, tecnicos, tecCorMap }) {
+  if (!folgaIds || folgaIds.length === 0) return null
+  return (
+    <div className="shrink-0 flex flex-col gap-0.5 px-1 pb-1">
+      {folgaIds.map(tid => {
+        const tec = tecnicos.find(t => t.id === tid)
+        if (!tec) return null
+        const cor = tecCorMap[tid]
+        return (
+          <div key={tid} className="rounded border border-green-400/20 bg-green-400/[0.07] px-1.5 py-1 flex items-center gap-1">
+            <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', cor?.dot ?? 'bg-green-400')} />
+            <span className={clsx('text-[10px] font-semibold truncate', cor?.text ?? 'text-green-400')}>{tec.nome.split(' ')[0]}</span>
+            <span className="text-[9px] text-green-400/70 ml-auto shrink-0">Boa folga!</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, folgasIdx, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick }) {
 
   if (!paisagem) {
     // Portrait: strip de 7 dias + detalhe
@@ -262,6 +302,8 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
                 )
               })
           }
+          <PillLmdCard lmdIds={lmdPorDia[diaSeleccionado]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
+          <PillFolgaCard folgaIds={folgasIdx?.[diaSeleccionado]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
         </div>
       </div>
     )
@@ -299,6 +341,8 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
                 )
               })}
             </div>
+            <PillLmdCard lmdIds={lmdPorDia[dataStr]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
+            <PillFolgaCard folgaIds={folgasIdx?.[dataStr]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
           </div>
         )
       })}
@@ -526,8 +570,7 @@ export function ColaboradorAgenda() {
                 ? 'bg-amber-400/15 border-amber-400/30 text-amber-400'
                 : 'bg-surface-2 border-border text-accent-muted hover:text-accent',
             )}>
-            <Star size={11} className={filtroMeu ? 'fill-amber-400' : ''} />
-            Os meus
+            <Star size={13} className={filtroMeu ? 'fill-amber-400' : ''} />
           </button>
         </div>
         {/* Navegação */}
@@ -556,7 +599,7 @@ export function ColaboradorAgenda() {
       {vista === 'semana' && (
         <VistaSemana semana7={semana7} paisagem={paisagem}
           diaSeleccionado={diaSeleccionado} setDiaSeleccionado={setDiaSelec}
-          eventosPorDia={eventosPorDia} lmdPorDia={lmdPorDia}
+          eventosPorDia={eventosPorDia} lmdPorDia={lmdPorDia} folgasIdx={folgasIdx}
           meusIds={meusIds} espacosIdx={espacosIdx}
           tecnicos={tecnicos} tecCorMap={tecCorMap} evTecIdx={evTecIdx}
           colaborador={colaborador}
