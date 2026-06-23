@@ -604,49 +604,64 @@ export function ColaboradorAgenda() {
   return (
     <div className="flex flex-col flex-1 min-h-0" style={{ height: paisagem ? '100dvh' : 'calc(100svh - 112px)' }}>
 
-      {/* Header — tudo numa linha */}
-      <div className="shrink-0 border-b border-border/40 px-3 py-1.5 flex items-center gap-1">
-        {/* Tabs */}
-        {[
-          { id: 'mes',    label: 'Mês',    Ic: CalendarRange },
-          { id: 'semana', label: 'Semana', Ic: CalendarDays },
-          { id: 'dia',    label: 'Dia',    Ic: List },
-        ].map(({ id, label, Ic }) => (
-          <button key={id} onClick={() => setVista(id)}
+      {/* Header */}
+      <div className="shrink-0 border-b border-border/40">
+        {/* Linha 1: tabs + filtro [ + nav em landscape ] */}
+        <div className="flex items-center px-3 pt-1.5 pb-1 gap-1 border-b border-border/30">
+          {[
+            { id: 'mes',    label: 'Mês',    Ic: CalendarRange },
+            { id: 'semana', label: 'Semana', Ic: CalendarDays },
+            { id: 'dia',    label: 'Dia',    Ic: List },
+          ].map(({ id, label, Ic }) => (
+            <button key={id} onClick={() => setVista(id)}
+              className={clsx(
+                'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors border',
+                vista === id
+                  ? 'bg-amber-400/15 border-amber-400/30 text-amber-400'
+                  : 'border-transparent text-accent-muted hover:text-accent',
+              )}>
+              <Ic size={12} />
+              {label}
+            </button>
+          ))}
+          <button onClick={() => setFiltroMeu(v => !v)}
             className={clsx(
-              'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors border',
-              vista === id
+              'flex items-center px-2.5 py-1.5 rounded-lg border text-[12px] font-semibold transition-colors',
+              filtroMeu
                 ? 'bg-amber-400/15 border-amber-400/30 text-amber-400'
                 : 'border-transparent text-accent-muted hover:text-accent',
             )}>
-            <Ic size={12} />
-            {label}
+            <Star size={12} className={filtroMeu ? 'fill-amber-400' : ''} />
           </button>
-        ))}
-
-        {/* Filtro ⭐ */}
-        <button onClick={() => setFiltroMeu(v => !v)}
-          className={clsx(
-            'flex items-center px-2.5 py-1.5 rounded-lg border text-[12px] font-semibold transition-colors',
-            filtroMeu
-              ? 'bg-amber-400/15 border-amber-400/30 text-amber-400'
-              : 'border-transparent text-accent-muted hover:text-accent',
-          )}>
-          <Star size={12} className={filtroMeu ? 'fill-amber-400' : ''} />
-        </button>
-
-        {/* Navegação */}
-        <div className="ml-auto flex items-center gap-1.5">
-          <button onClick={() => vista === 'mes' ? navegar(-1) : vista === 'semana' ? navSemana(-1) : navDia(-1)}
-            className="p-1 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
-            <ChevronLeft size={13} />
-          </button>
-          <span className="text-[13px] font-bold text-accent capitalize min-w-[90px] text-center">{navLabel}</span>
-          <button onClick={() => vista === 'mes' ? navegar(1) : vista === 'semana' ? navSemana(1) : navDia(1)}
-            className="p-1 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
-            <ChevronRight size={13} />
-          </button>
+          {/* Em landscape a navegação cabe aqui */}
+          {paisagem && (
+            <div className="ml-auto flex items-center gap-1.5">
+              <button onClick={() => vista === 'mes' ? navegar(-1) : vista === 'semana' ? navSemana(-1) : navDia(-1)}
+                className="p-1 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
+                <ChevronLeft size={13} />
+              </button>
+              <span className="text-[13px] font-bold text-accent capitalize min-w-[80px] text-center">{navLabel}</span>
+              <button onClick={() => vista === 'mes' ? navegar(1) : vista === 'semana' ? navSemana(1) : navDia(1)}
+                className="p-1 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          )}
         </div>
+        {/* Linha 2: navegação — só em portrait */}
+        {!paisagem && (
+          <div className="flex items-center justify-between px-4 py-1.5">
+            <button onClick={() => vista === 'mes' ? navegar(-1) : vista === 'semana' ? navSemana(-1) : navDia(-1)}
+              className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
+              <ChevronLeft size={14} />
+            </button>
+            <span className="text-[15px] font-bold text-accent capitalize">{navLabel}</span>
+            <button onClick={() => vista === 'mes' ? navegar(1) : vista === 'semana' ? navSemana(1) : navDia(1)}
+              className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Conteúdo */}
