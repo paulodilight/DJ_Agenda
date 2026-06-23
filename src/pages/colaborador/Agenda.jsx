@@ -23,9 +23,14 @@ const NOMES_DIA_ABREV   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 const NOMES_DIA_SEMANA  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 
 // ── Pill de evento ────────────────────────────────────────────────────────────
-function PillEvento({ ev, espaco, meu, tecNome, tecCor, compact = false, onClick }) {
+function PillEvento({ ev, espaco, meu, tecNome, tecCor, colaboradorNome, compact = false, onClick }) {
   const instalar = hhmm(ev.hora_instalacao)
   const inicio   = hhmm(ev.hora_inicio)
+  const nomeBadge = meu
+    ? { nome: colaboradorNome ?? 'Meu', chip: 'bg-amber-400/10 border-amber-400/30 text-amber-400' }
+    : tecNome
+    ? { nome: tecNome, chip: tecCor?.chip ?? 'bg-surface-3 border-border text-accent-muted' }
+    : null
   return (
     <button onClick={onClick}
       className={clsx(
@@ -40,19 +45,11 @@ function PillEvento({ ev, espaco, meu, tecNome, tecCor, compact = false, onClick
         <span className={clsx('font-bold truncate text-accent', compact ? 'text-[12px]' : 'text-[13px]')}>
           {espaco}
         </span>
-        <span className="flex items-center gap-1 shrink-0">
-          {meu && (
-            <span className="text-[12px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded px-1 py-0.5 leading-none">
-              Meu
-            </span>
-          )}
-          {tecNome && (
-            <span className="flex items-center gap-0.5 text-[12px]">
-              <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', tecCor?.dot ?? 'bg-slate-400')} />
-              <span className={clsx('font-semibold', tecCor?.text ?? 'text-slate-400')}>{tecNome.split(' ')[0]}</span>
-            </span>
-          )}
-        </span>
+        {nomeBadge && (
+          <span className={clsx('text-[11px] font-semibold rounded px-1.5 py-0.5 border leading-none shrink-0', nomeBadge.chip)}>
+            {nomeBadge.nome.split(' ')[0]}
+          </span>
+        )}
       </div>
       {/* Linha 2: nome do evento */}
       <p className={clsx('truncate mt-0.5', compact ? 'text-[11px] text-accent-subtle' : 'text-[12px] text-accent-muted')}>{ev.evento}</p>
@@ -212,19 +209,39 @@ function VistaMes({ anoMes, dias, eventosPorDia, lmdPorDia, meusIds, espacosIdx,
 }
 
 // ── Vista Semana ──────────────────────────────────────────────────────────────
-function PillLmdCard({ lmdIds, tecnicos, tecCorMap }) {
+function NomeBadge({ nome, cor }) {
+  return (
+    <span className={clsx('text-[11px] font-semibold rounded px-1.5 py-0.5 border leading-none shrink-0', cor?.chip ?? 'bg-surface-3 border-border text-accent-muted')}>
+      {nome.split(' ')[0]}
+    </span>
+  )
+}
+
+function PillLmdCard({ lmdIds, lmdAgendDia, tecnicos, tecCorMap, compact = false }) {
   if (!lmdIds || lmdIds.length === 0) return null
   return (
-    <div className="shrink-0 flex flex-col gap-0.5 px-1 pb-0.5">
+    <div className={clsx('flex flex-col gap-0.5', compact ? 'px-1 pb-0.5' : 'pb-1')}>
       {lmdIds.map(tid => {
-        const tec = tecnicos.find(t => t.id === tid)
+        const tec   = tecnicos.find(t => t.id === tid)
         if (!tec) return null
-        const cor = tecCorMap[tid]
+        const cor   = tecCorMap[tid]
+        const agend = lmdAgendDia?.[tid]
+        const notas = agend?.notas ?? agend?.descricao ?? null
         return (
-          <div key={tid} className="rounded border border-red-400/20 bg-red-400/[0.07] px-1.5 py-1 flex items-center gap-1">
-            <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', cor?.dot ?? 'bg-red-400')} />
-            <span className={clsx('text-[10px] font-semibold truncate', cor?.text ?? 'text-red-400')}>{tec.nome.split(' ')[0]}</span>
-            <span className="text-[9px] text-red-400/70 ml-auto shrink-0">10:00–19:00</span>
+          <div key={tid} className={clsx(
+            'rounded-lg border border-red-400/20 bg-red-400/[0.07] transition-all',
+            compact ? 'px-2 py-1.5' : 'px-3 py-2',
+          )}>
+            <div className="flex items-center justify-between gap-1 min-w-0">
+              <span className={clsx('font-bold text-accent truncate', compact ? 'text-[12px]' : 'text-[13px]')}>
+                Trabalho LMD
+              </span>
+              <NomeBadge nome={tec.nome} cor={cor} />
+            </div>
+            {notas && (
+              <p className={clsx('truncate mt-0.5', compact ? 'text-[11px] text-accent-subtle' : 'text-[12px] text-accent-muted')}>{notas}</p>
+            )}
+            <p className={clsx('text-red-400/70 mt-0.5', compact ? 'text-[10px]' : 'text-[11px]')}>10:00 · 19:00</p>
           </div>
         )
       })}
@@ -232,19 +249,29 @@ function PillLmdCard({ lmdIds, tecnicos, tecCorMap }) {
   )
 }
 
-function PillFolgaCard({ folgaIds, tecnicos, tecCorMap }) {
+function PillFolgaCard({ folgaIds, tecnicos, tecCorMap, compact = false }) {
   if (!folgaIds || folgaIds.length === 0) return null
   return (
-    <div className="shrink-0 flex flex-col gap-0.5 px-1 pb-1">
+    <div className={clsx('flex flex-col gap-0.5', compact ? 'px-1 pb-1' : 'pb-1')}>
       {folgaIds.map(tid => {
         const tec = tecnicos.find(t => t.id === tid)
         if (!tec) return null
         const cor = tecCorMap[tid]
         return (
-          <div key={tid} className="rounded border border-green-400/20 bg-green-400/[0.07] px-1.5 py-1 flex items-center gap-1">
-            <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', cor?.dot ?? 'bg-green-400')} />
-            <span className={clsx('text-[10px] font-semibold truncate', cor?.text ?? 'text-green-400')}>{tec.nome.split(' ')[0]}</span>
-            <span className="text-[9px] text-green-400/70 ml-auto shrink-0">Boa folga!</span>
+          <div key={tid} className={clsx(
+            'rounded-lg border transition-all',
+            cor?.chip ?? 'border-border bg-surface-2/60',
+            compact ? 'px-2 py-1.5' : 'px-3 py-2',
+          )}>
+            <div className="flex items-center justify-between gap-1 min-w-0">
+              <span className={clsx('font-bold truncate', cor?.text ?? 'text-accent-muted', compact ? 'text-[12px]' : 'text-[13px]')}>
+                Folga
+              </span>
+              <NomeBadge nome={tec.nome} cor={cor} />
+            </div>
+            <p className={clsx('mt-0.5', cor?.text ?? 'text-accent-subtle', 'opacity-60', compact ? 'text-[10px]' : 'text-[11px]')}>
+              Boa folga!
+            </p>
           </div>
         )
       })}
@@ -252,7 +279,7 @@ function PillFolgaCard({ folgaIds, tecnicos, tecCorMap }) {
   )
 }
 
-function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, folgasIdx, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick }) {
+function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, folgasIdx, lmdAgendIdx, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick }) {
 
   if (!paisagem) {
     // Portrait: strip de 7 dias + detalhe
@@ -298,11 +325,12 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
                 return (
                   <PillEvento key={ev.id} ev={ev} espaco={espaco} meu={meu}
                     tecNome={tec?.nome ?? null} tecCor={tec ? tecCorMap[tec.id] : null}
+                    colaboradorNome={colaborador?.nome}
                     onClick={() => onEventoClick(ev)} />
                 )
               })
           }
-          <PillLmdCard lmdIds={lmdPorDia[diaSeleccionado]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
+          <PillLmdCard lmdIds={lmdPorDia[diaSeleccionado]} lmdAgendDia={lmdAgendIdx?.[diaSeleccionado]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
           <PillFolgaCard folgaIds={folgasIdx?.[diaSeleccionado]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
         </div>
       </div>
@@ -336,13 +364,14 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
                 const tec    = tecnicos.find(t => t.id === tecIds[0])
                 return (
                   <PillEvento key={ev.id} ev={ev} espaco={espaco} meu={meu}
-                    tecNome={tec?.nome ?? null} tecCor={tec ? tecCorMap[tec.id] : null} compact
+                    tecNome={tec?.nome ?? null} tecCor={tec ? tecCorMap[tec.id] : null}
+                    colaboradorNome={colaborador?.nome} compact
                     onClick={() => onEventoClick(ev)} />
                 )
               })}
             </div>
-            <PillLmdCard lmdIds={lmdPorDia[dataStr]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
-            <PillFolgaCard folgaIds={folgasIdx?.[dataStr]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
+            <PillLmdCard lmdIds={lmdPorDia[dataStr]} lmdAgendDia={lmdAgendIdx?.[dataStr]} tecnicos={tecnicos} tecCorMap={tecCorMap} compact />
+            <PillFolgaCard folgaIds={folgasIdx?.[dataStr]} tecnicos={tecnicos} tecCorMap={tecCorMap} compact />
           </div>
         )
       })}
@@ -369,6 +398,7 @@ function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, meusIds, espacosI
             return (
               <PillEvento key={ev.id} ev={ev} espaco={espaco} meu={meu}
                 tecNome={tec?.nome ?? null} tecCor={tec ? tecCorMap[tec.id] : null}
+                colaboradorNome={colaborador?.nome}
                 onClick={() => onEventoClick(ev)} />
             )
           })
@@ -475,6 +505,15 @@ export function ColaboradorAgenda() {
     agendamentos.filter(a => a.folga).forEach(a => {
       if (!m[a.data]) m[a.data] = []
       m[a.data].push(a.tecnico_id)
+    })
+    return m
+  }, [agendamentos])
+
+  const lmdAgendIdx = useMemo(() => {
+    const m = {}
+    agendamentos.filter(a => !a.folga).forEach(a => {
+      if (!m[a.data]) m[a.data] = {}
+      m[a.data][a.tecnico_id] = a
     })
     return m
   }, [agendamentos])
@@ -599,7 +638,7 @@ export function ColaboradorAgenda() {
       {vista === 'semana' && (
         <VistaSemana semana7={semana7} paisagem={paisagem}
           diaSeleccionado={diaSeleccionado} setDiaSeleccionado={setDiaSelec}
-          eventosPorDia={eventosPorDia} lmdPorDia={lmdPorDia} folgasIdx={folgasIdx}
+          eventosPorDia={eventosPorDia} lmdPorDia={lmdPorDia} folgasIdx={folgasIdx} lmdAgendIdx={lmdAgendIdx}
           meusIds={meusIds} espacosIdx={espacosIdx}
           tecnicos={tecnicos} tecCorMap={tecCorMap} evTecIdx={evTecIdx}
           colaborador={colaborador}
