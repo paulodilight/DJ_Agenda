@@ -89,8 +89,8 @@ export function ColaboradorLayout() {
 
       {/* ── Header: logo + acções ── */}
       <header className={clsx(
-        'sticky top-0 z-30 bg-surface-1/90 backdrop-blur border-b border-border transition-transform duration-300',
-        !mostrarChrome && '-translate-y-full pointer-events-none'
+        'sticky top-0 z-30 bg-surface-1/90 backdrop-blur border-b border-border',
+        !mostrarChrome && 'hidden'
       )}>
         {/* Safe area top — espaço transparente acima do logo */}
         <div style={{ height: 'max(env(safe-area-inset-top, 0px), 6px)' }} />
@@ -125,16 +125,16 @@ export function ColaboradorLayout() {
 
       {/* ── Conteúdo ── */}
       <main className={clsx(
-        'flex-1 max-w-5xl w-full mx-auto px-4 py-4 transition-all duration-300',
-        mostrarChrome ? 'pb-20' : 'pb-4'
+        'flex-1 max-w-5xl w-full mx-auto px-4 py-4',
+        mostrarChrome ? 'pb-20' : 'pb-0 py-0 px-0 max-w-none'
       )}>
         <Outlet />
       </main>
 
       {/* ── Nav inferior ── */}
       <nav className={clsx(
-        'fixed bottom-0 left-0 right-0 z-30 bg-surface-1/95 backdrop-blur border-t border-border transition-transform duration-300',
-        !mostrarChrome && 'translate-y-full pointer-events-none'
+        'fixed bottom-0 left-0 right-0 z-30 bg-surface-1/95 backdrop-blur border-t border-border',
+        !mostrarChrome && 'hidden'
       )}>
         <div className="max-w-5xl mx-auto flex items-center justify-around px-2 py-1">
           {navItens.map(({ to, fim, rotulo, Icone }) => (
