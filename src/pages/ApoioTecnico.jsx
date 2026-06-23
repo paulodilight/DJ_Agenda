@@ -1,7 +1,9 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addDays, parseISO, isSameMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, List, CalendarDays, ChevronLeft, ChevronRight, Plus, Wrench, CalendarRange } from 'lucide-react'
+import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, List, CalendarDays, ChevronLeft, ChevronRight, Plus, Wrench, CalendarRange, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { OcorrenciaDetalhe } from '@/components/ocorrencias/OcorrenciaDetalhe'
+import { ModalNovaOcorrencia } from '@/components/ocorrencias/ModalNovaOcorrencia'
 import { useMesStore } from '@/store'
 import { supabase } from '@/lib/supabase'
 import { Modal } from '@/components/ui/Modal'
@@ -519,6 +521,143 @@ function ModalDia({ dataStr, tecnicos, tecCorMap, lmdPorDia, linhasBrutas, folga
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Vista Ocorrências (Admin) ─────────────────────────────────────────────────
+const STATUS_OC = {
+  aberta:      { label: 'Aberta',      Ic: AlertCircle,  cls: 'text-red-400 bg-red-400/10 border-red-400/30' },
+  em_processo: { label: 'Em processo', Ic: Clock,         cls: 'text-amber-400 bg-amber-400/10 border-amber-400/30' },
+  fechada:     { label: 'Fechada',     Ic: CheckCircle,   cls: 'text-green-400 bg-green-400/10 border-green-400/30' },
+}
+const FILTROS_OC = [
+  { id: 'todas', label: 'Todas' },
+  { id: 'aberta', label: 'Abertas' },
+  { id: 'em_processo', label: 'Em processo' },
+  { id: 'fechada', label: 'Fechadas' },
+]
+
+function VistaOcorrencias({ espacos }) {
+  const [ocorrencias, setOcorrencias] = useState([])
+  const [intervIdx,   setIntervIdx]   = useState({})
+  const [loading,     setLoading]     = useState(true)
+  const [filtro,      setFiltro]      = useState('todas')
+  const [aberta,      setAberta]      = useState(null)
+  const [modalNova,   setModalNova]   = useState(false)
+  const [versao,      setVersao]      = useState(0)
+
+  useEffect(() => {
+    let activo = true
+    setLoading(true)
+    supabase.from('ocorrencias').select('*, espacos(nome)').order('created_at', { ascending: false })
+      .then(async ({ data: ocs }) => {
+        if (!activo) return
+        const ids = (ocs ?? []).map(o => o.id)
+        let ivIdx = {}
+        if (ids.length > 0) {
+          const { data: ivs } = await supabase.from('ocorrencias_intervencoes')
+            .select('*').in('ocorrencia_id', ids).order('created_at', { ascending: true })
+          ;(ivs ?? []).forEach(iv => {
+            if (!ivIdx[iv.ocorrencia_id]) ivIdx[iv.ocorrencia_id] = []
+            ivIdx[iv.ocorrencia_id].push(iv)
+          })
+        }
+        setOcorrencias(ocs ?? [])
+        setIntervIdx(ivIdx)
+        setLoading(false)
+      })
+    return () => { activo = false }
+  }, [versao])
+
+  const atualizar = () => {
+    setVersao(v => v + 1)
+    if (aberta) {
+      supabase.from('ocorrencias').select('*, espacos(nome)').eq('id', aberta.id).single()
+        .then(({ data }) => data && setAberta(data))
+    }
+  }
+
+  const lista = filtro === 'todas' ? ocorrencias : ocorrencias.filter(o => o.status === filtro)
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Toolbar */}
+      <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-border/40 flex-wrap">
+        <div className="flex gap-1 flex-wrap">
+          {FILTROS_OC.map(f => (
+            <button key={f.id} onClick={() => setFiltro(f.id)}
+              className={clsx('px-3 py-1 rounded-full border text-[11px] font-semibold transition-colors',
+                filtro === f.id
+                  ? 'bg-amber-400/15 border-amber-400/30 text-amber-400'
+                  : 'bg-surface-2/60 border-border/60 text-accent-subtle hover:text-accent')}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setModalNova(true)}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-400 text-[12px] font-semibold hover:bg-amber-400/20 transition-colors">
+          <Plus size={13} />Nova ocorrência
+        </button>
+      </div>
+
+      {/* Lista */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {loading
+          ? <div className="flex items-center justify-center py-16 text-accent-subtle/40">A carregar…</div>
+          : lista.length === 0
+          ? <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <AlertTriangle size={32} className="text-accent-subtle/20" />
+              <p className="text-[13px] text-accent-subtle/50">Sem ocorrências.</p>
+            </div>
+          : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {lista.map(oc => {
+                const cfg = STATUS_OC[oc.status] ?? STATUS_OC.aberta
+                const Ic  = cfg.Ic
+                const nIv = (intervIdx[oc.id] ?? []).length
+                return (
+                  <button key={oc.id} onClick={() => setAberta(oc)}
+                    className="text-left rounded-xl border border-border/60 bg-surface-1 hover:border-white/15 active:scale-[0.99] transition-all px-4 py-3">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="text-[13px] font-bold text-accent leading-snug">{oc.titulo}</p>
+                      <span className={clsx('shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border', cfg.cls)}>
+                        <Ic size={9} />{cfg.label}
+                      </span>
+                    </div>
+                    {oc.descricao && <p className="text-[11px] text-accent-muted line-clamp-2 mb-1">{oc.descricao}</p>}
+                    {oc.foto_url && <img src={oc.foto_url} alt="" className="w-full h-24 object-cover rounded-lg border border-border/30 mb-1" />}
+                    <div className="flex items-center gap-2 text-[10px] text-accent-subtle/60 flex-wrap">
+                      <span>{oc.data_ocorrencia}</span>
+                      {oc.espacos?.nome && <><span>·</span><span>{oc.espacos.nome}</span></>}
+                      <span>·</span><span>{oc.registado_por}</span>
+                      {nIv > 0 && <><span>·</span><span>{nIv} interv.</span></>}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+        }
+      </div>
+
+      {aberta && (
+        <OcorrenciaDetalhe
+          ocorrencia={aberta}
+          intervencoes={intervIdx[aberta.id] ?? []}
+          nomeUtilizador="Admin"
+          tipoUtilizador="admin"
+          onFechar={() => setAberta(null)}
+          onAtualizar={atualizar}
+        />
+      )}
+      {modalNova && (
+        <ModalNovaOcorrencia
+          nomeUtilizador="Admin"
+          tipoUtilizador="admin"
+          espacos={espacos}
+          onFechar={() => setModalNova(false)}
+          onCriada={() => setVersao(v => v + 1)}
+        />
+      )}
     </div>
   )
 }
@@ -1670,10 +1809,7 @@ export function ApoioTecnico() {
 
         {/* ════ VISTA OCORRÊNCIAS ════ */}
         {vista === 'ocorrencias' && (
-          <div className="flex-1 flex items-center justify-center flex-col gap-3 text-accent-subtle/40">
-            <AlignJustify size={32} className="opacity-30" />
-            <p className="text-sm font-medium">Ocorrências — Em breve</p>
-          </div>
+          <VistaOcorrencias espacos={espacos} />
         )}
 
         {/* ════ VISTA ESTATÍSTICAS ════ */}
