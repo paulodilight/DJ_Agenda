@@ -1077,9 +1077,10 @@ export function ApoioTecnico() {
                   'flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-all border select-none',
                   'cursor-grab active:cursor-grabbing',
                   isDraggingThis && 'opacity-40 scale-95',
+                  cor?.chip ?? 'bg-surface-2 text-accent-muted border-border',
                   filtroTecnico === t.nome
-                    ? (cor?.chip ?? 'bg-status-confirmado/15 text-status-confirmado border-status-confirmado/30') + ' font-medium'
-                    : 'bg-surface-2 text-accent-muted border-border hover:text-accent hover:border-white/20'
+                    ? 'font-medium ring-1 ring-white/20'
+                    : 'opacity-50 hover:opacity-90'
                 )}
               >
                 <span className={clsx('font-semibold', cor?.text ?? 'text-accent-muted')}>{t.nome}</span>
@@ -1481,7 +1482,9 @@ export function ApoioTecnico() {
                 <ChevronLeft size={14} />
               </button>
               <span className="text-xs text-accent-muted flex-1 text-center font-medium">
-                {dataFmt(semana7[0])} — {dataFmt(semana7[6])}
+                {cap(format(new Date(semana7[0] + 'T00:00:00'), 'EEE', { locale: pt }))} {dataFmt(semana7[0])}
+                {' — '}
+                {cap(format(new Date(semana7[6] + 'T00:00:00'), 'EEE', { locale: pt }))} {dataFmt(semana7[6])}
               </span>
               <button onClick={() => setSemanaRef(prev => isoData(addDays(parseISO(prev), 7)))}
                 className="p-1.5 rounded hover:bg-surface-2 text-accent-subtle hover:text-accent transition-colors">
@@ -1523,7 +1526,13 @@ export function ApoioTecnico() {
                           <div key={linha.espaco_id} onClick={() => setModalEditEvento(linha.ev)}
                             className="cursor-pointer px-1.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border/50 transition-colors">
                             <p className="text-[9px] font-bold text-accent-subtle truncate">{linha.espacoNome}</p>
-                            <p className="text-[10px] text-accent truncate">{linha.ev?.evento ?? ''}</p>
+                            <div className="flex items-center gap-0.5">
+                              {(linha.tecIds ?? []).slice(0, 2).map(tid => {
+                                const cor = tecCorMap[tid]
+                                return cor ? <span key={tid} className={clsx('w-1.5 h-1.5 rounded-full shrink-0', cor.dot)} /> : null
+                              })}
+                              <p className="text-[10px] text-accent truncate">{linha.ev?.evento ?? ''}</p>
+                            </div>
                             {tecNomes
                               ? <p className="text-[9px] text-accent-muted truncate">{tecNomes}</p>
                               : <p className="text-[9px] italic text-red-400/60">sem técnico</p>}
@@ -1600,7 +1609,13 @@ export function ApoioTecnico() {
                           {linhasDia.slice(0, 3).map(linha => (
                             <div key={linha.espaco_id} className="px-1 py-0.5 rounded bg-surface-2 border border-border/40">
                               <p className="text-[8px] font-bold text-accent-subtle truncate">{linha.espacoNome}</p>
-                              <p className="text-[9px] text-accent truncate">{linha.ev?.evento ?? ''}</p>
+                              <div className="flex items-center gap-0.5">
+                                {(linha.tecIds ?? []).slice(0, 2).map(tid => {
+                                  const cor = tecCorMap[tid]
+                                  return cor ? <span key={tid} className={clsx('w-1.5 h-1.5 rounded-full shrink-0', cor.dot)} /> : null
+                                })}
+                                <p className="text-[9px] text-accent truncate">{linha.ev?.evento ?? ''}</p>
+                              </div>
                             </div>
                           ))}
                           {linhasDia.length > 3 && <p className="text-[8px] text-accent-subtle/50">+{linhasDia.length - 3} mais</p>}
