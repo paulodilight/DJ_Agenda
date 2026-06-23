@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine } from 'lucide-react'
+import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
 import { colaboradorApi } from '@/lib/colaboradorApi'
@@ -76,6 +77,17 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   )
   // Só o responsável principal pode assinar presença
   const isResponsavel = colaborador?.id === evento.tecnico_id
+
+  // ── Assinatura de início/fim de evento ──
+  const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading } = useAssinaturaDia(colaborador?.id ?? null)
+  const [assinandoEvento, setAssinandoEvento] = useState(false)
+  const mostrarInicioEvento = !assinLoading && proximaAssin?.tipo === 'evento_entrada' && proximaAssin?.eventoId === evento.id
+
+  const assinarEvento = async () => {
+    setAssinandoEvento(true)
+    await registarAssin('evento_entrada', { eventoId: evento.id })
+    setAssinandoEvento(false)
+  }
 
   // ── Assinatura de presença do técnico (GPS) ──
   const pres = usePresenca({ kind: 'tecnico', refId: evento.id, ownerId: colaborador?.id ?? null, signedBy: 'tecnico' })
@@ -291,9 +303,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
           )}
         </div>
 
-        {/* Rodapé — assinatura de presença + fechar */}
+        {/* Rodapé — assinatura de início de evento + presença + fechar */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 shrink-0">
-          <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {mostrarInicioEvento && (
+              <button onClick={assinarEvento} disabled={assinandoEvento}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-green-400/30 bg-green-400/[0.07] text-green-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
+                <PenLine size={13} />
+                {assinandoEvento ? 'A registar…' : 'Início de Evento'}
+              </button>
+            )}
             {isResponsavel && pres.status === 'signed' && pres.presenca ? (
               <span
                 title={`Presente · ${new Date(pres.presenca.signed_at).toLocaleString('pt-PT')}${pres.presenca.latitude != null ? ` · ${Number(pres.presenca.latitude).toFixed(5)}, ${Number(pres.presenca.longitude).toFixed(5)}${pres.presenca.accuracy_m != null ? ` (±${pres.presenca.accuracy_m}m)` : ''}` : ' · sem GPS'}`}

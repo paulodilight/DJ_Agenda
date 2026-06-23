@@ -1,12 +1,38 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, ClipboardList, Camera, ChevronRight, MapPin, CalendarClock, Wrench, LayoutList } from 'lucide-react'
+import { CalendarDays, ClipboardList, Camera, ChevronRight, MapPin, CalendarClock, Wrench, LayoutList, PenLine } from 'lucide-react'
 import { useColaboradorStore } from '@/store'
 import { colaboradorApi } from '@/lib/colaboradorApi'
 import { Avatar } from '@/components/colaborador/Avatar'
 import { EventoModal } from '@/components/colaborador/EventoModal'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { hhmm, dataLonga } from '@/components/colaborador/format'
+import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
+
+const LABELS_ASSIN = {
+  lmd_entrada:   { label: 'Entrada LMD',    cor: 'text-indigo-400 border-indigo-400/30 bg-indigo-400/[0.07]' },
+  evento_saida:  { label: 'Fim de Evento',  cor: 'text-red-400   border-red-400/30   bg-red-400/[0.07]'   },
+  lmd_saida:     { label: 'Saída LMD',      cor: 'text-red-400   border-red-400/30   bg-red-400/[0.07]'   },
+}
+
+function BotaoAssinatura({ proxima, registar }) {
+  const [loading, setLoading] = useState(false)
+  if (!proxima || !LABELS_ASSIN[proxima.tipo]) return null
+  const { label, cor } = LABELS_ASSIN[proxima.tipo]
+  const onClick = async (e) => {
+    e.stopPropagation()
+    setLoading(true)
+    await registar(proxima.tipo, { eventoId: proxima.eventoId, agendamentoId: proxima.agendamentoId })
+    setLoading(false)
+  }
+  return (
+    <button onClick={onClick} disabled={loading}
+      className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-opacity disabled:opacity-50 ${cor}`}>
+      <PenLine size={13} />
+      {loading ? 'A registar…' : label}
+    </button>
+  )
+}
 
 const hojeISO = () => {
   const d = new Date()
@@ -28,6 +54,7 @@ function CardNav({ to, Icone, rotulo }) {
 
 export function ColaboradorDashboard() {
   const { colaborador, actualizarFoto } = useColaboradorStore()
+  const { proxima: proximaAssin, registar: registarAssin } = useAssinaturaDia(colaborador?.id ?? null)
   const [loading, setLoading]           = useState(true)
   const [eventos, setEventos]           = useState([])
   const [mapaTecnicos, setMapaTecnicos] = useState({})
@@ -116,36 +143,35 @@ export function ColaboradorDashboard() {
         </p>
 
         {proximoEvento ? (
-          <button onClick={() => setEventoAberto(proximoEvento)}
-            className="mt-4 w-full text-left rounded-2xl border border-white/10 bg-surface-1 p-4 hover:border-amber-500/30 hover:bg-surface-2 active:scale-[0.99] transition-all group">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-2 group-hover:text-amber-400 transition-colors">
-              Próximo evento →
-            </p>
-            <p className="text-lg font-bold text-accent leading-snug">{proximoEvento.evento}</p>
-            <div className="mt-2 flex flex-col gap-1.5">
-              {instalProximo && (
-                <span className="flex items-center gap-2 text-[15px] text-accent font-semibold">
-                  <Wrench size={13} className="text-accent shrink-0" />
-                  Instalação: {instalProximo}
-                </span>
-              )}
-              <span className="flex items-center gap-2 text-sm text-accent-muted">
-                <CalendarClock size={13} className="text-accent-subtle shrink-0" />
-                <span className="capitalize">{dataLonga(proximoEvento.data_evento)}</span>
-                {proximoEvento.hora_inicio && <span>· {hhmm(proximoEvento.hora_inicio)}</span>}
-              </span>
-              {localProximo && (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 p-4">
+            <button onClick={() => setEventoAberto(proximoEvento)}
+              className="w-full text-left hover:opacity-80 active:scale-[0.99] transition-all group">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-2 group-hover:text-amber-400 transition-colors">
+                Próximo evento →
+              </p>
+              <p className="text-lg font-bold text-accent leading-snug">{proximoEvento.evento}</p>
+              {localProximo && <p className="text-sm text-accent-muted mt-0.5">{localProximo}</p>}
+              <div className="mt-2 flex flex-col gap-1.5">
+                {instalProximo && (
+                  <span className="flex items-center gap-2 text-[15px] text-accent font-semibold">
+                    <Wrench size={13} className="text-accent shrink-0" />
+                    Instalação: {instalProximo}
+                  </span>
+                )}
                 <span className="flex items-center gap-2 text-sm text-accent-muted">
-                  <MapPin size={13} className="text-accent-subtle shrink-0" />
-                  {localProximo}
+                  <CalendarClock size={13} className="text-accent-subtle shrink-0" />
+                  <span className="capitalize">{dataLonga(proximoEvento.data_evento)}</span>
+                  {proximoEvento.hora_inicio && <span>· {hhmm(proximoEvento.hora_inicio)}</span>}
                 </span>
-              )}
-            </div>
-          </button>
+              </div>
+            </button>
+            <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} />
+          </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 p-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2">Próximo evento</p>
             <p className="text-sm text-accent-subtle">Sem eventos agendados de momento.</p>
+            <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} />
           </div>
         )}
       </div>

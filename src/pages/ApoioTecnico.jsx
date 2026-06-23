@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addDays, parseISO, isSameMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle } from 'lucide-react'
+import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, List, CalendarDays, ChevronLeft, ChevronRight, Plus, Wrench, CalendarRange } from 'lucide-react'
 import { useMesStore } from '@/store'
 import { supabase } from '@/lib/supabase'
 import { Modal } from '@/components/ui/Modal'
@@ -430,6 +430,99 @@ function FolgaChip({ tecnico, cor, dataStr, onDragStart, isDragging }) {
 }
 
 // ── Página principal ──────────────────────────────────────────────────────────
+// ── Modal Dia (vista mês) ─────────────────────────────────────────────────────
+function ModalDia({ dataStr, tecnicos, tecCorMap, lmdPorDia, linhasBrutas, folgasIdx, onFechar, onNavegar, onEditEvento, onAtribuir, onNovoEvento }) {
+  if (!dataStr) return null
+  const grupo = linhasBrutas.find(g => g.dataStr === dataStr)
+  const linhas = (grupo?.linhas ?? []).filter(l => l.ev !== null)
+  const folgaIds = folgasIdx[dataStr] ?? []
+  const lmdTecs = lmdPorDia[dataStr] ?? []
+  const dt = new Date(dataStr + 'T00:00:00')
+  const label = format(dt, "EEEE, d 'de' MMMM", { locale: pt })
+  const isHoje = dataStr === hojeStr
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onFechar}>
+      <div className="bg-surface-1 border border-border rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+          <button onClick={() => onNavegar(-1)} className="p-1.5 rounded-lg hover:bg-surface-2 text-accent-subtle hover:text-accent transition-colors"><ChevronLeft size={16} /></button>
+          <div className="flex-1 text-center">
+            <p className={clsx('text-sm font-bold capitalize', isHoje && 'text-amber-400')}>{label}</p>
+          </div>
+          <button onClick={() => onNavegar(1)} className="p-1.5 rounded-lg hover:bg-surface-2 text-accent-subtle hover:text-accent transition-colors"><ChevronRight size={16} /></button>
+          <button onClick={onFechar} className="ml-1 text-accent-subtle hover:text-accent"><X size={15} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+          {lmdTecs.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-red-400/70 mb-2">LMD</p>
+              <div className="flex flex-wrap gap-1">
+                {lmdTecs.map(tid => {
+                  const tec = tecnicos.find(t => t.id === tid)
+                  const cor = tecCorMap[tid]
+                  if (!tec) return null
+                  return <span key={tid} className={clsx('inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold border', cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30')}>{tec.nome}</span>
+                })}
+              </div>
+            </div>
+          )}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2">Eventos</p>
+            {linhas.length === 0
+              ? <p className="text-xs text-accent-subtle/50">Sem eventos neste dia.</p>
+              : <div className="flex flex-col gap-2">
+                  {linhas.map(linha => (
+                    <div key={linha.espaco_id} className="p-3 rounded-xl border border-border bg-surface-2 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-accent">{linha.espacoNome}</span>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => onAtribuir(linha)} className="px-2 py-1 rounded-lg bg-surface-3 hover:bg-surface-4 text-accent-subtle hover:text-accent text-[10px] border border-border transition-colors">técnico</button>
+                          {linha.ev && <button onClick={() => onEditEvento(linha.ev)} className="px-2 py-1 rounded-lg bg-surface-3 hover:bg-surface-4 text-accent-subtle hover:text-accent text-[10px] border border-border transition-colors"><Pencil size={9} /></button>}
+                        </div>
+                      </div>
+                      {linha.ev && <p className="text-[11px] text-accent-muted truncate">{linha.ev.evento}</p>}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {(linha.tecIds ?? []).map(tid => {
+                          const tec = tecnicos.find(t => t.id === tid)
+                          const cor = tecCorMap[tid]
+                          if (!tec) return null
+                          return <span key={tid} className={clsx('inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border', cor?.chip ?? 'bg-surface-3 text-accent-muted border-border')}>{tec.nome}</span>
+                        })}
+                        {(linha.tecIds ?? []).length === 0 && <span className="text-[11px] italic text-red-400/70">sem técnico</span>}
+                      </div>
+                      {(linha.ev?.hora_instalacao || linha.ev?.hora_inicio) && (
+                        <div className="flex items-center gap-2 text-[10px] text-accent-subtle">
+                          {linha.ev?.hora_instalacao && <span><Wrench size={9} className="inline mr-0.5" />{hhmm(linha.ev.hora_instalacao)}</span>}
+                          {linha.ev?.hora_inicio && <span>{hhmm(linha.ev.hora_inicio)}</span>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+            }
+            <button onClick={() => onNovoEvento(dataStr)} className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-xs text-accent-subtle hover:text-accent transition-colors">
+              <Plus size={12} /> Novo evento
+            </button>
+          </div>
+          {folgaIds.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400/70 mb-2">Folgas</p>
+              <div className="flex flex-wrap gap-1">
+                {folgaIds.map(tid => {
+                  const tec = tecnicos.find(t => t.id === tid)
+                  const cor = tecCorMap[tid]
+                  if (!tec) return null
+                  return <span key={tid} className={clsx('inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold border', cor?.chip ?? 'bg-orange-400/15 text-orange-400 border-orange-400/30')}>{tec.nome}</span>
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ApoioTecnico() {
   const { anoMes } = useMesStore()
   const [loading, setLoading]           = useState(true)
@@ -445,8 +538,10 @@ export function ApoioTecnico() {
   const [filtroEspaco, setFiltroEspaco]   = useState('')
   const [filtroTecnico, setFiltroTecnico] = useState('')
   const [pesquisa, setPesquisa]           = useState('')
-  const [vista, setVista]                 = useState('linhas')
+  const [vista, setVista]                 = useState('lista') // lista | semana | mes | colunas | stats | ocorrencias
   const [ocultarVazios, setOcultarVazios] = useState(true)
+  const [semanaRef, setSemanaRef]         = useState(hojeStr)
+  const [modalDia, setModalDia]           = useState(null)
 
   // ── Scroll refs ─────────────────────────────────────────────────────────────
   const scrollRef   = useRef(null)
@@ -626,6 +721,13 @@ export function ApoioTecnico() {
   // Técnicos fixos + i4DJ espaco_id
   const tecnicosFixos = useMemo(() => tecnicos.filter(t => t.tipo === 'fixo'), [tecnicos])
   const i4djEspacoId  = useMemo(() => espacos.find(e => e.nome?.trim().toLowerCase() === 'lmd')?.id ?? null, [espacos])
+
+  // Semana view: 7 dias a partir de 2ª feira da semana que contém semanaRef
+  const semana7 = useMemo(() => {
+    const ref = parseISO(semanaRef)
+    const lun = startOfWeek(ref, { weekStartsOn: 1 })
+    return Array.from({ length: 7 }, (_, i) => isoData(addDays(lun, i)))
+  }, [semanaRef])
 
   // LMD por dia: data → tecIds (técnicos fixos livres = no LMD)
   const lmdPorDia = useMemo(() => {
@@ -1026,13 +1128,21 @@ export function ApoioTecnico() {
           <div className="ml-auto flex items-center gap-2 shrink-0">
             {/* Toggle vista */}
             <div className="flex bg-surface-2 border border-border rounded p-0.5">
+              <button onClick={() => setVista('lista')} title="Lista"
+                className={clsx('p-1.5 rounded transition-colors', vista === 'lista' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}>
+                <List size={13} />
+              </button>
+              <button onClick={() => setVista('semana')} title="Semana"
+                className={clsx('p-1.5 rounded transition-colors', vista === 'semana' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}>
+                <CalendarRange size={13} />
+              </button>
+              <button onClick={() => setVista('mes')} title="Mês"
+                className={clsx('p-1.5 rounded transition-colors', vista === 'mes' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}>
+                <CalendarDays size={13} />
+              </button>
               <button onClick={() => setVista('colunas')} title="Colunas"
                 className={clsx('p-1.5 rounded transition-colors', vista === 'colunas' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}>
                 <Columns2 size={13} />
-              </button>
-              <button onClick={() => setVista('linhas')} title="Linhas"
-                className={clsx('p-1.5 rounded transition-colors', vista === 'linhas' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}>
-                <AlignJustify size={13} />
               </button>
               <button onClick={() => setVista('stats')} title="Estatísticas"
                 className={clsx('p-1.5 rounded transition-colors', vista === 'stats' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}>
@@ -1235,8 +1345,8 @@ export function ApoioTecnico() {
           </table>
         )}
 
-        {/* ════ VISTA LINHAS ════ */}
-        {vista === 'linhas' && (
+        {/* ════ VISTA LISTA ════ */}
+        {vista === 'lista' && (
           <table className="w-full text-xs border-collapse">
             <colgroup>
               <col style={{ width: 160 }} />
@@ -1250,70 +1360,93 @@ export function ApoioTecnico() {
             </colgroup>
             <thead className="sticky top-0 z-10 bg-surface-2 border-b-2 border-border">
               <tr>
-                <th className={thCls}>Dia</th>
                 <th className={thCls}>Técnico</th>
                 <th className={thCls}>Cliente</th>
                 <th className={thCls}>Evento</th>
-                <th className={clsx(thCls, 'text-center')}>Hora Inst.</th>
-                <th className={clsx(thCls, 'text-center')}>Hora Início</th>
+                <th className={clsx(thCls, 'text-center')}>Inst.</th>
+                <th className={clsx(thCls, 'text-center')}>Início</th>
                 <th className={thCls}>DJ</th>
-                <th className={clsx(thCls, 'border-l border-border/60')}>Folga</th>
-                {i4djEspacoId && <th className={clsx(thCls, 'border-l border-red-500/30 text-red-400/70')}>LMD</th>}
               </tr>
             </thead>
             <tbody>
               {linhasPorDia.length === 0 && (
-                <tr><td colSpan={9} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
+                <tr><td colSpan={6} className="py-16 text-center text-accent-subtle/40">Sem eventos activos neste mês.</td></tr>
               )}
               {linhasPorDia.flatMap(({ dataStr, dia, linhas, folgas }, dayIdx) => {
                 const tecsFolga    = folgas.map(tid => tecnicos.find(t => t.id === tid)).filter(Boolean)
-                const rowSpan      = linhas.length || 1
-                const zebraCls     = dayIdx % 2 === 1 ? 'bg-white/[0.04]' : ''
                 const isSabLinhas  = new Date(dataStr + 'T00:00:00').getDay() === 0
                 const isHojeLinhas = dataStr === hojeStr
+                const lmdTecsDia   = lmdPorDia[dataStr] ?? []
                 const rowsToRender = linhas.length > 0 ? linhas : [null]
+                // Unused vars kept for compat
+                void dayIdx
 
+                // ── Linha de cabeçalho do dia ──────────────────────────────
+                const dayHeader = (
+                  <tr key={`hdr-${dataStr}`} className={isHojeLinhas ? 'bg-amber-400/10' : 'bg-surface-2/60'}>
+                    <td colSpan={6} className="px-3 py-2 border-b border-border/40">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className={clsx('text-[11px] font-bold', isHojeLinhas ? 'text-amber-400' : 'text-accent-muted')}>
+                          {diaSemanaData(dataStr)}
+                        </span>
+                        {lmdTecsDia.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <span className="text-[9px] font-bold text-red-400/60 uppercase tracking-widest">LMD</span>
+                            {lmdTecsDia.map(tid => {
+                              const tec = tecnicos.find(t => t.id === tid)
+                              const cor = tecCorMap[tid]
+                              if (!tec) return null
+                              return <span key={tid} className={clsx('inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border', cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30')}>{tec.nome}</span>
+                            })}
+                          </span>
+                        )}
+                        {tecsFolga.length > 0 && (
+                          <button onClick={() => setModalFolga({ data: dataStr })}
+                            className="flex items-center gap-1 hover:opacity-80 transition-opacity">
+                            <span className="text-[9px] font-bold text-orange-400/60 uppercase tracking-widest">Folga</span>
+                            {tecsFolga.map(t => (
+                              <FolgaChip key={t.id} tecnico={t} cor={tecCorMap[t.id]}
+                                dataStr={dataStr} onDragStart={handleFolgaDragStart}
+                                isDragging={dragFolga?.data === dataStr && dragFolga?.tecnicoId === t.id} />
+                            ))}
+                          </button>
+                        )}
+                        <button onClick={() => setModalEditEvento({ data_evento: dataStr })}
+                          className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded border border-border/50 text-[10px] text-accent-subtle/50 hover:text-accent-subtle hover:border-border transition-colors">
+                          <Plus size={10} /> evento
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+
+                // ── Linhas de eventos ───────────────────────────────────────
                 const rows = rowsToRender.map((linha, li) => (
                   <tr key={linha ? `${dataStr}-${linha.espaco_id}` : `${dataStr}-empty`}
                     className={clsx(
-                      'hover:bg-surface-2/20 transition-colors',
-                      li < rowsToRender.length - 1 ? 'border-b border-border/10' : 'border-b border-border/20',
-                      isHojeLinhas ? 'bg-zinc-100 [&_td]:!text-gray-700' : zebraCls
+                      'hover:bg-surface-2/20 transition-colors border-b border-border/10',
                     )}
                   >
-                    {li === 0 && (
-                      <td rowSpan={rowSpan} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
-                        className={clsx('px-3 py-2 font-medium whitespace-nowrap align-top border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors',
-                          isHojeLinhas ? 'text-gray-800 font-bold' : 'text-accent-muted')}>
-                        {diaSemanaData(dataStr)}
-                      </td>
-                    )}
                     {/* Técnico — draggable */}
                     {linha ? renderTecCell(linha) : <td className="px-2 py-2" />}
                     {/* Cliente */}
                     <td className={clsx('px-2 py-2 font-medium whitespace-nowrap', linha?.espacoNome?.toLowerCase() === 'lmd' ? 'text-red-400' : 'text-accent-muted')}>{linha?.espacoNome ?? ''}</td>
-                    {/* Evento — clique para editar, criar com espaço, ou criar só com data */}
-                    <td
-                      onClick={() => {
-                        if (linha?.ev) setModalEditEvento(linha.ev)
-                        else if (linha) setModalEditEvento({ espaco_id: linha.espaco_id, data_evento: dataStr })
-                        else setModalEditEvento({ data_evento: dataStr })
-                      }}
+                    {/* Evento */}
+                    <td onClick={() => linha?.ev ? setModalEditEvento(linha.ev) : linha ? setModalEditEvento({ espaco_id: linha.espaco_id, data_evento: dataStr }) : null}
                       className="px-2 py-2 text-accent-muted max-w-0 group cursor-pointer hover:text-accent transition-colors">
                       <span className="flex items-center gap-1">
                         <span className="block truncate">{linha?.ev?.evento ?? ''}</span>
                         {linha?.ev
                           ? <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
-                          : linha
-                            ? <span className="opacity-0 group-hover:opacity-30 text-[10px]">+ evento</span>
-                            : <span className="opacity-0 group-hover:opacity-40 text-[10px] text-status-confirmado/70">+ evento</span>}
+                          : linha ? <span className="opacity-0 group-hover:opacity-30 text-[10px]">+ evento</span> : null}
                       </span>
+                      {linha && (linha.tecIds ?? []).length === 0 && (
+                        <span className="text-[10px] italic text-red-400/70">sem técnico</span>
+                      )}
                     </td>
                     {/* Hora Inst. */}
                     <td className="px-2 py-2 text-center tabular-nums whitespace-nowrap font-medium">
-                      {linha?.ev?.hora_instalacao
-                        ? <span className="text-accent-subtle">{hhmm(linha.ev.hora_instalacao)}</span>
-                        : linha ? <span className="text-border/20">—</span> : null}
+                      {linha?.ev?.hora_instalacao ? <span className="text-accent-subtle">{hhmm(linha.ev.hora_instalacao)}</span> : linha ? <span className="text-border/20">—</span> : null}
                     </td>
                     {/* Hora Início */}
                     <td className="px-2 py-2 text-center text-accent-subtle tabular-nums whitespace-nowrap">
@@ -1323,84 +1456,209 @@ export function ApoioTecnico() {
                     <td className="px-2 py-2 text-accent-muted whitespace-nowrap">
                       {linha ? (linha.djs?.length ? linha.djs.join(' · ') : <span className="text-border/20">—</span>) : null}
                     </td>
-                    {/* Folga — rowSpan */}
-                    {li === 0 && (
-                      <td rowSpan={rowSpan}
-                        onClick={() => setModalFolga({ data: dataStr })}
-                        onDragOver={e => { e.preventDefault(); setDragOverFolga(dataStr) }}
-                        onDragLeave={() => setDragOverFolga(null)}
-                        onDrop={e => handleFolgaDrop(e, dataStr)}
-                        title="Gerir folgas · arrastar para mover folga"
-                        className={clsx(
-                          'px-2 py-2 border-l border-border/40 cursor-pointer transition-colors whitespace-nowrap',
-                          tecsFolga.length === 1 ? 'align-middle' : 'align-top',
-                          dragOverFolga === dataStr ? 'bg-orange-400/10 outline outline-1 outline-orange-400/40' : 'hover:bg-orange-400/5'
-                        )}>
-                        {tecsFolga.length > 0
-                          ? <span className="inline-flex flex-nowrap gap-1 overflow-hidden">
-                              {tecsFolga.map(t => (
-                                <FolgaChip key={t.id} tecnico={t} cor={tecCorMap[t.id]}
-                                  dataStr={dataStr} onDragStart={handleFolgaDragStart}
-                                  isDragging={dragFolga?.data === dataStr && dragFolga?.tecnicoId === t.id} />
-                              ))}
-                            </span>
-                          : <span className="text-border/20 text-[10px]">—</span>
-                        }
-                      </td>
-                    )}
-                    {/* LMD — rowSpan, aceita drag */}
-                    {li === 0 && i4djEspacoId && (
-                      <td rowSpan={rowSpan}
-                        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-                        onDrop={async e => {
-                          e.preventDefault()
-                          const tecnicoId = e.dataTransfer.getData('tecnicoId') || dragSourceRef.current?.tecnicoId
-                          const eventoId  = e.dataTransfer.getData('eventoId')  || dragSourceRef.current?.eventoId || null
-                          const dropKey   = e.dataTransfer.getData('dropKey')   || dragSourceRef.current?.dropKey  || null
-                          dragSourceRef.current = null; setDragSource(null)
-                          if (!tecnicoId) return
-                          try {
-                            const { data: existe } = await supabase.from('agendamentos_tecnicos')
-                              .select('id').eq('data', dataStr).eq('espaco_id', i4djEspacoId).eq('tecnico_id', tecnicoId).maybeSingle()
-                            if (!existe) await supabase.from('agendamentos_tecnicos')
-                              .insert({ data: dataStr, espaco_id: i4djEspacoId, tecnico_id: tecnicoId, folga: false })
-                            if (eventoId && dropKey) await supabase.from('evento_tecnicos')
-                              .delete().eq('evento_id', eventoId).eq('tecnico_id', tecnicoId)
-                            carregarComScroll()
-                          } catch (err) { console.error('LMD drop error:', err) }
-                        }}
-                        className="px-2 py-2 border-l border-red-500/20 align-middle whitespace-nowrap cursor-pointer hover:bg-red-500/5 transition-colors">
-                        <span className="inline-flex flex-nowrap gap-1 overflow-hidden">
-                          {(lmdPorDia[dataStr] ?? []).map(tid => {
-                            const tec = tecnicos.find(t => t.id === tid)
-                            const cor = tecCorMap[tid]
-                            if (!tec) return null
-                            return (
-                              <span key={tid} className={clsx(
-                                'inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold border shrink-0',
-                                cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30'
-                              )}>
-                                {tec.nome}
-                              </span>
-                            )
-                          })}
-                          {(lmdPorDia[dataStr] ?? []).length === 0 && <span className="text-border/20 text-[10px]">—</span>}
-                        </span>
-                      </td>
-                    )}
                   </tr>
                 ))
 
                 const sepLinhas = isSabLinhas ? (
                   <tr key={`sep-week-linhas-${dataStr}`}>
-                    <td colSpan={8} className="h-[3px] bg-border/80 p-0" />
+                    <td colSpan={6} className="h-[3px] bg-border/80 p-0" />
                   </tr>
                 ) : null
 
-                return sepLinhas ? [...rows, sepLinhas] : rows
+                return sepLinhas ? [dayHeader, ...rows, sepLinhas] : [dayHeader, ...rows]
               })}
             </tbody>
           </table>
+        )}
+
+        {/* ════ VISTA SEMANA ════ */}
+        {vista === 'semana' && (
+          <div className="flex flex-col h-full overflow-hidden">
+            {/* Nav semana */}
+            <div className="shrink-0 px-4 py-2 border-b border-border/30 flex items-center gap-2">
+              <button onClick={() => setSemanaRef(prev => isoData(addDays(parseISO(prev), -7)))}
+                className="p-1.5 rounded hover:bg-surface-2 text-accent-subtle hover:text-accent transition-colors">
+                <ChevronLeft size={14} />
+              </button>
+              <span className="text-xs text-accent-muted flex-1 text-center font-medium">
+                {dataFmt(semana7[0])} — {dataFmt(semana7[6])}
+              </span>
+              <button onClick={() => setSemanaRef(prev => isoData(addDays(parseISO(prev), 7)))}
+                className="p-1.5 rounded hover:bg-surface-2 text-accent-subtle hover:text-accent transition-colors">
+                <ChevronRight size={14} />
+              </button>
+            </div>
+            {/* 7 cartões */}
+            <div className="flex-1 overflow-auto p-3 grid grid-cols-7 gap-2 min-h-0">
+              {semana7.map(dataStr => {
+                const grupo = linhasBrutas.find(g => g.dataStr === dataStr) ?? { linhas: [], folgas: [] }
+                const linhasDia = grupo.linhas.filter(l => l.ev !== null && (!filtroEspaco || l.espaco_id === filtroEspaco))
+                const folgaIds  = folgasIdx[dataStr] ?? []
+                const lmdTecsDia = lmdPorDia[dataStr] ?? []
+                const isHoje    = dataStr === hojeStr
+                const isNoMes   = dataStr >= dataInicio && dataStr <= dataFim
+                return (
+                  <div key={dataStr} className={clsx(
+                    'flex flex-col gap-0.5 rounded-xl border overflow-hidden',
+                    isHoje ? 'border-accent/40 bg-accent/[0.04]' : 'border-border bg-surface-1',
+                    !isNoMes && 'opacity-40'
+                  )}>
+                    <div className={clsx('px-2 py-1.5 text-center text-[10px] font-bold border-b border-border/40 shrink-0', isHoje ? 'text-amber-400' : 'text-accent-muted')}>
+                      {cap(format(new Date(dataStr + 'T00:00:00'), 'EEE d', { locale: pt }))}
+                    </div>
+                    {lmdTecsDia.length > 0 && (
+                      <div className="px-1.5 pt-1 flex flex-wrap gap-0.5">
+                        {lmdTecsDia.slice(0, 2).map(tid => {
+                          const tec = tecnicos.find(t => t.id === tid)
+                          const cor = tecCorMap[tid]
+                          return tec ? <span key={tid} className={clsx('text-[9px] font-bold px-1 py-0.5 rounded border', cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30')}>{tec.nome.split(' ')[0]}</span> : null
+                        })}
+                        {lmdTecsDia.length > 2 && <span className="text-[9px] text-accent-subtle">+{lmdTecsDia.length - 2}</span>}
+                      </div>
+                    )}
+                    <div className="flex-1 overflow-y-auto px-1.5 pb-1.5 flex flex-col gap-0.5">
+                      {linhasDia.map(linha => {
+                        const tecNomes = (linha.tecIds ?? []).map(id => tecnicos.find(t => t.id === id)?.nome?.split(' ')[0] ?? '?').join(', ')
+                        return (
+                          <div key={linha.espaco_id} onClick={() => setModalEditEvento(linha.ev)}
+                            className="cursor-pointer px-1.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border/50 transition-colors">
+                            <p className="text-[9px] font-bold text-accent-subtle truncate">{linha.espacoNome}</p>
+                            <p className="text-[10px] text-accent truncate">{linha.ev?.evento ?? ''}</p>
+                            {tecNomes
+                              ? <p className="text-[9px] text-accent-muted truncate">{tecNomes}</p>
+                              : <p className="text-[9px] italic text-red-400/60">sem técnico</p>}
+                          </div>
+                        )
+                      })}
+                      <button onClick={() => setModalEditEvento({ data_evento: dataStr })}
+                        className="w-full text-center text-[9px] text-accent-subtle/40 hover:text-accent-subtle py-0.5 transition-colors">
+                        + evento
+                      </button>
+                    </div>
+                    {folgaIds.length > 0 && (
+                      <div className="px-1.5 pb-1 flex flex-wrap gap-0.5 shrink-0 border-t border-border/20 pt-0.5">
+                        {folgaIds.map(tid => {
+                          const tec = tecnicos.find(t => t.id === tid)
+                          return tec ? <span key={tid} className="text-[8px] px-1 py-0.5 rounded bg-orange-400/10 text-orange-400/80 border border-orange-400/20">{tec.nome.split(' ')[0]}</span> : null
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ════ VISTA MÊS ════ */}
+        {vista === 'mes' && (
+          <div className="flex h-full overflow-hidden">
+            {/* Calendário */}
+            <div className="flex-1 overflow-auto p-4">
+              {/* Cabeçalho dias da semana */}
+              <div className="grid grid-cols-7 gap-1 mb-1">
+                {['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(d => (
+                  <div key={d} className="text-center text-[10px] font-bold text-accent-subtle py-1">{d}</div>
+                ))}
+              </div>
+              {/* Grid do calendário */}
+              {(() => {
+                const primeiro = parseISO(anoMes + '-01')
+                const lun0 = startOfWeek(startOfMonth(primeiro), { weekStartsOn: 1 })
+                const dom6 = endOfWeek(endOfMonth(primeiro), { weekStartsOn: 1 })
+                const celulas = []
+                let cur = lun0
+                while (cur <= dom6) { celulas.push(isoData(cur)); cur = addDays(cur, 1) }
+                const semanas = []
+                for (let i = 0; i < celulas.length; i += 7) semanas.push(celulas.slice(i, i + 7))
+                return semanas.map((semana, si) => (
+                  <div key={si} className="grid grid-cols-7 gap-1 mb-1">
+                    {semana.map(dataStr => {
+                      const grupo = linhasBrutas.find(g => g.dataStr === dataStr) ?? { linhas: [], folgas: [] }
+                      const linhasDia = grupo.linhas.filter(l => l.ev !== null && (!filtroEspaco || l.espaco_id === filtroEspaco))
+                      const folgaIds  = folgasIdx[dataStr] ?? []
+                      const lmdTecsDia = lmdPorDia[dataStr] ?? []
+                      const isHoje    = dataStr === hojeStr
+                      const isNoMes   = dataStr >= dataInicio && dataStr <= dataFim
+                      return (
+                        <div key={dataStr} onClick={() => setModalDia(dataStr)}
+                          className={clsx(
+                            'rounded-xl border cursor-pointer transition-all min-h-[80px] p-1.5 flex flex-col gap-0.5',
+                            isHoje ? 'border-accent/40 bg-accent/[0.04]' : isNoMes ? 'border-border bg-surface-1 hover:bg-surface-2' : 'border-border/20 bg-transparent opacity-30 pointer-events-none',
+                          )}>
+                          <p className={clsx('text-[10px] font-bold mb-0.5', isHoje ? 'text-amber-400' : 'text-accent-subtle')}>{parseInt(dataStr.slice(-2))}</p>
+                          {lmdTecsDia.length > 0 && (
+                            <div className="flex gap-0.5 flex-wrap mb-0.5">
+                              {lmdTecsDia.slice(0, 2).map(tid => {
+                                const tec = tecnicos.find(t => t.id === tid)
+                                const cor = tecCorMap[tid]
+                                return tec ? <span key={tid} className={clsx('text-[8px] font-bold px-1 rounded border', cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30')}>{tec.nome.split(' ')[0]}</span> : null
+                              })}
+                              {lmdTecsDia.length > 2 && <span className="text-[8px] text-accent-subtle">+{lmdTecsDia.length - 2}</span>}
+                            </div>
+                          )}
+                          {linhasDia.slice(0, 3).map(linha => (
+                            <div key={linha.espaco_id} className="px-1 py-0.5 rounded bg-surface-2 border border-border/40">
+                              <p className="text-[8px] font-bold text-accent-subtle truncate">{linha.espacoNome}</p>
+                              <p className="text-[9px] text-accent truncate">{linha.ev?.evento ?? ''}</p>
+                            </div>
+                          ))}
+                          {linhasDia.length > 3 && <p className="text-[8px] text-accent-subtle/50">+{linhasDia.length - 3} mais</p>}
+                          {folgaIds.length > 0 && (
+                            <div className="flex gap-0.5 flex-wrap mt-auto">
+                              {folgaIds.slice(0, 2).map(tid => {
+                                const tec = tecnicos.find(t => t.id === tid)
+                                return tec ? <span key={tid} className="text-[8px] px-0.5 rounded bg-orange-400/10 text-orange-400/70">{tec.nome.split(' ')[0]}</span> : null
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))
+              })()}
+            </div>
+
+            {/* Painel de técnicos (arrastar para atribuir) */}
+            <div className="w-36 shrink-0 border-l border-border overflow-y-auto p-3 flex flex-col gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-1">Técnicos</p>
+              {tecnicos.map(t => {
+                const cor = tecCorMap[t.id]
+                const isDraggingThis = dragSource?.tecnicoId === t.id && dragSource?.dropKey === null
+                return (
+                  <div key={t.id}
+                    draggable
+                    onDragStart={e => {
+                      e.dataTransfer.effectAllowed = 'move'
+                      const paletteSrc = { dropKey: null, tecnicoId: t.id, eventoId: null, agId: null }
+                      dragSourceRef.current = paletteSrc
+                      setDragSource(paletteSrc)
+                      e.dataTransfer.setData('tecnicoId', t.id)
+                      e.dataTransfer.setData('eventoId', '')
+                      e.dataTransfer.setData('dropKey', '')
+                    }}
+                    onDragEnd={() => { dragSourceRef.current = null; setDragSource(null) }}
+                    className={clsx(
+                      'px-2 py-1.5 rounded-lg border text-xs font-semibold cursor-grab active:cursor-grabbing select-none transition-opacity',
+                      cor?.chip ?? 'bg-surface-2 text-accent-muted border-border',
+                      isDraggingThis && 'opacity-40'
+                    )}
+                  >
+                    {t.nome}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ════ VISTA OCORRÊNCIAS ════ */}
+        {vista === 'ocorrencias' && (
+          <div className="flex-1 flex items-center justify-center flex-col gap-3 text-accent-subtle/40">
+            <AlignJustify size={32} className="opacity-30" />
+            <p className="text-sm font-medium">Ocorrências — Em breve</p>
+          </div>
         )}
 
         {/* ════ VISTA ESTATÍSTICAS ════ */}
@@ -1433,6 +1691,34 @@ export function ApoioTecnico() {
         onFechar={() => setModalEditEvento(null)}
         onGuardado={() => { setModalEditEvento(null); carregarComScroll() }}
       />
+
+      {/* Modal Dia (vista mês) */}
+      {modalDia && (
+        <ModalDia
+          dataStr={modalDia}
+          tecnicos={tecnicos}
+          tecCorMap={tecCorMap}
+          lmdPorDia={lmdPorDia}
+          linhasBrutas={linhasBrutas}
+          folgasIdx={folgasIdx}
+          onFechar={() => setModalDia(null)}
+          onNavegar={delta => {
+            const next = isoData(addDays(parseISO(modalDia), delta))
+            setModalDia(next)
+          }}
+          onEditEvento={ev => { setModalDia(null); setModalEditEvento(ev) }}
+          onAtribuir={linha => {
+            setModalDia(null)
+            setModalAtrib({
+              data: linha.dataStr, espaco_id: linha.espaco_id,
+              espaco: linha.espacoNome, agendamento: linha.ag,
+              evento: linha.ev, dj: linha.djs?.join(', '),
+              tecIds: linha.tecIds,
+            })
+          }}
+          onNovoEvento={data => { setModalDia(null); setModalEditEvento({ data_evento: data }) }}
+        />
+      )}
 
       {/* Modal conflito drag & drop */}
       {conflitoDrag && (
