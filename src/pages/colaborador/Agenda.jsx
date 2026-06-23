@@ -288,32 +288,44 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Day strip — grid fixo 7 colunas para garantir que o Domingo aparece */}
-        <div className="shrink-0 grid grid-cols-7 gap-0.5 px-2 py-2 border-b border-border/40">
+        {/* Day strip — uma linha por dia: TER 24 • + traços folga */}
+        <div className="shrink-0 grid grid-cols-7 px-1 py-1.5 border-b border-border/40 gap-0.5">
           {semana7.map(dataStr => {
-            const dt     = parseISO(dataStr)
-            const isHoje = dataStr === hojeStr
-            const isSel  = dataStr === diaSeleccionado
-            const temEvs = (eventosPorDia[dataStr] ?? []).length > 0
+            const dt       = parseISO(dataStr)
+            const isHoje   = dataStr === hojeStr
+            const isSel    = dataStr === diaSeleccionado
+            const temEvs   = (eventosPorDia[dataStr] ?? []).length > 0
+            const folgaIds = folgasIdx?.[dataStr] ?? []
             return (
               <button key={dataStr} onClick={() => setDiaSeleccionado(dataStr)}
                 className={clsx(
-                  'flex flex-col items-center gap-0.5 py-1.5 rounded-xl border transition-all',
+                  'flex flex-col items-center gap-0.5 py-1 rounded-lg border transition-all',
                   isSel ? 'bg-amber-400/15 border-amber-400/40 text-amber-400'
                     : isHoje ? 'bg-surface-2 border-amber-400/20 text-accent'
                     : 'bg-surface-2/40 border-border/40 text-accent-subtle hover:text-accent',
                 )}>
-                <span className="text-[10px] font-semibold uppercase">{NOMES_DIA_ABREV[dt.getDay()]}</span>
-                <span className={clsx('w-6 h-6 flex items-center justify-center rounded-full text-[13px] font-black', isHoje && !isSel && 'text-amber-400')}>
+                {/* Dia abrev + número na mesma linha */}
+                <span className="text-[10px] font-bold uppercase leading-none">{NOMES_DIA_ABREV[dt.getDay()]}</span>
+                <span className={clsx('text-[13px] font-black leading-none', isHoje && !isSel && 'text-amber-400')}>
                   {dt.getDate()}
                 </span>
+                {/* Dot evento */}
                 {temEvs && <span className={clsx('w-1 h-1 rounded-full', isSel ? 'bg-amber-400' : 'bg-accent-subtle/50')} />}
+                {/* Traços folga */}
+                {folgaIds.length > 0 && (
+                  <div className="flex gap-0.5 w-full px-1 mt-0.5">
+                    {folgaIds.map(tid => {
+                      const cor = tecCorMap[tid]
+                      return <span key={tid} className={clsx('h-0.5 flex-1 rounded-full', cor?.dot ?? 'bg-accent-subtle/40')} />
+                    })}
+                  </div>
+                )}
               </button>
             )
           })}
         </div>
-        {/* Detalhe */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
+        {/* Detalhe — min-h-0 garante scroll quando muitos cards */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-2">
           {temMeuLmd && <PillLmd onClick={() => onLmdClick(diaSeleccionado)} comBotao={false} />}
           {evsDia.length === 0 && !temMeuLmd
             ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos.</p>
@@ -339,21 +351,34 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
 
   // Landscape: 7 cards lado a lado
   return (
-    <div className="flex-1 flex overflow-x-auto">
+    <div className="flex-1 flex">
       {semana7.map(dataStr => {
         const dt        = parseISO(dataStr)
         const isHoje    = dataStr === hojeStr
         const evs       = eventosPorDia[dataStr] ?? []
         const temMeuLmd = (lmdPorDia[dataStr] ?? []).includes(colaborador?.id)
+        const folgaIds  = folgasIdx?.[dataStr] ?? []
         return (
           <div key={dataStr}
             className={clsx(
-              'flex-1 min-w-[120px] border-r border-border/30 last:border-r-0 flex flex-col',
+              'flex-1 min-w-[100px] border-r border-border/30 last:border-r-0 flex flex-col',
               isHoje && 'bg-amber-400/[0.03]',
             )}>
-            <div className={clsx('px-2 py-1.5 border-b border-border/30 text-center', isHoje ? 'bg-amber-400/10' : 'bg-surface-2/40')}>
-              <p className="text-[12px] font-bold text-accent-subtle uppercase">{NOMES_DIA_ABREV[dt.getDay()]}</p>
-              <p className={clsx('text-[13px] font-black', isHoje ? 'text-amber-400' : 'text-accent')}>{dt.getDate()}</p>
+            <div className={clsx('px-2 py-1 border-b border-border/30', isHoje ? 'bg-amber-400/10' : 'bg-surface-2/40')}>
+              {/* TER 24 numa linha */}
+              <p className={clsx('text-[12px] font-black', isHoje ? 'text-amber-400' : 'text-accent-subtle')}>
+                <span className="uppercase">{NOMES_DIA_ABREV[dt.getDay()]}</span>
+                {' '}{dt.getDate()}
+              </p>
+              {/* Traços folga */}
+              {folgaIds.length > 0 && (
+                <div className="flex gap-0.5 mt-0.5">
+                  {folgaIds.map(tid => {
+                    const cor = tecCorMap[tid]
+                    return <span key={tid} className={clsx('h-0.5 flex-1 rounded-full', cor?.dot ?? 'bg-accent-subtle/40')} />
+                  })}
+                </div>
+              )}
             </div>
             <div className="flex-1 flex flex-col gap-1 p-1 overflow-y-auto">
               {temMeuLmd && <PillLmd onClick={() => onLmdClick(dataStr)} />}
@@ -584,44 +609,47 @@ export function ColaboradorAgenda() {
   return (
     <div className="flex flex-col flex-1 min-h-0" style={{ height: paisagem ? '100dvh' : 'calc(100svh - 112px)' }}>
 
-      {/* Header */}
-      <div className="shrink-0 border-b border-border/40">
-        {/* Tabs + filtro */}
-        <div className="flex items-center px-4 pt-2 gap-1 border-b border-border/30">
-          {[
-            { id: 'mes',    label: 'Mês',    Ic: CalendarRange },
-            { id: 'semana', label: 'Semana', Ic: CalendarDays },
-            { id: 'dia',    label: 'Dia',    Ic: List },
-          ].map(({ id, label, Ic }) => (
-            <button key={id} onClick={() => setVista(id)}
-              className={clsx(
-                'flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors',
-                vista === id ? 'border-amber-400 text-amber-400' : 'border-transparent text-accent-muted hover:text-accent',
-              )}>
-              <Ic size={13} />
-              {label}
-            </button>
-          ))}
-          <button onClick={() => setFiltroMeu(v => !v)}
+      {/* Header — tudo numa linha */}
+      <div className="shrink-0 border-b border-border/40 px-3 py-1.5 flex items-center gap-1">
+        {/* Tabs */}
+        {[
+          { id: 'mes',    label: 'Mês',    Ic: CalendarRange },
+          { id: 'semana', label: 'Semana', Ic: CalendarDays },
+          { id: 'dia',    label: 'Dia',    Ic: List },
+        ].map(({ id, label, Ic }) => (
+          <button key={id} onClick={() => setVista(id)}
             className={clsx(
-              'ml-auto flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[13px] font-semibold transition-colors',
-              filtroMeu
+              'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors border',
+              vista === id
                 ? 'bg-amber-400/15 border-amber-400/30 text-amber-400'
-                : 'bg-surface-2 border-border text-accent-muted hover:text-accent',
+                : 'border-transparent text-accent-muted hover:text-accent',
             )}>
-            <Star size={13} className={filtroMeu ? 'fill-amber-400' : ''} />
+            <Ic size={12} />
+            {label}
           </button>
-        </div>
+        ))}
+
+        {/* Filtro ⭐ */}
+        <button onClick={() => setFiltroMeu(v => !v)}
+          className={clsx(
+            'flex items-center px-2.5 py-1.5 rounded-lg border text-[12px] font-semibold transition-colors',
+            filtroMeu
+              ? 'bg-amber-400/15 border-amber-400/30 text-amber-400'
+              : 'border-transparent text-accent-muted hover:text-accent',
+          )}>
+          <Star size={12} className={filtroMeu ? 'fill-amber-400' : ''} />
+        </button>
+
         {/* Navegação */}
-        <div className="flex items-center justify-between px-4 py-2">
+        <div className="ml-auto flex items-center gap-1.5">
           <button onClick={() => vista === 'mes' ? navegar(-1) : vista === 'semana' ? navSemana(-1) : navDia(-1)}
-            className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
-            <ChevronLeft size={14} />
+            className="p-1 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
+            <ChevronLeft size={13} />
           </button>
-          <span className="text-[15px] font-bold text-accent capitalize">{navLabel}</span>
+          <span className="text-[13px] font-bold text-accent capitalize min-w-[90px] text-center">{navLabel}</span>
           <button onClick={() => vista === 'mes' ? navegar(1) : vista === 'semana' ? navSemana(1) : navDia(1)}
-            className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
-            <ChevronRight size={14} />
+            className="p-1 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
+            <ChevronRight size={13} />
           </button>
         </div>
       </div>
