@@ -340,13 +340,12 @@ export function ColaboradorAgenda() {
   const [lmdAberto, setLmdAberto]     = useState(null)
   const [loading, setLoading]         = useState(true)
 
-  const [paisagem, setPaisagem] = useState(() =>
-    typeof window !== 'undefined' && window.innerWidth > window.innerHeight && window.innerWidth < 768
-  )
+  const isPaisagem = () => typeof window !== 'undefined' && window.innerWidth > window.innerHeight
+  const [paisagem, setPaisagem] = useState(isPaisagem)
   useEffect(() => {
-    const fn = () => setPaisagem(window.innerWidth > window.innerHeight && window.innerWidth < 768)
+    const fn = () => setPaisagem(isPaisagem())
     window.addEventListener('resize', fn)
-    window.addEventListener('orientationchange', fn)
+    window.addEventListener('orientationchange', () => setTimeout(fn, 100))
     return () => { window.removeEventListener('resize', fn); window.removeEventListener('orientationchange', fn) }
   }, [])
 
