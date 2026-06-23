@@ -55,9 +55,7 @@ function PillEvento({ ev, espaco, meu, tecNome, tecCor, compact = false, onClick
         </span>
       </div>
       {/* Linha 2: nome do evento */}
-      {!compact && (
-        <p className="text-[12px] text-accent-muted truncate mt-0.5">{ev.evento}</p>
-      )}
+      <p className={clsx('truncate mt-0.5', compact ? 'text-[11px] text-accent-subtle' : 'text-[12px] text-accent-muted')}>{ev.evento}</p>
       {/* Linha 3: horários */}
       {(instalar || inicio) && (
         <div className="flex items-center gap-1.5 mt-1" style={{ fontSize: 10, color: '#64748b' }}>
