@@ -310,7 +310,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               <button onClick={assinarEvento} disabled={assinandoEvento}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-green-400/30 bg-green-400/[0.07] text-green-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
                 <PenLine size={13} />
-                {assinandoEvento ? 'A registar…' : 'Início de Evento'}
+                {assinandoEvento ? 'A registar…' : 'In Evento'}
               </button>
             )}
             {isResponsavel && pres.status === 'signed' && pres.presenca ? (

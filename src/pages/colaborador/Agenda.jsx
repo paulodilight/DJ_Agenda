@@ -501,7 +501,7 @@ export function ColaboradorAgenda() {
   if (loading) return <LoadingPage />
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 112px)' }}>
+    <div className="flex flex-col flex-1 min-h-0" style={{ height: paisagem ? '100dvh' : 'calc(100svh - 112px)' }}>
 
       {/* Header */}
       <div className="shrink-0 border-b border-border/40">
