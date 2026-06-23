@@ -259,19 +259,14 @@ function PillFolgaCard({ folgaIds, tecnicos, tecCorMap, compact = false }) {
         const cor = tecCorMap[tid]
         return (
           <div key={tid} className={clsx(
-            'rounded-lg border transition-all',
+            'rounded-lg border flex items-center justify-between gap-1 min-w-0 transition-all',
             cor?.chip ?? 'border-border bg-surface-2/60',
-            compact ? 'px-2 py-1.5' : 'px-3 py-2',
+            compact ? 'px-2 py-1' : 'px-3 py-1.5',
           )}>
-            <div className="flex items-center justify-between gap-1 min-w-0">
-              <span className={clsx('font-bold truncate', cor?.text ?? 'text-accent-muted', compact ? 'text-[12px]' : 'text-[13px]')}>
-                Folga
-              </span>
-              <NomeBadge nome={tec.nome} cor={cor} />
-            </div>
-            <p className={clsx('mt-0.5', cor?.text ?? 'text-accent-subtle', 'opacity-60', compact ? 'text-[10px]' : 'text-[11px]')}>
+            <span className={clsx('font-bold truncate', cor?.text ?? 'text-accent-muted', compact ? 'text-[11px]' : 'text-[12px]')}>
               Boa folga!
-            </p>
+            </span>
+            <NomeBadge nome={tec.nome} cor={cor} />
           </div>
         )
       })}
