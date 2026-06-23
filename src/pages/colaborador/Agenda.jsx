@@ -47,9 +47,9 @@ function PillEvento({ ev, espaco, meu, tecNome, tecCor, compact = false, onClick
             </span>
           )}
           {tecNome && (
-            <span className="flex items-center gap-0.5" style={{ fontSize: 10 }}>
-              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: tecCor?.dot ?? '#94a3b8' }} />
-              <span className="font-semibold" style={{ color: tecCor?.text ?? '#94a3b8' }}>{tecNome.split(' ')[0]}</span>
+            <span className="flex items-center gap-0.5 text-[10px]">
+              <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', tecCor?.dot ?? 'bg-slate-400')} />
+              <span className={clsx('font-semibold', tecCor?.text ?? 'text-slate-400')}>{tecNome.split(' ')[0]}</span>
             </span>
           )}
         </span>
