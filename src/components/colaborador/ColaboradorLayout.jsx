@@ -85,7 +85,10 @@ export function ColaboradorLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-0 text-accent flex flex-col">
+    <div className={clsx(
+      'bg-surface-0 text-accent flex flex-col',
+      mostrarChrome ? 'min-h-screen' : 'h-dvh overflow-hidden'
+    )}>
 
       {/* ── Header: logo + acções ── */}
       <header className={clsx(
