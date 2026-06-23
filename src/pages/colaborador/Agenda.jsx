@@ -223,8 +223,8 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Day strip */}
-        <div className="shrink-0 flex gap-1 px-3 py-2 border-b border-border/40 overflow-x-auto">
+        {/* Day strip — grid fixo 7 colunas para garantir que o Domingo aparece */}
+        <div className="shrink-0 grid grid-cols-7 gap-0.5 px-2 py-2 border-b border-border/40">
           {semana7.map(dataStr => {
             const dt     = parseISO(dataStr)
             const isHoje = dataStr === hojeStr
@@ -233,13 +233,13 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
             return (
               <button key={dataStr} onClick={() => setDiaSeleccionado(dataStr)}
                 className={clsx(
-                  'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl border transition-all shrink-0',
+                  'flex flex-col items-center gap-0.5 py-1.5 rounded-xl border transition-all',
                   isSel ? 'bg-amber-400/15 border-amber-400/40 text-amber-400'
                     : isHoje ? 'bg-surface-2 border-amber-400/20 text-accent'
                     : 'bg-surface-2/40 border-border/40 text-accent-subtle hover:text-accent',
                 )}>
-                <span className="text-[12px] font-semibold uppercase">{NOMES_DIA_ABREV[dt.getDay()]}</span>
-                <span className={clsx('w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-black', isHoje && !isSel && 'text-amber-400')}>
+                <span className="text-[10px] font-semibold uppercase">{NOMES_DIA_ABREV[dt.getDay()]}</span>
+                <span className={clsx('w-6 h-6 flex items-center justify-center rounded-full text-[13px] font-black', isHoje && !isSel && 'text-amber-400')}>
                   {dt.getDate()}
                 </span>
                 {temEvs && <span className={clsx('w-1 h-1 rounded-full', isSel ? 'bg-amber-400' : 'bg-accent-subtle/50')} />}
