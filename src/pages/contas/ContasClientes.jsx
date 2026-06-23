@@ -1649,7 +1649,8 @@ export function ContasClientes() {
   const [espacoAtivo, setEspacoAtivo] = useState(null)
   const [pesquisa, setPesquisa]       = useState('')
   const [layoutView, setLayoutView]   = useState(() => localStorage.getItem('contasClientes_layout') ?? 'prev')
-  const [mostrarPrevisao, setMostrarPrevisao] = useState({})
+  const [mostrarPrevisao, setMostrarPrevisao]   = useState({})
+  const [verOcorrencias,  setVerOcorrencias]    = useState({})
 
   const { dataInicio, dataFim, mes } = useMemo(() => {
     const [ano, mesN] = anoMes.split('-').map(Number)
@@ -1719,6 +1720,11 @@ export function ContasClientes() {
       espacos.forEach(e => { next[e.id] = e.mostrar_previsao ?? false })
       return next
     })
+    setVerOcorrencias(prev => {
+      const next = {}
+      espacos.forEach(e => { next[e.id] = e.operator_ver_ocorrencias ?? false })
+      return next
+    })
   }, [espacos])
 
   const handleCardChange = useCallback((id, state) => setCards(p => ({ ...p, [id]: state })), [])
@@ -1728,6 +1734,12 @@ export function ContasClientes() {
     setMostrarPrevisao(prev => ({ ...prev, [id]: !atual }))
     await supabase.from('espacos').update({ mostrar_previsao: !atual }).eq('id', id)
   }, [mostrarPrevisao])
+
+  const toggleVerOcorrencias = useCallback(async (id) => {
+    const atual = verOcorrencias[id] ?? false
+    setVerOcorrencias(prev => ({ ...prev, [id]: !atual }))
+    await supabase.from('espacos').update({ operator_ver_ocorrencias: !atual }).eq('id', id)
+  }, [verOcorrencias])
 
   const handleSave = useCallback(async (espacoId) => {
     const card = cards[espacoId]; if (!card) return
@@ -1860,6 +1872,17 @@ export function ContasClientes() {
               )}>
               {mostrarPrevisao[espacoAtivo] ? <Eye size={12} /> : <EyeOff size={12} />}
               {mostrarPrevisao[espacoAtivo] ? 'Financeiro visível' : 'Financeiro oculto'}
+            </button>
+            <button
+              onClick={() => toggleVerOcorrencias(espacoAtivo)}
+              className={clsx(
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-[11px] font-medium border transition-colors',
+                verOcorrencias[espacoAtivo]
+                  ? 'bg-amber-400/15 border-amber-400/30 text-amber-400'
+                  : 'bg-surface-2 border-border text-accent-muted hover:text-accent'
+              )}>
+              <AlertTriangle size={12} />
+              {verOcorrencias[espacoAtivo] ? 'Ocorrências on' : 'Ocorrências off'}
             </button>
             <div className="flex items-center gap-0.5 bg-surface-2 border border-border rounded p-0.5">
               {[
