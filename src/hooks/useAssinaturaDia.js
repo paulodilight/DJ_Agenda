@@ -11,6 +11,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
+/** Obtém posição GPS. Se recusar/falhar, resolve com nulls (assinatura grava na mesma). */
+function obterPosicao() {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve({ latitude: null, longitude: null })
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      ()    => resolve({ latitude: null, longitude: null }),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
+  })
+}
+
 const LMD_ESPACO_ID = '299fc621-afe2-42c9-ba87-5c7080f2a32d'
 
 const hojeISO = () => {
@@ -112,8 +127,10 @@ export function useAssinaturaDia(tecnicoId) {
 
   const registar = useCallback(async (tipo, { eventoId = null, agendamentoId = null } = {}) => {
     if (!tecnicoId) return
+    const { latitude, longitude } = await obterPosicao()
     await supabase.from('assinaturas_tecnico').insert({
       tecnico_id: tecnicoId, evento_id: eventoId, agendamento_id: agendamentoId, tipo,
+      latitude, longitude,
     })
     setVersao(v => v + 1)
   }, [tecnicoId])
