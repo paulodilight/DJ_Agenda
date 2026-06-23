@@ -306,9 +306,9 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
                 </span>
                 {/* Dot evento */}
                 {temEvs && <span className={clsx('w-1 h-1 rounded-full', isSel ? 'bg-amber-400' : 'bg-accent-subtle/50')} />}
-                {/* Traços folga */}
+                {/* Linhas de folga — abaixo do dot */}
                 {folgaIds.length > 0 && (
-                  <div className="flex gap-0.5 w-full px-1 mt-0.5">
+                  <div className="flex gap-0.5 w-full px-1">
                     {folgaIds.map(tid => {
                       const cor = tecCorMap[tid]
                       return <span key={tid} className={clsx('h-0.5 flex-1 rounded-full', cor?.dot ?? 'bg-accent-subtle/40')} />
@@ -365,12 +365,12 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
                 <span className="uppercase">{NOMES_DIA_ABREV[dt.getDay()]}</span>
                 {' '}{dt.getDate()}
               </p>
-              {/* Traços folga */}
+              {/* Dots folga alinhados com o dot do evento */}
               {folgaIds.length > 0 && (
                 <div className="flex gap-0.5 mt-0.5">
                   {folgaIds.map(tid => {
                     const cor = tecCorMap[tid]
-                    return <span key={tid} className={clsx('h-0.5 flex-1 rounded-full', cor?.dot ?? 'bg-accent-subtle/40')} />
+                    return <span key={tid} className={clsx('w-1 h-1 rounded-full shrink-0', cor?.dot ?? 'bg-accent-subtle/40')} />
                   })}
                 </div>
               )}
