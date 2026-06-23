@@ -23,6 +23,7 @@ export function useEspacos({ todos = false, anoMes = null } = {}) {
 
       // Clientes com calendário semanal configurado
       const comCalendario = data.filter(e =>
+        e.modo_livre === true ||
         (e.turnos_espaco ?? []).some(t => t.dias_semana?.length > 0)
       )
 

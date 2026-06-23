@@ -4,6 +4,7 @@ import { pt } from 'date-fns/locale'
 import {
   Save, Search, X, Plus, Trash2, ChevronRight, ChevronsDown,
   MessageSquare, Link2, Check, Calendar, ExternalLink, Printer, AlertTriangle,
+  Eye, EyeOff,
 } from 'lucide-react'
 import { useMesStore } from '@/store'
 import { useEspacos } from '@/hooks/useEspacos'
@@ -1648,6 +1649,7 @@ export function ContasClientes() {
   const [espacoAtivo, setEspacoAtivo] = useState(null)
   const [pesquisa, setPesquisa]       = useState('')
   const [layoutView, setLayoutView]   = useState(() => localStorage.getItem('contasClientes_layout') ?? 'prev')
+  const [mostrarPrevisao, setMostrarPrevisao] = useState({})
 
   const { dataInicio, dataFim, mes } = useMemo(() => {
     const [ano, mesN] = anoMes.split('-').map(Number)
@@ -1710,7 +1712,22 @@ export function ContasClientes() {
 
   useEffect(() => { if (!loadingEspacos) carregar() }, [carregar, loadingEspacos])
 
+  useEffect(() => {
+    if (espacos.length === 0) return
+    setMostrarPrevisao(prev => {
+      const next = {}
+      espacos.forEach(e => { next[e.id] = e.mostrar_previsao ?? false })
+      return next
+    })
+  }, [espacos])
+
   const handleCardChange = useCallback((id, state) => setCards(p => ({ ...p, [id]: state })), [])
+
+  const togglePrevisao = useCallback(async (id) => {
+    const atual = mostrarPrevisao[id] ?? false
+    setMostrarPrevisao(prev => ({ ...prev, [id]: !atual }))
+    await supabase.from('espacos').update({ mostrar_previsao: !atual }).eq('id', id)
+  }, [mostrarPrevisao])
 
   const handleSave = useCallback(async (espacoId) => {
     const card = cards[espacoId]; if (!card) return
@@ -1832,21 +1849,34 @@ export function ContasClientes() {
         ))}
 
         {espacoAtivo !== null && (
-          <div className="ml-auto flex items-center gap-0.5 bg-surface-2 border border-border rounded p-0.5">
-            {[
-              { id: 'prev',        label: 'Previsão' },
-              { id: 'prev-agenda', label: 'Prev. + Agenda' },
-              { id: 'conf',        label: 'Confirmação' },
-              { id: 'conf-agenda', label: 'Conf. + Agenda' },
-            ].map(opt => (
-              <button key={opt.id}
-                onClick={() => { setLayoutView(opt.id); localStorage.setItem('contasClientes_layout', opt.id) }}
-                className={clsx('px-2.5 py-1 rounded text-[11px] transition-colors',
-                  layoutView === opt.id ? 'bg-surface-3 text-accent font-medium' : 'text-accent-subtle hover:text-accent'
-                )}>
-                {opt.label}
-              </button>
-            ))}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => togglePrevisao(espacoAtivo)}
+              className={clsx(
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-[11px] font-medium border transition-colors',
+                mostrarPrevisao[espacoAtivo]
+                  ? 'bg-surface-3 border-white/20 text-accent'
+                  : 'bg-surface-2 border-border text-accent-muted hover:text-accent'
+              )}>
+              {mostrarPrevisao[espacoAtivo] ? <Eye size={12} /> : <EyeOff size={12} />}
+              {mostrarPrevisao[espacoAtivo] ? 'Financeiro visível' : 'Financeiro oculto'}
+            </button>
+            <div className="flex items-center gap-0.5 bg-surface-2 border border-border rounded p-0.5">
+              {[
+                { id: 'prev',        label: 'Previsão' },
+                { id: 'prev-agenda', label: 'Prev. + Agenda' },
+                { id: 'conf',        label: 'Confirmação' },
+                { id: 'conf-agenda', label: 'Conf. + Agenda' },
+              ].map(opt => (
+                <button key={opt.id}
+                  onClick={() => { setLayoutView(opt.id); localStorage.setItem('contasClientes_layout', opt.id) }}
+                  className={clsx('px-2.5 py-1 rounded text-[11px] transition-colors',
+                    layoutView === opt.id ? 'bg-surface-3 text-accent font-medium' : 'text-accent-subtle hover:text-accent'
+                  )}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {espacoAtivo === null && (

@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, Save, ChevronLeft, ChevronRight, ImageIcon, X, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, ChevronLeft, ChevronRight, ImageIcon, X, ExternalLink, Zap } from 'lucide-react'
 import { espacosApi, turnosApi, djsFixosApi, espacoDjPreferenciasApi, turnoValoresDiaApi, categoriasDjApi, turnoCategoriaApi } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { useDJs } from '@/hooks/useDJs'
@@ -68,6 +68,7 @@ export function EspacoPerfil() {
     pin_operator_admin: '', pin_operator_user: '',
     pin_manager_admin: '', pin_manager_user: '',
     pin_marketing_admin: '', pin_marketing_user: '',
+    modo_livre: false,
   })
   const [logoUploading, setLogoUploading] = useState(false)
 
@@ -122,6 +123,7 @@ export function EspacoPerfil() {
         pin_manager_user: data.pin_manager_user ?? '',
         pin_marketing_admin: data.pin_marketing_admin ?? '',
         pin_marketing_user: data.pin_marketing_user ?? '',
+        modo_livre: data.modo_livre ?? false,
       })
 
       const turnosCarregados = data.turnos?.length > 0
@@ -534,6 +536,31 @@ export function EspacoPerfil() {
             </div>
             <Textarea label="Notas / regras do Cliente" value={form.notas} onChange={setField('notas')} placeholder="Regras específicas, preferências..." />
             <Textarea label="Notas Gerais para o DJ" value={form.notas_gerais} onChange={setField('notas_gerais')} placeholder="Informações que o DJ vê na sua app: rider, parqueamento, contactos, regras do espaço…" rows={5} />
+
+            {/* ── Modo livre (sem turnos) ── */}
+            <div className="flex items-center justify-between rounded-xl border border-border bg-surface-1 px-4 py-3">
+              <div>
+                <p className="text-xs font-medium text-accent">Modo livre · sem turnos</p>
+                <p className="text-[11px] text-accent-subtle mt-0.5">
+                  {form.modo_livre
+                    ? 'Este espaço aparece na Agenda e Contas sem necessitar de turnos configurados.'
+                    : 'Activa para espaços sem calendário semanal fixo (ex: Xclusive).'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, modo_livre: !f.modo_livre }))}
+                className={clsx(
+                  'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition-colors',
+                  form.modo_livre
+                    ? 'border-gold-500/40 bg-gold-500/10 text-gold-400 hover:bg-gold-500/20'
+                    : 'border-border bg-surface-2 text-accent-muted hover:text-accent'
+                )}
+              >
+                <Zap size={11} />
+                {form.modo_livre ? 'Activo' : 'Inactivo'}
+              </button>
+            </div>
           </CardBody>
         </Card>
 
