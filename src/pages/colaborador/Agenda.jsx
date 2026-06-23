@@ -179,17 +179,24 @@ function VistaMes({ anoMes, dias, eventosPorDia, lmdPorDia, meusIds, espacosIdx,
                   {evs.slice(0, 2).map(ev => {
                     const meu    = meusIds.has(ev.id)
                     const espaco = espacosIdx[ev.espaco_id]?.nome ?? ''
+                    const tecIds = evTecIdx[ev.id] ?? (ev.tecnico_id ? [ev.tecnico_id] : [])
                     return (
                       <button key={ev.id}
                         onClick={e => { e.stopPropagation(); onEventoClick(ev) }}
                         className={clsx(
-                          'w-full text-left rounded px-1 py-0.5 truncate leading-none border transition-colors',
+                          'w-full text-left rounded px-1 py-0.5 leading-none border transition-colors',
                           meu
                             ? 'bg-amber-400/10 border-amber-400/20 text-amber-300'
                             : 'bg-surface-3/60 border-border/40 text-accent-subtle',
                         )}
                         style={{ fontSize: 9 }}>
-                        {espaco || ev.evento}
+                        <span className="flex items-center gap-0.5">
+                          {tecIds.slice(0, 2).map(tid => {
+                            const cor = tecCorMap[tid]
+                            return cor ? <span key={tid} className={clsx('w-1.5 h-1.5 rounded-full shrink-0', cor.dot)} /> : null
+                          })}
+                          <span className="truncate">{espaco || ev.evento}</span>
+                        </span>
                       </button>
                     )
                   })}
