@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   startOfWeek, endOfWeek, addDays, addWeeks, subWeeks,
@@ -37,17 +37,17 @@ function PillEvento({ ev, espaco, meu, tecNome, tecCor, compact = false, onClick
       )}>
       {/* Linha 1: espaço + técnico */}
       <div className="flex items-center justify-between gap-1 min-w-0">
-        <span className={clsx('font-bold truncate text-accent', compact ? 'text-[11px]' : 'text-xs')}>
+        <span className={clsx('font-bold truncate text-accent', compact ? 'text-[12px]' : 'text-[13px]')}>
           {espaco}
         </span>
         <span className="flex items-center gap-1 shrink-0">
           {meu && (
-            <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded px-1 py-0.5 leading-none">
+            <span className="text-[12px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded px-1 py-0.5 leading-none">
               Meu
             </span>
           )}
           {tecNome && (
-            <span className="flex items-center gap-0.5 text-[10px]">
+            <span className="flex items-center gap-0.5 text-[12px]">
               <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', tecCor?.dot ?? 'bg-slate-400')} />
               <span className={clsx('font-semibold', tecCor?.text ?? 'text-slate-400')}>{tecNome.split(' ')[0]}</span>
             </span>
@@ -56,7 +56,7 @@ function PillEvento({ ev, espaco, meu, tecNome, tecCor, compact = false, onClick
       </div>
       {/* Linha 2: nome do evento */}
       {!compact && (
-        <p className="text-[11px] text-accent-muted truncate mt-0.5">{ev.evento}</p>
+        <p className="text-[12px] text-accent-muted truncate mt-0.5">{ev.evento}</p>
       )}
       {/* Linha 3: horários */}
       {(instalar || inicio) && (
@@ -77,8 +77,8 @@ function PillLmd({ onClick, comBotao = false }) {
       className="w-full text-left rounded-lg px-2 py-1.5 border border-indigo-500/20 bg-indigo-500/[0.06] hover:border-indigo-500/35 transition-all active:scale-[0.98]">
       <div className="flex items-center gap-1.5">
         <Package size={10} className="text-indigo-400 shrink-0" />
-        <span className="text-[11px] font-bold text-indigo-400">LMD</span>
-        {comBotao && <span className="ml-auto text-[9px] text-indigo-400/60">assinar →</span>}
+        <span className="text-[12px] font-bold text-indigo-400">LMD</span>
+        {comBotao && <span className="ml-auto text-[12px] text-indigo-400/60">assinar →</span>}
       </div>
     </button>
   )
@@ -106,8 +106,8 @@ function ModalLmd({ dataStr, proxima, registar, onFechar }) {
             <Package size={16} className="text-indigo-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-black text-accent text-sm">LMD — Armazém</p>
-            <p className="text-xs text-accent-subtle capitalize">{nomeDia}</p>
+            <p className="font-black text-accent text-[15px]">LMD — Armazém</p>
+            <p className="text-[13px] text-accent-subtle capitalize">{nomeDia}</p>
           </div>
           <button onClick={onFechar}
             className="w-8 h-8 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent transition-colors">
@@ -117,12 +117,12 @@ function ModalLmd({ dataStr, proxima, registar, onFechar }) {
         <div className="px-5 py-4">
           {podeAssinar ? (
             <button onClick={assinar} disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-400/30 bg-red-400/[0.07] text-red-400 text-sm font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-400/30 bg-red-400/[0.07] text-red-400 text-[15px] font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
               <PenLine size={15} />
               {loading ? 'A registar…' : 'Saída LMD'}
             </button>
           ) : (
-            <p className="text-sm text-accent-subtle text-center py-2">Sem ação pendente para o LMD.</p>
+            <p className="text-[15px] text-accent-subtle text-center py-2">Sem ação pendente para o LMD.</p>
           )}
         </div>
       </div>
@@ -146,7 +146,7 @@ function VistaMes({ anoMes, dias, eventosPorDia, lmdPorDia, meusIds, espacosIdx,
     <div className="flex-1 overflow-auto">
       <div className="grid grid-cols-7 border-b border-border/40 bg-surface-1/60 sticky top-0 z-10">
         {['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(d => (
-          <div key={d} className="py-1.5 text-center text-[10px] font-bold text-accent-subtle uppercase tracking-widest">{d}</div>
+          <div key={d} className="py-1.5 text-center text-[12px] font-bold text-accent-subtle uppercase tracking-widest">{d}</div>
         ))}
       </div>
       {semanas.map((semana, si) => (
@@ -165,14 +165,14 @@ function VistaMes({ anoMes, dias, eventosPorDia, lmdPorDia, meusIds, espacosIdx,
                   isHoje && 'bg-amber-400/[0.04]',
                 )}>
                 <div className={clsx(
-                  'w-6 h-6 flex items-center justify-center rounded-full text-[11px] font-bold mb-1 mx-auto',
+                  'w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-bold mb-1 mx-auto',
                   isHoje ? 'bg-amber-400 text-black' : 'text-accent-muted',
                 )}>
                   {dia.getDate()}
                 </div>
                 {temMeuLmd && (
                   <div className="mb-0.5 rounded px-1 py-0.5 bg-indigo-500/[0.08] border border-indigo-500/20">
-                    <span className="text-[9px] font-bold text-indigo-400">LMD</span>
+                    <span className="text-[12px] font-bold text-indigo-400">LMD</span>
                   </div>
                 )}
                 <div className="flex flex-col gap-0.5">
@@ -189,7 +189,7 @@ function VistaMes({ anoMes, dias, eventosPorDia, lmdPorDia, meusIds, espacosIdx,
                             ? 'bg-amber-400/10 border-amber-400/20 text-amber-300'
                             : 'bg-surface-3/60 border-border/40 text-accent-subtle',
                         )}
-                        style={{ fontSize: 9 }}>
+                        style={{ fontSize: 10 }}>
                         <span className="flex items-center gap-0.5">
                           {tecIds.slice(0, 2).map(tid => {
                             const cor = tecCorMap[tid]
@@ -201,7 +201,7 @@ function VistaMes({ anoMes, dias, eventosPorDia, lmdPorDia, meusIds, espacosIdx,
                     )
                   })}
                   {evs.length > 2 && (
-                    <span className="text-[9px] text-accent-subtle/50 text-center">+{evs.length - 2}</span>
+                    <span className="text-[12px] text-accent-subtle/50 text-center">+{evs.length - 2}</span>
                   )}
                 </div>
               </div>
@@ -238,8 +238,8 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
                     : isHoje ? 'bg-surface-2 border-amber-400/20 text-accent'
                     : 'bg-surface-2/40 border-border/40 text-accent-subtle hover:text-accent',
                 )}>
-                <span className="text-[10px] font-semibold uppercase">{NOMES_DIA_ABREV[dt.getDay()]}</span>
-                <span className={clsx('w-7 h-7 flex items-center justify-center rounded-full text-sm font-black', isHoje && !isSel && 'text-amber-400')}>
+                <span className="text-[12px] font-semibold uppercase">{NOMES_DIA_ABREV[dt.getDay()]}</span>
+                <span className={clsx('w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-black', isHoje && !isSel && 'text-amber-400')}>
                   {dt.getDate()}
                 </span>
                 {temEvs && <span className={clsx('w-1 h-1 rounded-full', isSel ? 'bg-amber-400' : 'bg-accent-subtle/50')} />}
@@ -251,7 +251,7 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
         <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
           {temMeuLmd && <PillLmd onClick={() => onLmdClick(diaSeleccionado)} comBotao={false} />}
           {evsDia.length === 0 && !temMeuLmd
-            ? <p className="text-center text-accent-subtle/40 text-sm py-8">Sem eventos.</p>
+            ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos.</p>
             : evsDia.map(ev => {
                 const meu    = meusIds.has(ev.id)
                 const espaco = espacosIdx[ev.espaco_id]?.nome ?? ''
@@ -284,8 +284,8 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
               isHoje && 'bg-amber-400/[0.03]',
             )}>
             <div className={clsx('px-2 py-1.5 border-b border-border/30 text-center', isHoje ? 'bg-amber-400/10' : 'bg-surface-2/40')}>
-              <p className="text-[10px] font-bold text-accent-subtle uppercase">{NOMES_DIA_ABREV[dt.getDay()]}</p>
-              <p className={clsx('text-xs font-black', isHoje ? 'text-amber-400' : 'text-accent')}>{dt.getDate()}</p>
+              <p className="text-[12px] font-bold text-accent-subtle uppercase">{NOMES_DIA_ABREV[dt.getDay()]}</p>
+              <p className={clsx('text-[13px] font-black', isHoje ? 'text-amber-400' : 'text-accent')}>{dt.getDate()}</p>
             </div>
             <div className="flex-1 flex flex-col gap-1 p-1 overflow-y-auto">
               {temMeuLmd && <PillLmd onClick={() => onLmdClick(dataStr)} />}
@@ -315,10 +315,10 @@ function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, meusIds, espacosI
   const nomeDia   = cap(format(parseISO(diaSeleccionado), 'EEEE, d MMMM', { locale: pt }))
   return (
     <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle capitalize mb-1">{nomeDia}</p>
+      <p className="text-[12px] font-bold uppercase tracking-widest text-accent-subtle capitalize mb-1">{nomeDia}</p>
       {temMeuLmd && <PillLmd onClick={() => onLmdClick(diaSeleccionado)} comBotao />}
       {evsDia.length === 0 && !temMeuLmd
-        ? <p className="text-center text-accent-subtle/40 text-sm py-8">Sem eventos neste dia.</p>
+        ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos neste dia.</p>
         : evsDia.map(ev => {
             const meu    = meusIds.has(ev.id)
             const espaco = espacosIdx[ev.espaco_id]?.nome ?? ''
@@ -514,7 +514,7 @@ export function ColaboradorAgenda() {
           ].map(({ id, label, Ic }) => (
             <button key={id} onClick={() => setVista(id)}
               className={clsx(
-                'flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors',
+                'flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors',
                 vista === id ? 'border-amber-400 text-amber-400' : 'border-transparent text-accent-muted hover:text-accent',
               )}>
               <Ic size={13} />
@@ -523,7 +523,7 @@ export function ColaboradorAgenda() {
           ))}
           <button onClick={() => setFiltroMeu(v => !v)}
             className={clsx(
-              'ml-auto flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors',
+              'ml-auto flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[13px] font-semibold transition-colors',
               filtroMeu
                 ? 'bg-amber-400/15 border-amber-400/30 text-amber-400'
                 : 'bg-surface-2 border-border text-accent-muted hover:text-accent',
@@ -538,7 +538,7 @@ export function ColaboradorAgenda() {
             className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
             <ChevronLeft size={14} />
           </button>
-          <span className="text-sm font-bold text-accent capitalize">{navLabel}</span>
+          <span className="text-[15px] font-bold text-accent capitalize">{navLabel}</span>
           <button onClick={() => vista === 'mes' ? navegar(1) : vista === 'semana' ? navSemana(1) : navDia(1)}
             className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
             <ChevronRight size={14} />
@@ -587,3 +587,4 @@ export function ColaboradorAgenda() {
     </div>
   )
 }
+
