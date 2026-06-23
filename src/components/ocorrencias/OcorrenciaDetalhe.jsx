@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Plus, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { X, CheckCircle, Clock, AlertCircle } from 'lucide-react'
 import { clsx } from 'clsx'
 import { supabase } from '@/lib/supabase'
 
@@ -16,15 +16,15 @@ const fmtDT = (ts) => {
     + ' ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onAtualizar, nomeUtilizador, tipoUtilizador }) {
-  const [nota, setNota]         = useState('')
-  const [aFecho, setAFecho]     = useState(false)
-  const [loading, setLoading]   = useState(false)
+export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onAtualizar, nomeUtilizador }) {
+  const [nota,    setNota]    = useState('')
+  const [aFecho,  setAFecho]  = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const cfg = STATUS_CFG[ocorrencia.status] ?? STATUS_CFG.aberta
   const Ic  = cfg.icon
 
-  const adicionarIntervencao = async () => {
+  const registarNota = async () => {
     if (!nota.trim()) return
     setLoading(true)
     await supabase.from('ocorrencias_intervencoes').insert({
@@ -40,21 +40,29 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
     onAtualizar?.()
   }
 
-  const fechar = async () => {
+  const fecharOcorrencia = async () => {
     setLoading(true)
+    if (nota.trim()) {
+      await supabase.from('ocorrencias_intervencoes').insert({
+        ocorrencia_id: ocorrencia.id,
+        nota: nota.trim(),
+        tecnico_nome: nomeUtilizador,
+      })
+    }
     await supabase.from('ocorrencias').update({
       status: 'fechada',
       fechada_em: new Date().toISOString(),
       fechada_por: nomeUtilizador,
     }).eq('id', ocorrencia.id)
+    setNota('')
     setAFecho(false)
     setLoading(false)
     onAtualizar?.()
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-surface-1 border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-surface-1 border border-border rounded-2xl w-full max-w-lg max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden">
 
         {/* Header */}
         <div className="px-5 py-4 border-b border-border/40 flex items-start justify-between gap-3 shrink-0">
@@ -73,9 +81,8 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto">
 
-          {/* Descrição */}
           {ocorrencia.descricao && (
             <div className="px-5 py-3 border-b border-border/20">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-accent-subtle mb-1">Descrição</p>
@@ -83,7 +90,6 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
             </div>
           )}
 
-          {/* Foto */}
           {ocorrencia.foto_url && (
             <div className="px-5 py-3 border-b border-border/20">
               <img src={ocorrencia.foto_url} alt="Foto ocorrência"
@@ -91,7 +97,6 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
             </div>
           )}
 
-          {/* Histórico de intervenções */}
           <div className="px-5 py-3 border-b border-border/20">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-accent-subtle mb-2">Histórico</p>
             {intervencoes.length === 0
@@ -110,9 +115,8 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
             }
           </div>
 
-          {/* Fecho */}
           {ocorrencia.status === 'fechada' && (
-            <div className="px-5 py-3 border-b border-border/20">
+            <div className="px-5 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-accent-subtle mb-1">Resolução</p>
               <p className="text-[12px] text-green-400">
                 Fechada por <strong>{ocorrencia.fechada_por}</strong> em {fmtDT(ocorrencia.fechada_em)}
@@ -121,37 +125,47 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
           )}
         </div>
 
-        {/* Acções — só se não fechada */}
+        {/* Acções */}
         {ocorrencia.status !== 'fechada' && (
-          <div className="px-5 py-3 border-t border-border/40 flex flex-col gap-2 shrink-0">
+          <div className="px-5 py-3 border-t border-border/40 flex flex-col gap-2.5 shrink-0">
+            <textarea
+              value={nota}
+              onChange={e => setNota(e.target.value)}
+              placeholder="Nota de intervenção (opcional para fechar)…"
+              rows={2}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-[13px] text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/25 resize-none"
+            />
+
             {!aFecho ? (
-              <>
-                <div className="flex gap-2">
-                  <input value={nota} onChange={e => setNota(e.target.value)}
-                    placeholder="Adicionar nota de intervenção…"
-                    className="flex-1 bg-surface-2 border border-border rounded-lg px-3 py-2 text-[13px] text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/25"
-                    onKeyDown={e => e.key === 'Enter' && adicionarIntervencao()} />
-                  <button onClick={adicionarIntervencao} disabled={!nota.trim() || loading}
-                    className="px-3 py-2 rounded-lg bg-amber-400/15 border border-amber-400/30 text-amber-400 hover:bg-amber-400/25 transition-colors disabled:opacity-40">
-                    <Plus size={15} />
-                  </button>
-                </div>
-                <button onClick={() => setAFecho(true)}
-                  className="w-full py-2 rounded-lg border border-green-400/30 bg-green-400/10 text-green-400 text-[12px] font-semibold hover:bg-green-400/20 transition-colors">
-                  Marcar como resolvida
+              <div className="flex gap-2">
+                <button
+                  onClick={registarNota}
+                  disabled={!nota.trim() || loading}
+                  className="flex-1 py-2.5 rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-400 text-[12px] font-semibold hover:bg-amber-400/20 transition-colors disabled:opacity-40">
+                  {loading ? 'A registar…' : 'Registar nota'}
                 </button>
-              </>
+                <button
+                  onClick={() => setAFecho(true)}
+                  disabled={loading}
+                  className="flex-1 py-2.5 rounded-xl border border-green-400/30 bg-green-400/10 text-green-400 text-[12px] font-semibold hover:bg-green-400/20 transition-colors disabled:opacity-40">
+                  Fechar ocorrência
+                </button>
+              </div>
             ) : (
               <div className="flex flex-col gap-2">
-                <p className="text-[12px] text-accent-muted text-center">Confirmar resolução da ocorrência?</p>
+                <p className="text-[12px] text-accent-muted text-center">
+                  {nota.trim()
+                    ? 'A nota será gravada e a ocorrência fechada.'
+                    : 'Confirmar fecho da ocorrência?'}
+                </p>
                 <div className="flex gap-2">
                   <button onClick={() => setAFecho(false)}
-                    className="flex-1 py-2 rounded-lg border border-border text-accent-subtle text-[12px] font-semibold hover:bg-surface-2 transition-colors">
+                    className="flex-1 py-2.5 rounded-xl border border-border text-accent-subtle text-[12px] font-semibold hover:bg-surface-2 transition-colors">
                     Cancelar
                   </button>
-                  <button onClick={fechar} disabled={loading}
-                    className="flex-1 py-2 rounded-lg border border-green-400/30 bg-green-400/15 text-green-400 text-[12px] font-semibold hover:bg-green-400/25 transition-colors disabled:opacity-50">
-                    {loading ? 'A fechar…' : 'Confirmar'}
+                  <button onClick={fecharOcorrencia} disabled={loading}
+                    className="flex-1 py-2.5 rounded-xl border border-green-400/30 bg-green-400/15 text-green-400 text-[12px] font-semibold hover:bg-green-400/25 transition-colors disabled:opacity-50">
+                    {loading ? 'A fechar…' : 'Confirmar fecho'}
                   </button>
                 </div>
               </div>
