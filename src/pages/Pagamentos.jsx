@@ -197,6 +197,14 @@ function TabEmPagamento({ pedidos, emAnalise, pendentesReg, onRefresh }) {
     onRefresh()
   }
 
+  const aprovarDireto = async (id) => {
+    if (!confirm('Aprovar diretamente para pagamento sem confirmação do DJ?')) return
+    setLoadingSlot(l => ({ ...l, [id]: 'aprovar' }))
+    await supabase.from('agenda').update({ estado_pagamento: 'aprovada_pagamento' }).eq('id', id)
+    setLoadingSlot(l => ({ ...l, [id]: null }))
+    onRefresh()
+  }
+
   if (!pedidos.length && !emAnalise.length && !pendentesReg.length) return (
     <div className="text-center py-12 text-white/30 text-sm">Nenhum pagamento em processo este mês</div>
   )
@@ -340,10 +348,16 @@ function TabEmPagamento({ pedidos, emAnalise, pendentesReg, onRefresh }) {
                 <td className={`${TD} text-center`}><EstadoPill estado="pendente_regularizacao" /></td>
                 <td className={`${TD} text-right font-semibold text-accent tabular-nums`}>{formatEuro(slot.valor)}</td>
                 <td className={`${TD} text-right`}>
-                  <button type="button" disabled={loadingSlot[slot.id] === 'reg'} onClick={() => regularizar(slot.id)}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-red-500/15 border border-red-500/25 text-red-300 hover:bg-red-500/25 transition-colors disabled:opacity-40">
-                    {loadingSlot[slot.id] === 'reg' ? 'A processar…' : 'Regularizar'}
-                  </button>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button type="button" disabled={loadingSlot[slot.id] === 'reg'} onClick={() => regularizar(slot.id)}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-red-500/15 border border-red-500/25 text-red-300 hover:bg-red-500/25 transition-colors disabled:opacity-40">
+                      {loadingSlot[slot.id] === 'reg' ? 'A processar…' : 'Regularizar'}
+                    </button>
+                    <button type="button" disabled={!!loadingSlot[slot.id]} onClick={() => aprovarDireto(slot.id)}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-teal-500/15 border border-teal-500/25 text-teal-300 hover:bg-teal-500/25 transition-colors disabled:opacity-40">
+                      {loadingSlot[slot.id] === 'aprovar' ? 'A processar…' : 'Aprovar'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
