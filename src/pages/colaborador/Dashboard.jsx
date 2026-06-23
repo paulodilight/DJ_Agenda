@@ -194,7 +194,6 @@ export function ColaboradorDashboard() {
         <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2">As minhas páginas</p>
         <CardNav to="/apoiot/agenda"  Icone={LayoutList}    rotulo="Agenda" />
         <CardNav to="/apoiot/eventos" Icone={CalendarDays}  rotulo="Eventos" />
-        <CardNav to="/apoiot/tarefas" Icone={ClipboardList} rotulo="Tarefas" />
       </div>
 
       {eventoAberto && (

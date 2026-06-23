@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LogOut, Home, CalendarDays, ClipboardList, LayoutList, KeyRound, Sun, Moon } from 'lucide-react'
+import { LogOut, Home, CalendarDays, ClipboardList, LayoutList, KeyRound, Sun, Moon, AlertTriangle } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
 import { useColaboradorStore } from '@/store'
@@ -28,7 +28,8 @@ const navItens = [
   { to: '/apoiot',          fim: true, rotulo: 'Início',  Icone: Home },
   { to: '/apoiot/agenda',              rotulo: 'Agenda',  Icone: LayoutList },
   { to: '/apoiot/eventos',             rotulo: 'Eventos', Icone: CalendarDays },
-  { to: '/apoiot/tarefas',             rotulo: 'Tarefas', Icone: ClipboardList },
+  { to: '/apoiot/tarefas',             rotulo: 'Tarefas',     Icone: ClipboardList },
+  { to: '/apoiot/ocorrencias',         rotulo: 'Ocorrências', Icone: AlertTriangle },
 ]
 
 function LogoXclusive() {
