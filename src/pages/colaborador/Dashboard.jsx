@@ -16,21 +16,43 @@ const LABELS_ASSIN = {
 }
 
 function BotaoAssinatura({ proxima, registar }) {
-  const [loading, setLoading] = useState(false)
-  if (!proxima || !LABELS_ASSIN[proxima.tipo]) return null
-  const { label, cor } = LABELS_ASSIN[proxima.tipo]
+  const [loading, setLoading]     = useState(false)
+  const [registados, setRegistados] = useState([]) // [{tipo, hora}]
+
+  if (!proxima && registados.length === 0) return null
+
   const onClick = async (e) => {
     e.stopPropagation()
+    if (!proxima || !LABELS_ASSIN[proxima.tipo]) return
     setLoading(true)
     await registar(proxima.tipo, { eventoId: proxima.eventoId, agendamentoId: proxima.agendamentoId })
+    const agora = new Date()
+    const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+    setRegistados(prev => [...prev, { tipo: proxima.tipo, hora }])
     setLoading(false)
   }
+
+  const podeAssinar = proxima && LABELS_ASSIN[proxima.tipo]
+
   return (
-    <button onClick={onClick} disabled={loading}
-      className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-opacity disabled:opacity-50 ${cor}`}>
-      <PenLine size={13} />
-      {loading ? 'A registar…' : label}
-    </button>
+    <div className="mt-3 flex flex-col gap-1.5">
+      {registados.map(({ tipo, hora }) => {
+        const cfg = LABELS_ASSIN[tipo]
+        return (
+          <span key={tipo} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold ${cfg?.cor ?? ''}`}>
+            <PenLine size={13} />
+            {cfg?.label} · {hora}
+          </span>
+        )
+      })}
+      {podeAssinar && (
+        <button onClick={onClick} disabled={loading}
+          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-opacity disabled:opacity-50 ${LABELS_ASSIN[proxima.tipo].cor}`}>
+          <PenLine size={13} />
+          {loading ? 'A registar…' : LABELS_ASSIN[proxima.tipo].label}
+        </button>
+      )}
+    </div>
   )
 }
 

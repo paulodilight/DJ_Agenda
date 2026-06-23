@@ -38,6 +38,37 @@ function calcDuracaoMin(hora_inicio, hora_fim) {
   return min
 }
 
+function calcHorasAssin(assinTec) {
+  let lmdMin = 0
+  let evMin  = 0
+
+  // LMD: parear entrada+saída por agendamento_id (ou por dia se null)
+  const lmdEnt = assinTec.filter(a => a.tipo === 'lmd_entrada')
+  const lmdSai = assinTec.filter(a => a.tipo === 'lmd_saida')
+  lmdEnt.forEach(en => {
+    const dia = en.registado_em?.slice(0, 10)
+    const sa  = lmdSai.find(s =>
+      (en.agendamento_id && s.agendamento_id === en.agendamento_id) ||
+      (!en.agendamento_id && s.registado_em?.slice(0, 10) === dia)
+    )
+    if (!sa) return
+    const diff = (new Date(sa.registado_em) - new Date(en.registado_em)) / 60000
+    if (diff > 0) lmdMin += Math.max(0, diff - 60) // -1h almoço
+  })
+
+  // Eventos: parear entrada+saída por evento_id
+  const evEnt = assinTec.filter(a => a.tipo === 'evento_entrada')
+  const evSai = assinTec.filter(a => a.tipo === 'evento_saida')
+  evEnt.forEach(en => {
+    const sa = evSai.find(s => s.evento_id === en.evento_id)
+    if (!sa) return
+    const diff = (new Date(sa.registado_em) - new Date(en.registado_em)) / 60000
+    if (diff > 0) evMin += diff
+  })
+
+  return { lmdMin: Math.round(lmdMin), evMin: Math.round(evMin), totalMin: Math.round(lmdMin + evMin) }
+}
+
 function fmtHoras(min) {
   if (!min) return '—'
   const h = Math.floor(min / 60)
@@ -95,6 +126,7 @@ export function ContasColaboradores() {
   const [eventos, setEventos]           = useState([])
   const [agendamentos, setAgendamentos] = useState([])
   const [espacos, setEspacos]           = useState([])
+  const [assinaturas, setAssinaturas]   = useState([])
   const [loading, setLoading]           = useState(true)
   const [expand, setExpand]             = useState(null)
   const [filtroTec, setFiltroTec]       = useState('dashboard')
@@ -123,16 +155,21 @@ export function ContasColaboradores() {
     Promise.all([
       supabase.from('tecnicos').select('*').eq('ativo', true).order('nome'),
       supabase.from('supa_eventos')
-        .select('id, tecnico_id, evento, data_evento, espaco_id, valor_apoio_tecnico, status, hora_inicio, hora_fim')
+        .select('id, tecnico_id, evento, data_evento, espaco_id, valor_apoio_tecnico, status, hora_inicio, hora_fim, hora_instalacao')
         .gte('data_evento', dataInicio).lte('data_evento', dataFim).neq('status', 'cancelado'),
       supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicio).lte('data', dataFim),
       supabase.from('espacos').select('id, nome'),
-    ]).then(([tRes, evRes, agRes, esRes]) => {
+      supabase.from('assinaturas_tecnico')
+        .select('tecnico_id, tipo, evento_id, agendamento_id, registado_em')
+        .gte('registado_em', dataInicio + 'T00:00:00.000Z')
+        .lte('registado_em', dataFim + 'T23:59:59.999Z'),
+    ]).then(([tRes, evRes, agRes, esRes, asRes]) => {
       if (cancelled) return
       setTecnicos(tRes.data ?? [])
       setEventos(evRes.data ?? [])
       setAgendamentos(agRes.data ?? [])
       setEspacos(esRes.data ?? [])
+      setAssinaturas(asRes.data ?? [])
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [dataInicio, dataFim])
@@ -148,11 +185,13 @@ export function ContasColaboradores() {
       const evsTec    = eventos.filter(e => e.tecnico_id === tec.id)
       const agsTec    = agendamentos.filter(a => a.tecnico_id === tec.id && !a.folga)
       const folgasTec = agendamentos.filter(a => a.tecnico_id === tec.id && a.folga).map(a => a.data).sort()
+      const assinTec  = assinaturas.filter(a => a.tecnico_id === tec.id)
 
       const somaEventos = evsTec.reduce((s, e) => s + Number(e.valor_apoio_tecnico ?? 0), 0)
       const somaAgs     = agsTec.reduce((s, a) => s + Number(a.valor ?? 0), 0)
       const nDias       = new Set([...evsTec.map(e => e.data_evento), ...agsTec.map(a => a.data)]).size
-      const horasMin    = evsTec.reduce((s, e) => s + calcDuracaoMin(e.hora_inicio, e.hora_fim), 0)
+      const horasMin    = evsTec.reduce((s, e) => s + calcDuracaoMin(e.hora_instalacao ?? e.hora_inicio, e.hora_fim), 0)
+      const horasAssin  = calcHorasAssin(assinTec)
       const valorFaturado = somaEventos  // o que cobrámos ao cliente pelo apoio
 
       // Variáveis editáveis com fallback para valor da DB
@@ -180,21 +219,22 @@ export function ContasColaboradores() {
         agsTec:     agsTec.sort((a, b) => a.data.localeCompare(b.data)),
         folgasTec,
         nDias, diasEfetivos, horasMin,
+        horasAssin,
         nEventos:   evsTec.length,
         nFolgas:    folgasTec.length,
         faltas, deducaoFaltas,
         valorBaseEfetivo,
         valorFaturado,
         valorPagar,
-        // strings para os inputs
         valorBaseStr, diasStr, faltasStr,
       }
     })
-  }, [tecnicos, eventos, agendamentos, vars])
+  }, [tecnicos, eventos, agendamentos, assinaturas, vars])
 
-  const totalPagar  = cards.reduce((s, c) => s + c.valorPagar, 0)
-  const totalHoras  = cards.reduce((s, c) => s + c.horasMin, 0)
-  const totalEvents = cards.reduce((s, c) => s + c.nEventos, 0)
+  const totalPagar      = cards.reduce((s, c) => s + c.valorPagar, 0)
+  const totalHoras      = cards.reduce((s, c) => s + c.horasMin, 0)
+  const totalEvents     = cards.reduce((s, c) => s + c.nEventos, 0)
+  const totalHorasAssin = cards.reduce((s, c) => s + c.horasAssin.totalMin, 0)
 
   // Cards filtrados — dashboard não mostra cards individuais
   const cardsFiltrados = filtroTec === 'dashboard'
@@ -256,7 +296,11 @@ export function ContasColaboradores() {
         </div>
         <div className="bg-surface-1 border border-border rounded-lg px-5 py-3">
           <p className="text-2xl font-bold tabular-nums text-accent-muted">{fmtHoras(totalHoras)}</p>
-          <p className="text-[11px] text-accent-muted mt-0.5">horas totais</p>
+          <p className="text-[11px] text-accent-muted mt-0.5">horas totais (agenda)</p>
+        </div>
+        <div className="bg-surface-1 border border-border rounded-lg px-5 py-3">
+          <p className="text-2xl font-bold tabular-nums text-indigo-400">{totalHorasAssin > 0 ? fmtHoras(totalHorasAssin) : '—'}</p>
+          <p className="text-[11px] text-accent-muted mt-0.5">horas registadas (assinaturas)</p>
         </div>
         <div className="bg-surface-1 border border-border rounded-lg px-5 py-3">
           <p className="text-2xl font-bold tabular-nums text-accent-muted">{cards.length}</p>
@@ -268,7 +312,7 @@ export function ContasColaboradores() {
       <div className="grid grid-cols-1 gap-4">
         {cardsFiltrados.map(({
           tec, evsTec, agsTec, folgasTec,
-          nDias, diasEfetivos, horasMin,
+          nDias, diasEfetivos, horasMin, horasAssin,
           nEventos, nFolgas, faltas, deducaoFaltas,
           valorBaseEfetivo, valorFaturado, valorPagar,
           valorBaseStr, diasStr, faltasStr,
@@ -343,7 +387,7 @@ export function ContasColaboradores() {
                   />
                 )}
 
-                {/* Horas trabalhadas — sempre visível */}
+                {/* Horas trabalhadas (agenda) */}
                 <VarInput
                   label="Horas trabalhadas"
                   value={fmtHoras(horasMin)}
@@ -351,6 +395,23 @@ export function ContasColaboradores() {
                   badge="auto"
                   nota={horasMin === 0 ? 'sem hora início/fim nos eventos' : null}
                 />
+
+                {/* Horas registadas por assinatura */}
+                <div className="flex items-start justify-between gap-3 py-2.5 border-b border-border/20">
+                  <span className="text-[11px] text-accent-subtle min-w-0 shrink-0 w-40">Horas c/ assinatura</span>
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span className={clsx('text-sm font-semibold tabular-nums', horasAssin.totalMin > 0 ? 'text-indigo-400' : 'text-border/40')}>
+                      {horasAssin.totalMin > 0 ? fmtHoras(horasAssin.totalMin) : '—'}
+                    </span>
+                    {horasAssin.totalMin > 0 && (
+                      <span className="text-[10px] text-accent-subtle/60 tabular-nums">
+                        {horasAssin.lmdMin > 0 && `LMD ${fmtHoras(horasAssin.lmdMin)}`}
+                        {horasAssin.lmdMin > 0 && horasAssin.evMin > 0 && ' · '}
+                        {horasAssin.evMin > 0 && `Eventos ${fmtHoras(horasAssin.evMin)}`}
+                      </span>
+                    )}
+                  </div>
+                </div>
 
                 {/* Faltas */}
                 <VarInput
