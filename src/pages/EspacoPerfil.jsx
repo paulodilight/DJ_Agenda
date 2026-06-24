@@ -69,6 +69,7 @@ export function EspacoPerfil() {
     pin_manager_admin: '', pin_manager_user: '',
     pin_marketing_admin: '', pin_marketing_user: '',
     modo_livre: false,
+    setup_slot_1: '', setup_slot_2: '', setup_slot_3: '',
   })
   const [logoUploading, setLogoUploading] = useState(false)
 
@@ -101,6 +102,12 @@ export function EspacoPerfil() {
   const [novoGrupoSlug, setNovoGrupoSlug] = useState('')
   const [mostrarFormGrupo, setMostrarFormGrupo] = useState(false)
   const [criandoGrupo, setCriandoGrupo] = useState(false)
+  const [setupEquipamentos, setSetupEquipamentos] = useState([])
+
+  useEffect(() => {
+    supabase.from('setup_equipamentos').select('id, nome').eq('ativo', true).order('ordem')
+      .then(({ data }) => setSetupEquipamentos(data ?? []))
+  }, [])
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro(null)
@@ -124,6 +131,9 @@ export function EspacoPerfil() {
         pin_marketing_admin: data.pin_marketing_admin ?? '',
         pin_marketing_user: data.pin_marketing_user ?? '',
         modo_livre: data.modo_livre ?? false,
+        setup_slot_1: data.setup_slot_1 ?? '',
+        setup_slot_2: data.setup_slot_2 ?? '',
+        setup_slot_3: data.setup_slot_3 ?? '',
       })
 
       const turnosCarregados = data.turnos?.length > 0
@@ -326,6 +336,9 @@ export function EspacoPerfil() {
       await espacosApi.actualizar(id, {
         ...form,
         budget_max: form.budget_max === '' ? null : Number(form.budget_max),
+        setup_slot_1: form.setup_slot_1 || null,
+        setup_slot_2: form.setup_slot_2 || null,
+        setup_slot_3: form.setup_slot_3 || null,
         dias_sem_repeticao: Number(form.dias_sem_repeticao),
         dias_espacamento: Number(form.dias_espacamento),
         ordem_distribuicao: form.ordem_distribuicao === '' ? null : Number(form.ordem_distribuicao),
@@ -536,6 +549,21 @@ export function EspacoPerfil() {
             </div>
             <Textarea label="Notas / regras do Cliente" value={form.notas} onChange={setField('notas')} placeholder="Regras específicas, preferências..." />
             <Textarea label="Notas Gerais para o DJ" value={form.notas_gerais} onChange={setField('notas_gerais')} placeholder="Informações que o DJ vê na sua app: rider, parqueamento, contactos, regras do espaço…" rows={5} />
+
+            {/* ── Setup DJ padrão ── */}
+            {setupEquipamentos.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Setup DJ padrão</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {(['setup_slot_1', 'setup_slot_2', 'setup_slot_3']).map((campo, i) => (
+                    <Select key={campo} label={`Slot ${i + 1}`} value={form[campo]} onChange={setField(campo)}>
+                      <option value="">—</option>
+                      {setupEquipamentos.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                    </Select>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* ── Modo livre (sem turnos) ── */}
             <div className="flex items-center justify-between rounded-xl border border-border bg-surface-1 px-4 py-3">

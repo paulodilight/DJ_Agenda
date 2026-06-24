@@ -65,6 +65,7 @@ const vazio = {
   dj_id: '', dj_externo: '', espaco_id: '', data: '', hora_inicio: '22:00', hora_fim: '02:00',
   valor: '', margem: '', estado: 'proposta', evento: '', notas: '', tipo_slot: '', subtipo_key: '',
   transporte: '', extras: '', notas_contas: '', estado_pagamento: 'pendente', forma_pagamento: '',
+  setup_slot_1: '', setup_slot_2: '', setup_slot_3: '',
 }
 
 const ESTADO_PAG_OPCOES = [
@@ -115,6 +116,9 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const [trocaDataId, setTrocaDataId]       = useState('')
   const [trocaSlots, setTrocaSlots]         = useState([])
   const [trocaSlotsLoading, setTrocaSlotsLoading] = useState(false)
+
+  // ── Setup Equipamentos ──
+  const [setupEquipamentos, setSetupEquipamentos] = useState([])
 
   // ── Histórico ──
   const [historico, setHistorico] = useState([])
@@ -260,6 +264,28 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       })
     }).catch(() => {})
   }, [aberto, slot?.turno_id, slot?.data, slot?.valor]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Carrega lista de equipamentos uma vez
+  useEffect(() => {
+    supabase.from('setup_equipamentos').select('id, nome').eq('ativo', true).order('ordem')
+      .then(({ data }) => setSetupEquipamentos(data ?? []))
+  }, [])
+
+  // Auto-fill setup do espaço em slots novos
+  useEffect(() => {
+    if (!form.espaco_id || slot?.id) return
+    supabase.from('espacos').select('setup_slot_1, setup_slot_2, setup_slot_3')
+      .eq('id', form.espaco_id).maybeSingle()
+      .then(({ data }) => {
+        if (!data) return
+        setForm(f => ({
+          ...f,
+          setup_slot_1: data.setup_slot_1 ?? '',
+          setup_slot_2: data.setup_slot_2 ?? '',
+          setup_slot_3: data.setup_slot_3 ?? '',
+        }))
+      })
+  }, [form.espaco_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-fill evento quando data + espaco_id mudam
   useEffect(() => {
@@ -464,6 +490,9 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         evento:    form.evento.trim() || null,
         notas:     form.notas.trim() || null,
         origem:    'manual',
+        setup_slot_1: form.setup_slot_1 || null,
+        setup_slot_2: form.setup_slot_2 || null,
+        setup_slot_3: form.setup_slot_3 || null,
       }
       if (slot?.id) {
         await agendaApi.actualizar(slot.id, payload)
@@ -829,6 +858,20 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 onChange={set('notas')}
                 placeholder="Notas sobre a atuação, rider, condições especiais..."
               />
+
+              {setupEquipamentos.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Setup DJ</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['setup_slot_1', 'setup_slot_2', 'setup_slot_3']).map((campo, i) => (
+                      <Select key={campo} label={`Slot ${i + 1}`} value={form[campo]} onChange={set(campo)}>
+                        <option value="">—</option>
+                        {setupEquipamentos.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                      </Select>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             /* ── MODO COMPLETO ── */
@@ -945,6 +988,20 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 onChange={set('notas')}
                 placeholder="Notas sobre a atuação, rider, condições especiais..."
               />
+
+              {setupEquipamentos.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Setup DJ</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(['setup_slot_1', 'setup_slot_2', 'setup_slot_3']).map((campo, i) => (
+                      <Select key={campo} label={`Slot ${i + 1}`} value={form[campo]} onChange={set(campo)}>
+                        <option value="">—</option>
+                        {setupEquipamentos.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                      </Select>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           ))}
 
