@@ -783,7 +783,7 @@ export function Agenda() {
   }, [vista, dias])
 
   return (
-    <><div id="agenda-app" className="flex flex-col h-full">
+    <><div id="agenda-app" className="flex flex-col h-full" {...swipe}>
       {/* Toolbar — 3 linhas explícitas */}
       <div className="flex flex-col border-b border-border/50 bg-surface-0/60 shrink-0">
 
@@ -1116,7 +1116,7 @@ export function Agenda() {
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveSlot(null)}
       >
-        <div className="flex-1 overflow-auto" {...swipe}>
+        <div className="flex-1 overflow-auto">
           {loading && <LoadingPage />}
           {erro && <Alerta tipo="erro" mensagem={erro} className="m-6" />}
 
