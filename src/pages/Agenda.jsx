@@ -1,4 +1,5 @@
-﻿import { useState, useMemo, useEffect } from 'react'
+﻿import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useSwipeNav } from '@/hooks/useSwipeNav'
 import { supabase } from '@/lib/supabase'
 import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2, Send, UserCheck, MessageSquare, RefreshCw, Download, Lock, Unlock } from 'lucide-react'
 import { startOfWeek, addDays, addWeeks, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, format } from 'date-fns'
@@ -642,16 +643,19 @@ export function Agenda() {
     setReferencia(novaRef)
     setAnoMes(format(novaRef, 'yyyy-MM'))
   }
-  const navAnterior = () => {
+  const navAnterior = useCallback(() => {
     if (vista === 'Dia')    return navegar(addDays(referencia, -1))
     if (vista === 'Semana') return navegar(addWeeks(referencia, -1))
     return navegar(addMonths(referencia, -1))
-  }
-  const navProxima = () => {
+  }, [vista, referencia])
+
+  const navProxima = useCallback(() => {
     if (vista === 'Dia')    return navegar(addDays(referencia, 1))
     if (vista === 'Semana') return navegar(addWeeks(referencia, 1))
     return navegar(addMonths(referencia, 1))
-  }
+  }, [vista, referencia])
+
+  const swipe = useSwipeNav(navAnterior, navProxima)
 
   const tituloMesImpressao = format(referencia, "MMMM yyyy", { locale: pt })
     .replace(/^\w/, (c) => c.toUpperCase())
@@ -1112,7 +1116,7 @@ export function Agenda() {
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveSlot(null)}
       >
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto" {...swipe}>
           {loading && <LoadingPage />}
           {erro && <Alerta tipo="erro" mensagem={erro} className="m-6" />}
 
