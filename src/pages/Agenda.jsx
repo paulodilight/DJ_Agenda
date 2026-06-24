@@ -783,7 +783,7 @@ export function Agenda() {
   }, [vista, dias])
 
   return (
-    <><div id="agenda-app" className="flex flex-col h-full" {...swipe}>
+    <><div id="agenda-app" className="flex flex-col h-full">
       {/* Toolbar — 3 linhas explícitas */}
       <div className="flex flex-col border-b border-border/50 bg-surface-0/60 shrink-0">
 

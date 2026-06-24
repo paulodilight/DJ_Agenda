@@ -1,32 +1,46 @@
-import { useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 
 /**
  * Swipe horizontal para navegar entre períodos.
- * Threshold de 60px; ignora gestos com componente vertical dominante.
+ * Usa listeners nativos no document para contornar o scroll do overflow-auto
+ * e o TouchSensor do dnd-kit.
  */
 export function useSwipeNav(onAnterior, onProxima, { threshold = 60 } = {}) {
-  const startX = useRef(null)
-  const startY = useRef(null)
+  const onAnteriorRef = useRef(onAnterior)
+  const onProximaRef  = useRef(onProxima)
+  onAnteriorRef.current = onAnterior
+  onProximaRef.current  = onProxima
 
-  const onTouchStart = useCallback((e) => {
-    startX.current = e.touches[0].clientX
-    startY.current = e.touches[0].clientY
-  }, [])
+  useEffect(() => {
+    let startX = null
+    let startY = null
 
-  const onTouchEnd = useCallback((e) => {
-    if (startX.current === null) return
-    const dx = e.changedTouches[0].clientX - startX.current
-    const dy = e.changedTouches[0].clientY - startY.current
-    startX.current = null
-    startY.current = null
+    const handleStart = (e) => {
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+    }
 
-    // Se o gesto é mais vertical do que horizontal, ignora
-    if (Math.abs(dy) > Math.abs(dx)) return
-    if (Math.abs(dx) < threshold) return
+    const handleEnd = (e) => {
+      if (startX === null) return
+      const dx = e.changedTouches[0].clientX - startX
+      const dy = e.changedTouches[0].clientY - startY
+      startX = null
+      startY = null
 
-    if (dx > 0) onAnterior()
-    else onProxima()
-  }, [onAnterior, onProxima, threshold])
+      // Gesto maioritariamente vertical → scroll normal, ignora
+      if (Math.abs(dy) > Math.abs(dx) * 0.8) return
+      if (Math.abs(dx) < threshold) return
 
-  return { onTouchStart, onTouchEnd }
+      if (dx > 0) onAnteriorRef.current()
+      else        onProximaRef.current()
+    }
+
+    document.addEventListener('touchstart', handleStart, { passive: true })
+    document.addEventListener('touchend',   handleEnd,   { passive: true })
+
+    return () => {
+      document.removeEventListener('touchstart', handleStart)
+      document.removeEventListener('touchend',   handleEnd)
+    }
+  }, [threshold])
 }
