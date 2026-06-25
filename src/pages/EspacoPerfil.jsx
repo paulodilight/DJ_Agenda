@@ -72,6 +72,7 @@ export function EspacoPerfil() {
     setup_slot_1: '', setup_slot_2: '', setup_slot_3: '',
     responsavel_nome: '', responsavel_telefone: '', hora_chegada_offset: '',
     dress_code: '', refeicoes: '', bebidas: '',
+    inputs_musicais: '',
   })
   const [logoUploading, setLogoUploading] = useState(false)
 
@@ -142,6 +143,7 @@ export function EspacoPerfil() {
         dress_code: data.dress_code ?? '',
         refeicoes: data.refeicoes ?? '',
         bebidas: data.bebidas ?? '',
+        inputs_musicais: data.inputs_musicais ?? '',
       })
 
       const turnosCarregados = data.turnos?.length > 0
@@ -353,6 +355,7 @@ export function EspacoPerfil() {
         dress_code: form.dress_code.trim() || null,
         refeicoes: form.refeicoes.trim() || null,
         bebidas: form.bebidas.trim() || null,
+        inputs_musicais: form.inputs_musicais.trim() || null,
         dias_sem_repeticao: Number(form.dias_sem_repeticao),
         dias_espacamento: Number(form.dias_espacamento),
         ordem_distribuicao: form.ordem_distribuicao === '' ? null : Number(form.ordem_distribuicao),
@@ -562,7 +565,8 @@ export function EspacoPerfil() {
               </div>
             </div>
             <Textarea label="Notas / regras do Cliente" value={form.notas} onChange={setField('notas')} placeholder="Regras específicas, preferências..." />
-            <Textarea label="Notas Gerais para o DJ" value={form.notas_gerais} onChange={setField('notas_gerais')} placeholder="Informações que o DJ vê na sua app: rider, parqueamento, contactos, regras do espaço…" rows={5} />
+            <Textarea label="Notas da Atuação" value={form.notas_gerais} onChange={setField('notas_gerais')} placeholder="Informações que o DJ vê na app: rider, parqueamento, regras do espaço…" rows={4} />
+            <Textarea label="Inputs Musicais" value={form.inputs_musicais} onChange={setField('inputs_musicais')} placeholder="Género musical, BPM, pedidos especiais, restrições…" rows={3} />
 
             {/* ── Responsável ── */}
             <div className="flex flex-col gap-2">
