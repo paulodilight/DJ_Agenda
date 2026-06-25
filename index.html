@@ -15,6 +15,20 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Xclusive" />
     <link rel="apple-touch-icon" href="/logo-x.png" />
+
+    <!-- Branding PWA por host: no subdomínio apoiot.* a app instala como "XTS" -->
+    <script>
+      (function () {
+        if (location.hostname.split('.')[0] !== 'apoiot') return
+        document.title = 'XTS — Técnicos'
+        var m = document.querySelector('link[rel="manifest"]')
+        if (m) m.setAttribute('href', '/manifest-apoiot.json')
+        var icon = document.querySelector('link[rel="apple-touch-icon"]')
+        if (icon) icon.setAttribute('href', '/logo-apoiot.png')
+        var title = document.querySelector('meta[name="apple-mobile-web-app-title"]')
+        if (title) title.setAttribute('content', 'XTS')
+      })()
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />

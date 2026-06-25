@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore, useColaboradorStore } from '@/store'
 import { Layout } from '@/components/ui/Layout'
 import { Login } from '@/pages/Login'
@@ -39,6 +39,19 @@ import { ColaboradorFolgas } from '@/pages/colaborador/Folgas'
 import { ColaboradorAgenda } from '@/pages/colaborador/Agenda'
 import { ColaboradorOcorrencias } from '@/pages/colaborador/Ocorrencias'
 
+// No subdomínio apoiot.* a app é a área de técnicos: qualquer rota fora de
+// /apoiot é encaminhada para lá. O /apoiot redireciona para /apoiot/login
+// quando não há sessão, ou mostra o dashboard se o técnico já entrou.
+const isApoiotHost = typeof window !== 'undefined' && window.location.hostname.split('.')[0] === 'apoiot'
+
+function HostRedirect() {
+  const { pathname } = useLocation()
+  if (isApoiotHost && !pathname.startsWith('/apoiot')) {
+    return <Navigate to="/apoiot" replace />
+  }
+  return null
+}
+
 function RotaProtegida({ children }) {
   const { session, loading } = useAuthStore()
   if (loading) return <div className="min-h-screen bg-surface-0 flex items-center justify-center"><LoadingPage /></div>
@@ -60,6 +73,7 @@ export default function App() {
   return (
     <UndoProvider>
     <BrowserRouter>
+      <HostRedirect />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
