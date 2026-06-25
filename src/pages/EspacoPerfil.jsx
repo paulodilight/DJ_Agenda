@@ -70,6 +70,8 @@ export function EspacoPerfil() {
     pin_marketing_admin: '', pin_marketing_user: '',
     modo_livre: false,
     setup_slot_1: '', setup_slot_2: '', setup_slot_3: '',
+    responsavel_nome: '', responsavel_telefone: '', hora_chegada_offset: '',
+    dress_code: '', refeicoes: '', bebidas: '',
   })
   const [logoUploading, setLogoUploading] = useState(false)
 
@@ -134,6 +136,12 @@ export function EspacoPerfil() {
         setup_slot_1: data.setup_slot_1 ?? '',
         setup_slot_2: data.setup_slot_2 ?? '',
         setup_slot_3: data.setup_slot_3 ?? '',
+        responsavel_nome: data.responsavel_nome ?? '',
+        responsavel_telefone: data.responsavel_telefone ?? '',
+        hora_chegada_offset: data.hora_chegada_offset != null ? String(data.hora_chegada_offset) : '',
+        dress_code: data.dress_code ?? '',
+        refeicoes: data.refeicoes ?? '',
+        bebidas: data.bebidas ?? '',
       })
 
       const turnosCarregados = data.turnos?.length > 0
@@ -339,6 +347,12 @@ export function EspacoPerfil() {
         setup_slot_1: form.setup_slot_1 || null,
         setup_slot_2: form.setup_slot_2 || null,
         setup_slot_3: form.setup_slot_3 || null,
+        responsavel_nome: form.responsavel_nome.trim() || null,
+        responsavel_telefone: form.responsavel_telefone.trim() || null,
+        hora_chegada_offset: form.hora_chegada_offset === '' ? null : Number(form.hora_chegada_offset),
+        dress_code: form.dress_code.trim() || null,
+        refeicoes: form.refeicoes.trim() || null,
+        bebidas: form.bebidas.trim() || null,
         dias_sem_repeticao: Number(form.dias_sem_repeticao),
         dias_espacamento: Number(form.dias_espacamento),
         ordem_distribuicao: form.ordem_distribuicao === '' ? null : Number(form.ordem_distribuicao),
@@ -549,6 +563,26 @@ export function EspacoPerfil() {
             </div>
             <Textarea label="Notas / regras do Cliente" value={form.notas} onChange={setField('notas')} placeholder="Regras específicas, preferências..." />
             <Textarea label="Notas Gerais para o DJ" value={form.notas_gerais} onChange={setField('notas_gerais')} placeholder="Informações que o DJ vê na sua app: rider, parqueamento, contactos, regras do espaço…" rows={5} />
+
+            {/* ── Responsável ── */}
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Responsável do Espaço</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Nome" value={form.responsavel_nome} onChange={setField('responsavel_nome')} placeholder="Nome do responsável" />
+                <Input label="Telefone" value={form.responsavel_telefone} onChange={setField('responsavel_telefone')} placeholder="+351 9xx xxx xxx" />
+              </div>
+              <Input label="Chegada DJ (min antes do início)" value={form.hora_chegada_offset} onChange={setField('hora_chegada_offset')} type="number" min={0} placeholder="ex: 30 (o DJ chega 30 min antes)" />
+            </div>
+
+            {/* ── Informações do Espaço ── */}
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Informações do Espaço (visível na app DJ)</p>
+              <div className="grid grid-cols-3 gap-3">
+                <Input label="Dress Code" value={form.dress_code} onChange={setField('dress_code')} placeholder="ex: Elegante" />
+                <Input label="Refeições" value={form.refeicoes} onChange={setField('refeicoes')} placeholder="ex: Jantar incluído" />
+                <Input label="Bebidas" value={form.bebidas} onChange={setField('bebidas')} placeholder="ex: Consumição incluída" />
+              </div>
+            </div>
 
             {/* ── Setup DJ padrão ── */}
             {setupEquipamentos.length > 0 && (

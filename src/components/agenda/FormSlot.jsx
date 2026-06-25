@@ -65,7 +65,7 @@ const vazio = {
   dj_id: '', dj_externo: '', espaco_id: '', data: '', hora_inicio: '22:00', hora_fim: '02:00',
   valor: '', margem: '', estado: 'proposta', evento: '', notas: '', tipo_slot: '', subtipo_key: '',
   transporte: '', extras: '', notas_contas: '', estado_pagamento: 'pendente', forma_pagamento: '',
-  setup_slot_1: '', setup_slot_2: '', setup_slot_3: '',
+  setup_slot_1: '', setup_slot_2: '', setup_slot_3: '', soundcheck: '',
 }
 
 const ESTADO_PAG_OPCOES = [
@@ -493,6 +493,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         setup_slot_1: form.setup_slot_1 || null,
         setup_slot_2: form.setup_slot_2 || null,
         setup_slot_3: form.setup_slot_3 || null,
+        soundcheck: form.soundcheck.trim() || null,
       }
       if (slot?.id) {
         await agendaApi.actualizar(slot.id, payload)
@@ -859,6 +860,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 placeholder="Notas sobre a atuação, rider, condições especiais..."
               />
 
+              <Input label="Soundcheck" value={form.soundcheck} onChange={set('soundcheck')} placeholder="ex: 21:45" />
+
               {setupEquipamentos.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Setup DJ</p>
@@ -988,6 +991,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 onChange={set('notas')}
                 placeholder="Notas sobre a atuação, rider, condições especiais..."
               />
+
+              <Input label="Soundcheck" value={form.soundcheck} onChange={set('soundcheck')} placeholder="ex: 21:45" />
 
               {setupEquipamentos.length > 0 && (
                 <div className="flex flex-col gap-2">
