@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, CheckCircle, Clock, AlertCircle, Camera, ImageIcon } from 'lucide-react'
+import { X, CheckCircle, Clock, AlertCircle, Camera, ImageIcon, Pencil, Trash2, Check } from 'lucide-react'
 import { clsx } from 'clsx'
 import { supabase } from '@/lib/supabase'
 
@@ -24,12 +24,16 @@ async function uploadFoto(file) {
   return supabase.storage.from('ocorrencias').getPublicUrl(path).data.publicUrl
 }
 
-export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onAtualizar, nomeUtilizador }) {
-  const [nota,      setNota]      = useState('')
-  const [fotoUrl,   setFotoUrl]   = useState(null)
-  const [aEnviar,   setAEnviar]   = useState(false)
-  const [aFecho,    setAFecho]    = useState(false)
-  const [loading,   setLoading]   = useState(false)
+export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onAtualizar, onApagar, nomeUtilizador, podeEditar = false }) {
+  const [nota,        setNota]        = useState('')
+  const [fotoUrl,     setFotoUrl]     = useState(null)
+  const [aEnviar,     setAEnviar]     = useState(false)
+  const [aFecho,      setAFecho]      = useState(false)
+  const [aApagar,     setAApagar]     = useState(false)
+  const [aEditar,     setAEditar]     = useState(false)
+  const [editTitulo,  setEditTitulo]  = useState(ocorrencia.titulo)
+  const [editDescr,   setEditDescr]   = useState(ocorrencia.descricao ?? '')
+  const [loading,     setLoading]     = useState(false)
   const camaraRef  = useRef(null)
   const galeriaRef = useRef(null)
 
@@ -92,34 +96,110 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
 
   const temConteudo = nota.trim() || fotoUrl
 
+  const gravarEdicao = async () => {
+    if (!editTitulo.trim()) return
+    setLoading(true)
+    await supabase.from('ocorrencias').update({
+      titulo:    editTitulo.trim(),
+      descricao: editDescr.trim() || null,
+    }).eq('id', ocorrencia.id)
+    setAEditar(false)
+    setLoading(false)
+    onAtualizar?.()
+  }
+
+  const confirmarApagar = async () => {
+    setLoading(true)
+    await supabase.from('ocorrencias').delete().eq('id', ocorrencia.id)
+    setLoading(false)
+    onApagar?.()
+    onFechar()
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="bg-surface-1 border border-border rounded-2xl w-full max-w-lg max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden">
 
         {/* Header */}
         <div className="px-5 py-4 border-b border-border/40 flex items-start justify-between gap-3 shrink-0">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <span className={clsx('inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border mb-1', cfg.cls)}>
               <Ic size={10} />{cfg.label}
             </span>
-            <p className="text-[15px] font-bold text-accent leading-snug">{ocorrencia.titulo}</p>
+            {aEditar ? (
+              <input value={editTitulo} onChange={e => setEditTitulo(e.target.value)} autoFocus
+                className="w-full bg-surface-2 border border-border rounded-lg px-2 py-1 text-[14px] font-bold text-accent focus:outline-none focus:border-white/25" />
+            ) : (
+              <p className="text-[15px] font-bold text-accent leading-snug">{ocorrencia.titulo}</p>
+            )}
             <p className="text-[11px] text-accent-subtle mt-0.5">
               {ocorrencia.data_ocorrencia} · {ocorrencia.registado_por}
               {ocorrencia.espacos?.nome && ` · ${ocorrencia.espacos.nome}`}
             </p>
           </div>
-          <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-surface-2 transition-colors shrink-0">
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {podeEditar && !aEditar && (
+              <>
+                <button onClick={() => { setAEditar(true); setEditTitulo(ocorrencia.titulo); setEditDescr(ocorrencia.descricao ?? '') }}
+                  title="Editar" className="p-1.5 rounded-lg hover:bg-surface-2 text-accent-subtle hover:text-accent transition-colors">
+                  <Pencil size={14} />
+                </button>
+                <button onClick={() => setAApagar(true)} title="Apagar"
+                  className="p-1.5 rounded-lg hover:bg-red-400/10 text-accent-subtle hover:text-red-400 transition-colors">
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
+            {aEditar && (
+              <>
+                <button onClick={gravarEdicao} disabled={!editTitulo.trim() || loading}
+                  className="p-1.5 rounded-lg hover:bg-green-400/10 text-green-400 transition-colors disabled:opacity-40">
+                  <Check size={14} />
+                </button>
+                <button onClick={() => setAEditar(false)}
+                  className="p-1.5 rounded-lg hover:bg-surface-2 text-accent-subtle transition-colors">
+                  <X size={14} />
+                </button>
+              </>
+            )}
+            {!aEditar && (
+              <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-surface-2 transition-colors">
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Confirmação apagar */}
+        {aApagar && (
+          <div className="px-5 py-3 bg-red-400/5 border-b border-red-400/20 flex items-center justify-between gap-3 shrink-0">
+            <p className="text-[12px] text-red-400 font-semibold">Apagar esta ocorrência e todo o histórico?</p>
+            <div className="flex gap-2 shrink-0">
+              <button onClick={() => setAApagar(false)}
+                className="px-3 py-1 rounded-lg border border-border text-accent-subtle text-[11px] font-semibold hover:bg-surface-2 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={confirmarApagar} disabled={loading}
+                className="px-3 py-1 rounded-lg border border-red-400/30 bg-red-400/15 text-red-400 text-[11px] font-semibold hover:bg-red-400/25 transition-colors disabled:opacity-50">
+                {loading ? 'A apagar…' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Corpo */}
         <div className="flex-1 min-h-0 overflow-y-auto">
 
-          {ocorrencia.descricao && (
+          {(ocorrencia.descricao || aEditar) && (
             <div className="px-5 py-3 border-b border-border/20">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-accent-subtle mb-1">Descrição</p>
-              <p className="text-[13px] text-accent-muted">{ocorrencia.descricao}</p>
+              {aEditar ? (
+                <textarea value={editDescr} onChange={e => setEditDescr(e.target.value)} rows={3}
+                  placeholder="Descrição (opcional)…"
+                  className="w-full bg-surface-2 border border-border rounded-lg px-2 py-1.5 text-[13px] text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/25 resize-none" />
+              ) : (
+                <p className="text-[13px] text-accent-muted">{ocorrencia.descricao}</p>
+              )}
             </div>
           )}
 

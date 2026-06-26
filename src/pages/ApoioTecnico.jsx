@@ -645,8 +645,10 @@ function VistaOcorrencias({ espacos }) {
           intervencoes={intervIdx[aberta.id] ?? []}
           nomeUtilizador="Admin"
           tipoUtilizador="admin"
+          podeEditar
           onFechar={() => setAberta(null)}
           onAtualizar={atualizar}
+          onApagar={() => setVersao(v => v + 1)}
         />
       )}
       {modalNova && (
