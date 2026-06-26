@@ -65,7 +65,7 @@ const vazio = {
   dj_id: '', dj_externo: '', espaco_id: '', data: '', hora_inicio: '22:00', hora_fim: '02:00',
   valor: '', margem: '', estado: 'proposta', evento: '', notas: '', tipo_slot: '', subtipo_key: '',
   transporte: '', extras: '', notas_contas: '', estado_pagamento: 'pendente', forma_pagamento: '',
-  setup_slot_1: '', setup_slot_2: '', setup_slot_3: '', soundcheck: '',
+  setup_slot_1: '', setup_slot_2: '', setup_slot_3: '', soundcheck: '', turno_id: '',
 }
 
 const ESTADO_PAG_OPCOES = [
@@ -119,6 +119,9 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
   // ── Setup Equipamentos ──
   const [setupEquipamentos, setSetupEquipamentos] = useState([])
+
+  // ── Turnos do espaço ──
+  const [turnosEspaco, setTurnosEspaco] = useState([])
 
   // ── Histórico ──
   const [historico, setHistorico] = useState([])
@@ -270,6 +273,13 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     supabase.from('setup_equipamentos').select('id, nome').eq('ativo', true).order('ordem')
       .then(({ data }) => setSetupEquipamentos(data ?? []))
   }, [])
+
+  // Carrega turnos do espaço quando espaco_id muda
+  useEffect(() => {
+    if (!form.espaco_id) { setTurnosEspaco([]); return }
+    supabase.from('turnos_espaco').select('id, nome, ordem').eq('espaco_id', form.espaco_id).order('ordem')
+      .then(({ data }) => setTurnosEspaco(data ?? []))
+  }, [form.espaco_id])
 
   // Auto-fill setup do espaço em slots novos
   useEffect(() => {
@@ -476,6 +486,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       const { subtipo_key: _sk, ...formData } = form
       const payload = {
         ...formData,
+        turno_id:         formData.turno_id || null,
         dj_id:            djIdFinal,
         dj_nome:          isConvidado ? form.dj_externo.trim() : null,
         espaco_id:        form.espaco_id || null,
@@ -774,11 +785,17 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
           {(!slot || aba === 0) && (simplificado ? (
             /* ── MODO SIMPLIFICADO ── */
             <>
-              {/* Horário */}
+              {/* Horário + Turno */}
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Início" value={form.hora_inicio} onChange={set('hora_inicio')} type="time" required />
                 <Input label="Fim" value={form.hora_fim} onChange={set('hora_fim')} type="time" required />
               </div>
+              {turnosEspaco.length > 0 && (
+                <Select label="Turno" value={form.turno_id ?? ''} onChange={set('turno_id')}>
+                  <option value="">— sem turno —</option>
+                  {turnosEspaco.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                </Select>
+              )}
 
               {/* Subtipo DJ — auto-preenche Valor e Categoria */}
               {!form.dj_externo?.trim() && subtiposDisp.length > 0 && (
@@ -911,6 +928,12 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 <Input label="Início" value={form.hora_inicio} onChange={set('hora_inicio')} type="time" required />
                 <Input label="Fim" value={form.hora_fim} onChange={set('hora_fim')} type="time" required />
               </div>
+              {turnosEspaco.length > 0 && (
+                <Select label="Turno" value={form.turno_id ?? ''} onChange={set('turno_id')}>
+                  <option value="">— sem turno —</option>
+                  {turnosEspaco.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                </Select>
+              )}
 
               {/* Subtipo DJ — auto-preenche Valor e Categoria */}
               {!form.dj_externo?.trim() && subtiposDisp.length > 0 && (
