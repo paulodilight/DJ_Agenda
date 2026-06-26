@@ -1288,6 +1288,10 @@ export function ApoioTecnico() {
                 className={clsx('p-1.5 rounded transition-colors', vista === 'stats' ? 'bg-surface-4 text-accent' : 'text-accent-muted hover:text-accent')}>
                 <BarChart3 size={13} />
               </button>
+              <button onClick={() => setVista('ocorrencias')} title="Ocorrências"
+                className={clsx('p-1.5 rounded transition-colors', vista === 'ocorrencias' ? 'bg-surface-4 text-amber-400' : 'text-accent-muted hover:text-accent')}>
+                <AlertTriangle size={13} />
+              </button>
             </div>
             {/* Ocultar vazios */}
             <button onClick={() => setOcultarVazios(v => !v)}
