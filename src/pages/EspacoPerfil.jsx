@@ -582,8 +582,8 @@ export function EspacoPerfil() {
             <div className="flex flex-col gap-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Informações do Espaço (visível na app DJ)</p>
               <div className="grid grid-cols-3 gap-3">
-                <Input label="Dress Code" value={form.dress_code} onChange={setField('dress_code')} placeholder="ex: Elegante" />
-                <Input label="Refeições" value={form.refeicoes} onChange={setField('refeicoes')} placeholder="ex: Jantar incluído" />
+                <Textarea label="Dress Code" value={form.dress_code} onChange={setField('dress_code')} placeholder="ex: Elegante" rows={2} />
+                <Textarea label="Refeições" value={form.refeicoes} onChange={setField('refeicoes')} placeholder="ex: Jantar incluído" rows={2} />
                 <Input label="Bebidas" value={form.bebidas} onChange={setField('bebidas')} placeholder="ex: Consumição incluída" />
               </div>
             </div>
