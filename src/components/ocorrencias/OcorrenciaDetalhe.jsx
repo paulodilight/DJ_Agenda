@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { X, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { X, CheckCircle, Clock, AlertCircle, Camera, ImageIcon } from 'lucide-react'
 import { clsx } from 'clsx'
 import { supabase } from '@/lib/supabase'
 
@@ -16,49 +16,81 @@ const fmtDT = (ts) => {
     + ' ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
 }
 
+async function uploadFoto(file) {
+  const ext  = file.name.split('.').pop()
+  const path = `intervencoes/${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('ocorrencias').upload(path, file, { upsert: true })
+  if (error) throw error
+  return supabase.storage.from('ocorrencias').getPublicUrl(path).data.publicUrl
+}
+
 export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onAtualizar, nomeUtilizador }) {
-  const [nota,    setNota]    = useState('')
-  const [aFecho,  setAFecho]  = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [nota,      setNota]      = useState('')
+  const [fotoUrl,   setFotoUrl]   = useState(null)
+  const [aEnviar,   setAEnviar]   = useState(false)
+  const [aFecho,    setAFecho]    = useState(false)
+  const [loading,   setLoading]   = useState(false)
+  const camaraRef  = useRef(null)
+  const galeriaRef = useRef(null)
 
   const cfg = STATUS_CFG[ocorrencia.status] ?? STATUS_CFG.aberta
   const Ic  = cfg.icon
 
+  const onFoto = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAEnviar(true)
+    try {
+      setFotoUrl(await uploadFoto(file))
+    } catch (err) {
+      alert('Erro ao enviar foto: ' + err.message)
+    } finally {
+      setAEnviar(false)
+      e.target.value = ''
+    }
+  }
+
   const registarNota = async () => {
-    if (!nota.trim()) return
+    if (!nota.trim() && !fotoUrl) return
     setLoading(true)
     await supabase.from('ocorrencias_intervencoes').insert({
       ocorrencia_id: ocorrencia.id,
-      nota: nota.trim(),
-      tecnico_nome: nomeUtilizador,
+      nota:          nota.trim() || '(foto)',
+      tecnico_nome:  nomeUtilizador,
+      foto_url:      fotoUrl,
     })
     if (ocorrencia.status === 'aberta') {
       await supabase.from('ocorrencias').update({ status: 'em_processo' }).eq('id', ocorrencia.id)
     }
     setNota('')
+    setFotoUrl(null)
     setLoading(false)
     onAtualizar?.()
   }
 
   const fecharOcorrencia = async () => {
     setLoading(true)
-    if (nota.trim()) {
+    if (nota.trim() || fotoUrl) {
       await supabase.from('ocorrencias_intervencoes').insert({
         ocorrencia_id: ocorrencia.id,
-        nota: nota.trim(),
-        tecnico_nome: nomeUtilizador,
+        nota:          nota.trim() || '(foto)',
+        tecnico_nome:  nomeUtilizador,
+        foto_url:      fotoUrl,
       })
     }
     await supabase.from('ocorrencias').update({
-      status: 'fechada',
-      fechada_em: new Date().toISOString(),
+      status:      'fechada',
+      fechada_em:  new Date().toISOString(),
       fechada_por: nomeUtilizador,
     }).eq('id', ocorrencia.id)
     setNota('')
+    setFotoUrl(null)
     setAFecho(false)
     setLoading(false)
     onAtualizar?.()
   }
+
+  const temConteudo = nota.trim() || fotoUrl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -81,6 +113,7 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
           </button>
         </div>
 
+        {/* Corpo */}
         <div className="flex-1 min-h-0 overflow-y-auto">
 
           {ocorrencia.descricao && (
@@ -97,6 +130,7 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
             </div>
           )}
 
+          {/* Histórico */}
           <div className="px-5 py-3 border-b border-border/20">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-accent-subtle mb-2">Histórico</p>
             {intervencoes.length === 0
@@ -104,11 +138,17 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
               : <div className="flex flex-col gap-2">
                   {intervencoes.map(iv => (
                     <div key={iv.id} className="rounded-lg bg-surface-2/60 border border-border/30 px-3 py-2">
-                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
                         <span className="text-[11px] font-semibold text-accent">{iv.tecnico_nome}</span>
                         <span className="text-[10px] text-accent-subtle/60">{fmtDT(iv.created_at)}</span>
                       </div>
-                      <p className="text-[12px] text-accent-muted">{iv.nota}</p>
+                      {iv.nota && iv.nota !== '(foto)' && (
+                        <p className="text-[12px] text-accent-muted mb-1">{iv.nota}</p>
+                      )}
+                      {iv.foto_url && (
+                        <img src={iv.foto_url} alt="Foto intervenção"
+                          className="w-full max-h-32 object-cover rounded-lg border border-border/30 mt-1" />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -127,20 +167,46 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
 
         {/* Acções */}
         {ocorrencia.status !== 'fechada' && (
-          <div className="px-5 py-3 border-t border-border/40 flex flex-col gap-2.5 shrink-0">
+          <div className="px-5 py-3 border-t border-border/40 flex flex-col gap-2 shrink-0">
+
             <textarea
               value={nota}
               onChange={e => setNota(e.target.value)}
-              placeholder="Nota de intervenção (opcional para fechar)…"
+              placeholder="Nota de intervenção…"
               rows={2}
               className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-[13px] text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/25 resize-none"
             />
 
+            {/* Foto da intervenção */}
+            {fotoUrl ? (
+              <div className="relative">
+                <img src={fotoUrl} alt="Foto" className="w-full max-h-28 object-cover rounded-lg border border-border/40" />
+                <button onClick={() => setFotoUrl(null)}
+                  className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80">
+                  <X size={11} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button onClick={() => camaraRef.current?.click()} disabled={aEnviar}
+                  className="flex-1 py-1.5 rounded-lg border border-border/60 text-accent-subtle hover:border-white/20 hover:text-accent transition-colors flex items-center justify-center gap-1.5 text-[11px] disabled:opacity-50">
+                  <Camera size={13} />{aEnviar ? 'A enviar…' : 'Câmara'}
+                </button>
+                <button onClick={() => galeriaRef.current?.click()} disabled={aEnviar}
+                  className="flex-1 py-1.5 rounded-lg border border-border/60 text-accent-subtle hover:border-white/20 hover:text-accent transition-colors flex items-center justify-center gap-1.5 text-[11px] disabled:opacity-50">
+                  <ImageIcon size={13} />{aEnviar ? 'A enviar…' : 'Galeria'}
+                </button>
+              </div>
+            )}
+            <input ref={camaraRef}  type="file" accept="image/*" capture="environment" className="hidden" onChange={onFoto} />
+            <input ref={galeriaRef} type="file" accept="image/*" className="hidden" onChange={onFoto} />
+
+            {/* Botões de acção */}
             {!aFecho ? (
               <div className="flex gap-2">
                 <button
                   onClick={registarNota}
-                  disabled={!nota.trim() || loading}
+                  disabled={!temConteudo || loading}
                   className="flex-1 py-2.5 rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-400 text-[12px] font-semibold hover:bg-amber-400/20 transition-colors disabled:opacity-40">
                   {loading ? 'A registar…' : 'Registar nota'}
                 </button>
@@ -154,9 +220,7 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
             ) : (
               <div className="flex flex-col gap-2">
                 <p className="text-[12px] text-accent-muted text-center">
-                  {nota.trim()
-                    ? 'A nota será gravada e a ocorrência fechada.'
-                    : 'Confirmar fecho da ocorrência?'}
+                  {temConteudo ? 'A nota/foto será gravada e a ocorrência fechada.' : 'Confirmar fecho da ocorrência?'}
                 </p>
                 <div className="flex gap-2">
                   <button onClick={() => setAFecho(false)}

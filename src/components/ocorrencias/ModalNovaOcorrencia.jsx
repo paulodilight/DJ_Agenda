@@ -1,6 +1,14 @@
 import { useState, useRef } from 'react'
-import { X, Camera, AlertTriangle } from 'lucide-react'
+import { X, Camera, ImageIcon, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+
+async function uploadFoto(file) {
+  const ext  = file.name.split('.').pop()
+  const path = `${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('ocorrencias').upload(path, file, { upsert: true })
+  if (error) throw error
+  return supabase.storage.from('ocorrencias').getPublicUrl(path).data.publicUrl
+}
 
 export function ModalNovaOcorrencia({ onFechar, onCriada, nomeUtilizador, tipoUtilizador, espacos = [], espacoIdInicial = null }) {
   const [titulo,    setTitulo]    = useState('')
@@ -9,24 +17,20 @@ export function ModalNovaOcorrencia({ onFechar, onCriada, nomeUtilizador, tipoUt
   const [fotoUrl,   setFotoUrl]   = useState(null)
   const [loading,   setLoading]   = useState(false)
   const [aEnviar,   setAEnviar]   = useState(false)
-  const fileRef = useRef(null)
+  const camaraRef  = useRef(null)
+  const galeriaRef = useRef(null)
 
   const onFoto = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     setAEnviar(true)
     try {
-      const ext  = file.name.split('.').pop()
-      const path = `${Date.now()}.${ext}`
-      const { error } = await supabase.storage.from('ocorrencias').upload(path, file, { upsert: true })
-      if (error) throw error
-      const { data } = supabase.storage.from('ocorrencias').getPublicUrl(path)
-      setFotoUrl(data.publicUrl)
+      setFotoUrl(await uploadFoto(file))
     } catch (err) {
       alert('Erro ao enviar foto: ' + err.message)
     } finally {
       setAEnviar(false)
-      if (fileRef.current) fileRef.current.value = ''
+      e.target.value = ''
     }
   }
 
@@ -35,13 +39,13 @@ export function ModalNovaOcorrencia({ onFechar, onCriada, nomeUtilizador, tipoUt
     setLoading(true)
     try {
       const { error } = await supabase.from('ocorrencias').insert({
-        titulo:              titulo.trim(),
-        descricao:           descricao.trim() || null,
-        foto_url:            fotoUrl,
-        espaco_id:           espacoId || null,
-        registado_por:       nomeUtilizador,
-        registado_por_tipo:  tipoUtilizador,
-        data_ocorrencia:     new Date().toISOString().slice(0, 10),
+        titulo:             titulo.trim(),
+        descricao:          descricao.trim() || null,
+        foto_url:           fotoUrl,
+        espaco_id:          espacoId || null,
+        registado_por:      nomeUtilizador,
+        registado_por_tipo: tipoUtilizador,
+        data_ocorrencia:    new Date().toISOString().slice(0, 10),
       })
       if (error) throw error
       onCriada?.()
@@ -54,10 +58,9 @@ export function ModalNovaOcorrencia({ onFechar, onCriada, nomeUtilizador, tipoUt
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-surface-1 border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90dvh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-surface-1 border border-border rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[85dvh]">
 
-        {/* Header */}
         <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <AlertTriangle size={16} className="text-amber-400" />
@@ -70,7 +73,6 @@ export function ModalNovaOcorrencia({ onFechar, onCriada, nomeUtilizador, tipoUt
 
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
 
-          {/* Espaço */}
           {espacos.length > 0 && !espacoIdInicial && (
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-widest text-accent-subtle mb-1 block">Local</label>
@@ -82,7 +84,6 @@ export function ModalNovaOcorrencia({ onFechar, onCriada, nomeUtilizador, tipoUt
             </div>
           )}
 
-          {/* Título */}
           <div>
             <label className="text-[11px] font-semibold uppercase tracking-widest text-accent-subtle mb-1 block">Ocorrência *</label>
             <input value={titulo} onChange={e => setTitulo(e.target.value)}
@@ -90,7 +91,6 @@ export function ModalNovaOcorrencia({ onFechar, onCriada, nomeUtilizador, tipoUt
               className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-[13px] text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/25" />
           </div>
 
-          {/* Descrição */}
           <div>
             <label className="text-[11px] font-semibold uppercase tracking-widest text-accent-subtle mb-1 block">Descrição</label>
             <textarea value={descricao} onChange={e => setDescricao(e.target.value)}
@@ -100,28 +100,36 @@ export function ModalNovaOcorrencia({ onFechar, onCriada, nomeUtilizador, tipoUt
 
           {/* Foto */}
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-accent-subtle mb-1 block">Foto</label>
-            {fotoUrl
-              ? <div className="relative">
-                  <img src={fotoUrl} alt="Foto" className="w-full max-h-40 object-cover rounded-lg border border-border/40" />
-                  <button onClick={() => setFotoUrl(null)}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80">
-                    <X size={12} />
-                  </button>
-                </div>
-              : <button onClick={() => fileRef.current?.click()} disabled={aEnviar}
-                  className="w-full py-3 rounded-lg border border-dashed border-border/60 text-accent-subtle hover:border-white/20 hover:text-accent transition-colors flex items-center justify-center gap-2 text-[12px] disabled:opacity-50">
-                  <Camera size={15} />
-                  {aEnviar ? 'A enviar…' : 'Tirar / escolher foto'}
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-accent-subtle mb-1.5 block">Foto</label>
+            {fotoUrl ? (
+              <div className="relative">
+                <img src={fotoUrl} alt="Foto" className="w-full max-h-40 object-cover rounded-lg border border-border/40" />
+                <button onClick={() => setFotoUrl(null)}
+                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80">
+                  <X size={12} />
                 </button>
-            }
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFoto} />
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button onClick={() => camaraRef.current?.click()} disabled={aEnviar}
+                  className="flex-1 py-2.5 rounded-lg border border-dashed border-border/60 text-accent-subtle hover:border-white/20 hover:text-accent transition-colors flex items-center justify-center gap-1.5 text-[12px] disabled:opacity-50">
+                  <Camera size={14} />
+                  {aEnviar ? 'A enviar…' : 'Câmara'}
+                </button>
+                <button onClick={() => galeriaRef.current?.click()} disabled={aEnviar}
+                  className="flex-1 py-2.5 rounded-lg border border-dashed border-border/60 text-accent-subtle hover:border-white/20 hover:text-accent transition-colors flex items-center justify-center gap-1.5 text-[12px] disabled:opacity-50">
+                  <ImageIcon size={14} />
+                  {aEnviar ? 'A enviar…' : 'Galeria'}
+                </button>
+              </div>
+            )}
+            <input ref={camaraRef}  type="file" accept="image/*" capture="environment" className="hidden" onChange={onFoto} />
+            <input ref={galeriaRef} type="file" accept="image/*" className="hidden" onChange={onFoto} />
           </div>
 
           <p className="text-[11px] text-accent-subtle/60">Registado por: <strong className="text-accent-subtle">{nomeUtilizador}</strong></p>
         </div>
 
-        {/* Footer */}
         <div className="px-5 py-3 border-t border-border/40 flex gap-2 shrink-0">
           <button onClick={onFechar}
             className="flex-1 py-2.5 rounded-xl border border-border text-accent-subtle text-[13px] font-semibold hover:bg-surface-2 transition-colors">
