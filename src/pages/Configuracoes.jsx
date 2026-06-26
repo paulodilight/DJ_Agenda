@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Settings, AlertTriangle, Ban, ScrollText, Car, Tag, Percent, Clock, Receipt } from 'lucide-react'
+import { Settings, AlertTriangle, Ban, ScrollText, Car, Tag, Percent, Clock, Receipt, Bell } from 'lucide-react'
 import { configuracoesApi, regrasAtuacaoApi } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
-import { Input } from '@/components/ui/Input'
+import { Input, Textarea } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { useAppStore } from '@/store'
@@ -174,6 +176,15 @@ export function Configuracoes() {
   const [transportes, setTransportes] = useState(TRANSP_DEFAULTS)
   const [descontos, setDescontos]     = useState(DESC_DEFAULTS)
   const [descontoPct, setDescontoPct] = useState('25')
+  const [novidadeGeral, setNovidadeGeral] = useState({ id: null, titulo: '', texto: '', imagem_url: '', ativo: false })
+  const [novidadeGeralSaving, setNovidadeGeralSaving] = useState(false)
+
+  useEffect(() => {
+    supabase.from('novidades').select('*').eq('tipo', 'geral').maybeSingle()
+      .then(({ data }) => {
+        if (data) setNovidadeGeral({ id: data.id, titulo: data.titulo ?? '', texto: data.texto ?? '', imagem_url: data.imagem_url ?? '', ativo: data.ativo })
+      })
+  }, [])
 
   useEffect(() => {
     Promise.all([configuracoesApi.listar(), regrasAtuacaoApi.obter()])
@@ -222,6 +233,21 @@ export function Configuracoes() {
 
   const setDesc = (i, field, val) =>
     setDescontos(prev => prev.map((d, idx) => idx === i ? { ...d, [field]: val } : d))
+
+  const guardarNovidadeGeral = async () => {
+    setNovidadeGeralSaving(true)
+    try {
+      const payload = { tipo: 'geral', espaco_id: null, titulo: novidadeGeral.titulo || null, texto: novidadeGeral.texto || null, imagem_url: novidadeGeral.imagem_url || null, ativo: novidadeGeral.ativo }
+      if (novidadeGeral.id) {
+        await supabase.from('novidades').update(payload).eq('id', novidadeGeral.id)
+      } else {
+        const { data } = await supabase.from('novidades').insert(payload).select().single()
+        if (data) setNovidadeGeral(n => ({ ...n, id: data.id }))
+      }
+    } finally {
+      setNovidadeGeralSaving(false)
+    }
+  }
 
   const guardar = useCallback(async () => {
     setSaving(true); setErro(null); setSucesso(false)
@@ -272,6 +298,36 @@ export function Configuracoes() {
 
       {erro && <Alerta tipo="erro" mensagem={erro} className="mb-4" />}
       {sucesso && <Alerta tipo="sucesso" mensagem="Configurações guardadas com sucesso." className="mb-4" />}
+
+      {/* ── Novidade Geral ── */}
+      <Card className="mb-4">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell size={13} className="text-amber-400" />
+              <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Novidade Geral — visível a todos os DJs</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-accent-subtle">{novidadeGeral.ativo ? 'Activa' : 'Inactiva'}</span>
+              <button type="button" onClick={() => setNovidadeGeral(n => ({ ...n, ativo: !n.ativo }))}
+                className={clsx('w-9 h-5 rounded-full transition-colors relative', novidadeGeral.ativo ? 'bg-amber-500' : 'bg-surface-3')}>
+                <div className={clsx('absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform shadow-sm', novidadeGeral.ativo ? 'left-[18px]' : 'left-0.5')} />
+              </button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-3">
+          <p className="text-xs text-accent-subtle">Aparece como notificação em todos os slots da app DJ, quando activa e ainda não vista pelo DJ.</p>
+          <Input label="Título" value={novidadeGeral.titulo} onChange={e => setNovidadeGeral(n => ({ ...n, titulo: e.target.value }))} placeholder="ex: Nova política de pontualidade" />
+          <Textarea label="Texto" value={novidadeGeral.texto} onChange={e => setNovidadeGeral(n => ({ ...n, texto: e.target.value }))} placeholder="Descreve a novidade..." rows={3} />
+          <Input label="Imagem (URL)" value={novidadeGeral.imagem_url} onChange={e => setNovidadeGeral(n => ({ ...n, imagem_url: e.target.value }))} placeholder="https://..." />
+          <div className="flex justify-end">
+            <Button type="button" onClick={guardarNovidadeGeral} loading={novidadeGeralSaving} size="sm">
+              Guardar Novidade
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
 
       {/* ── Regras de atuação ── */}
       <Card className="mb-4">

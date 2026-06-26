@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, Save, ChevronLeft, ChevronRight, ImageIcon, X, ExternalLink, Zap } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, ChevronLeft, ChevronRight, ImageIcon, X, ExternalLink, Zap, Bell } from 'lucide-react'
 import { espacosApi, turnosApi, djsFixosApi, espacoDjPreferenciasApi, turnoValoresDiaApi, categoriasDjApi, turnoCategoriaApi } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { useDJs } from '@/hooks/useDJs'
@@ -106,11 +106,21 @@ export function EspacoPerfil() {
   const [mostrarFormGrupo, setMostrarFormGrupo] = useState(false)
   const [criandoGrupo, setCriandoGrupo] = useState(false)
   const [setupEquipamentos, setSetupEquipamentos] = useState([])
+  const [novidade, setNovidade] = useState({ id: null, titulo: '', texto: '', imagem_url: '', ativo: false })
+  const [novidadeSaving, setNovidadeSaving] = useState(false)
 
   useEffect(() => {
     supabase.from('setup_equipamentos').select('id, nome').eq('ativo', true).order('ordem')
       .then(({ data }) => setSetupEquipamentos(data ?? []))
   }, [])
+
+  useEffect(() => {
+    if (!id) return
+    supabase.from('novidades').select('*').eq('tipo', 'espaco').eq('espaco_id', id).maybeSingle()
+      .then(({ data }) => {
+        if (data) setNovidade({ id: data.id, titulo: data.titulo ?? '', texto: data.texto ?? '', imagem_url: data.imagem_url ?? '', ativo: data.ativo })
+      })
+  }, [id])
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro(null)
@@ -336,6 +346,21 @@ export function EspacoPerfil() {
       ...f,
       [turnoKey]: { ...f[turnoKey], [diaIdx]: djId || null },
     }))
+
+  const guardarNovidade = async () => {
+    setNovidadeSaving(true)
+    try {
+      const payload = { tipo: 'espaco', espaco_id: id, titulo: novidade.titulo || null, texto: novidade.texto || null, imagem_url: novidade.imagem_url || null, ativo: novidade.ativo }
+      if (novidade.id) {
+        await supabase.from('novidades').update(payload).eq('id', novidade.id)
+      } else {
+        const { data } = await supabase.from('novidades').insert(payload).select().single()
+        if (data) setNovidade(n => ({ ...n, id: data.id }))
+      }
+    } finally {
+      setNovidadeSaving(false)
+    }
+  }
 
   // ── Guardar ─────────────────────────────────────────────────────────────────
 
@@ -602,6 +627,31 @@ export function EspacoPerfil() {
                 </div>
               </div>
             )}
+
+            {/* ── Novidade do Espaço ── */}
+            <div className="flex flex-col gap-3 border border-amber-500/20 rounded-xl p-4 bg-amber-500/3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bell size={13} className="text-amber-400" />
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-400/80">Novidade do Espaço (app DJ)</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-accent-subtle">{novidade.ativo ? 'Activa' : 'Inactiva'}</span>
+                  <button type="button" onClick={() => setNovidade(n => ({ ...n, ativo: !n.ativo }))}
+                    className={clsx('w-9 h-5 rounded-full transition-colors relative', novidade.ativo ? 'bg-amber-500' : 'bg-surface-3')}>
+                    <div className={clsx('absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform shadow-sm', novidade.ativo ? 'left-[18px]' : 'left-0.5')} />
+                  </button>
+                </div>
+              </div>
+              <Input label="Título" value={novidade.titulo} onChange={e => setNovidade(n => ({ ...n, titulo: e.target.value }))} placeholder="ex: Atualização de equipamento" />
+              <Textarea label="Texto" value={novidade.texto} onChange={e => setNovidade(n => ({ ...n, texto: e.target.value }))} placeholder="Descreve a novidade para o DJ..." rows={3} />
+              <Input label="Imagem (URL)" value={novidade.imagem_url} onChange={e => setNovidade(n => ({ ...n, imagem_url: e.target.value }))} placeholder="https://..." />
+              <div className="flex justify-end">
+                <Button type="button" onClick={guardarNovidade} loading={novidadeSaving} size="sm">
+                  Guardar Novidade
+                </Button>
+              </div>
+            </div>
 
             {/* ── Modo livre (sem turnos) ── */}
             <div className="flex items-center justify-between rounded-xl border border-border bg-surface-1 px-4 py-3">
