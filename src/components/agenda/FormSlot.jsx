@@ -498,13 +498,13 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         estado_pagamento: form.estado_pagamento || null,
         forma_pagamento:  form.forma_pagamento  || null,
         tipo_slot: isConvidado ? 'convidado' : (form.tipo_slot || 'residente'),
-        evento:    form.evento.trim() || null,
-        notas:     form.notas.trim() || null,
+        evento:    form.evento?.trim() || null,
+        notas:     form.notas?.trim() || null,
         origem:    'manual',
         setup_slot_1: form.setup_slot_1 || null,
         setup_slot_2: form.setup_slot_2 || null,
         setup_slot_3: form.setup_slot_3 || null,
-        soundcheck: form.soundcheck.trim() || null,
+        soundcheck: form.soundcheck?.trim() || null,
       }
       if (slot?.id) {
         await agendaApi.actualizar(slot.id, payload)
