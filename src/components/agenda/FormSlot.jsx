@@ -59,6 +59,8 @@ const KEY_TIPO_MAP = {
   'premium':       'premium',
 }
 
+const CATEGORIA_TIPO_MAP = { 1: 'residente anl', 2: 'residente', 3: 'convidado int', 4: 'convidado ext', 5: 'premium' }
+
 const safeParse = (s, fb) => { try { return s ? JSON.parse(s) : fb } catch { return fb } }
 
 const vazio = {
@@ -280,6 +282,16 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     supabase.from('turnos_espaco').select('id, nome, ordem').eq('espaco_id', form.espaco_id).order('ordem')
       .then(({ data }) => setTurnosEspaco(data ?? []))
   }, [form.espaco_id])
+
+  // Auto-define tipo_slot a partir da 1ª categoria do DJ (só em slots novos)
+  useEffect(() => {
+    if (!form.dj_id || slot?.id) return
+    supabase.from('dj_categorias').select('categoria_id').eq('dj_id', form.dj_id).order('posicao').limit(1)
+      .then(({ data }) => {
+        const tipoSlot = CATEGORIA_TIPO_MAP[data?.[0]?.categoria_id]
+        if (tipoSlot) setForm(f => ({ ...f, tipo_slot: tipoSlot }))
+      })
+  }, [form.dj_id, slot?.id])
 
   // Auto-fill setup do espaço em slots novos
   useEffect(() => {
@@ -797,16 +809,6 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 </Select>
               )}
 
-              {/* Subtipo DJ — auto-preenche Valor e Categoria */}
-              {!form.dj_externo?.trim() && subtiposDisp.length > 0 && (
-                <Select label="Subtipo DJ" value={form.subtipo_key} onChange={e => setSubtipoKey(e.target.value)}>
-                  <option value="">— selecionar subtipo —</option>
-                  {subtiposDisp.map(s => (
-                    <option key={s.key} value={s.key}>{s.label}{s.total > 0 ? ` · ${s.total}€` : ''}</option>
-                  ))}
-                </Select>
-              )}
-
               <div className="flex flex-col gap-1.5">
                 <DJCombobox
                   label="DJ da base"
@@ -935,15 +937,6 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 </Select>
               )}
 
-              {/* Subtipo DJ — auto-preenche Valor e Categoria */}
-              {!form.dj_externo?.trim() && subtiposDisp.length > 0 && (
-                <Select label="Subtipo DJ" value={form.subtipo_key} onChange={e => setSubtipoKey(e.target.value)}>
-                  <option value="">— selecionar subtipo —</option>
-                  {subtiposDisp.map(s => (
-                    <option key={s.key} value={s.key}>{s.label}{s.total > 0 ? ` · ${s.total}€` : ''}</option>
-                  ))}
-                </Select>
-              )}
 
               {/* Margem — só visível para DJ convidado */}
               {form.dj_externo?.trim() && (
