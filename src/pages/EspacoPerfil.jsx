@@ -8,6 +8,7 @@ import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
+import { NovidadeImageUpload } from '@/components/NovidadeImageUpload'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { formatarEuro } from '@/utils/formatacao'
 import { useAppStore } from '@/store'
@@ -646,7 +647,7 @@ export function EspacoPerfil() {
               </div>
               <Input label="Título" value={novidade.titulo} onChange={e => setNovidade(n => ({ ...n, titulo: e.target.value }))} placeholder="ex: Atualização de equipamento" />
               <Textarea label="Texto" value={novidade.texto} onChange={e => setNovidade(n => ({ ...n, texto: e.target.value }))} placeholder="Descreve a novidade para o DJ..." rows={3} />
-              <Input label="Imagem (URL)" value={novidade.imagem_url} onChange={e => setNovidade(n => ({ ...n, imagem_url: e.target.value }))} placeholder="https://..." />
+              <NovidadeImageUpload value={novidade.imagem_url} onChange={url => setNovidade(n => ({ ...n, imagem_url: url }))} />
               <div className="flex justify-end">
                 <Button type="button" onClick={guardarNovidade} loading={novidadeSaving} size="sm">
                   Guardar Novidade

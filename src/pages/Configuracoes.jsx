@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { useAppStore } from '@/store'
+import { NovidadeImageUpload } from '@/components/NovidadeImageUpload'
 import { clsx } from 'clsx'
 
 const CAT_DEFAULTS = [
@@ -321,7 +322,7 @@ export function Configuracoes() {
           <p className="text-xs text-accent-subtle">Aparece como notificação em todos os slots da app DJ, quando activa e ainda não vista pelo DJ.</p>
           <Input label="Título" value={novidadeGeral.titulo} onChange={e => setNovidadeGeral(n => ({ ...n, titulo: e.target.value }))} placeholder="ex: Nova política de pontualidade" />
           <Textarea label="Texto" value={novidadeGeral.texto} onChange={e => setNovidadeGeral(n => ({ ...n, texto: e.target.value }))} placeholder="Descreve a novidade..." rows={3} />
-          <Input label="Imagem (URL)" value={novidadeGeral.imagem_url} onChange={e => setNovidadeGeral(n => ({ ...n, imagem_url: e.target.value }))} placeholder="https://..." />
+          <NovidadeImageUpload value={novidadeGeral.imagem_url} onChange={url => setNovidadeGeral(n => ({ ...n, imagem_url: url }))} />
           <div className="flex justify-end">
             <Button type="button" onClick={guardarNovidadeGeral} loading={novidadeGeralSaving} size="sm">
               Guardar Novidade
