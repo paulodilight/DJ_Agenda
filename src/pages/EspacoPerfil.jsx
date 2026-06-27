@@ -106,7 +106,7 @@ export function EspacoPerfil() {
   const [mostrarFormGrupo, setMostrarFormGrupo] = useState(false)
   const [criandoGrupo, setCriandoGrupo] = useState(false)
   const [setupEquipamentos, setSetupEquipamentos] = useState([])
-  const [novidade, setNovidade] = useState({ id: null, titulo: '', texto: '', imagem_url: '', ativo: false })
+  const [novidade, setNovidade] = useState({ id: null, titulo: '', texto: '', imagem_url: '', ativo: true })
   const [novidadeSaving, setNovidadeSaving] = useState(false)
 
   useEffect(() => {
