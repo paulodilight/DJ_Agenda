@@ -353,6 +353,7 @@ export function EspacoPerfil() {
       const payload = { tipo: 'espaco', espaco_id: id, titulo: novidade.titulo || null, texto: novidade.texto || null, imagem_url: novidade.imagem_url || null, ativo: novidade.ativo }
       if (novidade.id) {
         await supabase.from('novidades').update(payload).eq('id', novidade.id)
+        await supabase.from('novidades_vistas').delete().eq('novidade_id', novidade.id)
       } else {
         const { data } = await supabase.from('novidades').insert(payload).select().single()
         if (data) setNovidade(n => ({ ...n, id: data.id }))

@@ -240,6 +240,7 @@ export function Configuracoes() {
       const payload = { tipo: 'geral', espaco_id: null, titulo: novidadeGeral.titulo || null, texto: novidadeGeral.texto || null, imagem_url: novidadeGeral.imagem_url || null, ativo: novidadeGeral.ativo }
       if (novidadeGeral.id) {
         await supabase.from('novidades').update(payload).eq('id', novidadeGeral.id)
+        await supabase.from('novidades_vistas').delete().eq('novidade_id', novidadeGeral.id)
       } else {
         const { data } = await supabase.from('novidades').insert(payload).select().single()
         if (data) setNovidadeGeral(n => ({ ...n, id: data.id }))
