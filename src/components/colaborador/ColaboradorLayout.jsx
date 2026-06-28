@@ -38,7 +38,6 @@ function LogoXclusive() {
   return (
     <div className="flex items-center gap-2">
       <img src="/logo-apoiot.png" alt="Xclusive TS" className="w-8 h-8 object-contain" />
-      <span className="text-sm font-bold tracking-widest text-accent uppercase">Clusive</span>
     </div>
   )
 }
@@ -124,7 +123,6 @@ export function ColaboradorLayout() {
               <Avatar nome={colaborador?.nome} foto={colaborador?.foto_url} tamanho="sm" />
               <span className="text-xs text-accent-muted">{colaborador?.nome}</span>
             </div>
-            <BotaoNotificacoes />
             <button onClick={toggleTheme} title={lightMode ? 'Modo escuro' : 'Modo claro'}
               className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent-subtle hover:text-amber-400 hover:border-amber-400/40 transition-colors">
               {lightMode ? <Moon size={13} /> : <Sun size={13} />}

@@ -66,10 +66,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [guardado, setGuardado]   = useState(false)
   const [erro, setErro]           = useState(null)
   const touchX = useRef(null)
-  const [eventoListas,    setEventoListas]    = useState([])
-  const [eventoChecks,    setEventoChecks]    = useState(new Set())
-  const [eventoSubmetido, setEventoSubmetido] = useState(false)
-  const [guardandoCl,     setGuardandoCl]     = useState(false)
+  const [eventoListas,  setEventoListas]  = useState([])
+  const [eventoChecks,  setEventoChecks]  = useState(new Set())
+  const [clSubmetidas,  setClSubmetidas]  = useState(new Set()) // Set de checklist_id já guardados
+  const [clGuardando,   setClGuardando]   = useState(new Set()) // Set de checklist_id a guardar agora
 
   // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
@@ -121,18 +121,17 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
         .eq('evento_id', evento.id)
         .eq('tecnico_id', colaborador.id) : Promise.resolve({ data: [] }),
       colaborador?.id ? supabase.from('checklist_submissoes')
-        .select('id')
+        .select('checklist_id')
         .eq('evento_id', evento.id)
-        .eq('tecnico_id', colaborador.id)
-        .maybeSingle() : Promise.resolve({ data: null }),
-    ]).then(([{ data: ecs }, { data: chks }, { data: sub }]) => {
+        .eq('tecnico_id', colaborador.id) : Promise.resolve({ data: [] }),
+    ]).then(([{ data: ecs }, { data: chks }, { data: subs }]) => {
       if (!activo) return
       setEventoListas((ecs ?? []).map(ec => ({
         clId: ec.checklist_id, nome: ec.checklists?.nome ?? '?',
         itens: (ec.checklists?.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem),
       })))
       setEventoChecks(new Set((chks ?? []).map(c => c.checklist_item_id)))
-      setEventoSubmetido(!!sub)
+      setClSubmetidas(new Set((subs ?? []).map(s => s.checklist_id)))
     })
     return () => { activo = false }
   }, [evento?.id, colaborador?.id])
@@ -159,8 +158,8 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     finally { setGuardando(false) }
   }
 
-  const toggleCheck = async (itemId) => {
-    if (!colaborador?.id || eventoSubmetido) return
+  const toggleCheck = async (itemId, checklistId) => {
+    if (!colaborador?.id || clSubmetidas.has(checklistId)) return
     const checked = eventoChecks.has(itemId)
     setEventoChecks(prev => { const s = new Set(prev); if (checked) s.delete(itemId); else s.add(itemId); return s })
     if (!checked) {
@@ -176,16 +175,17 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     }
   }
 
-  const guardarChecklist = async () => {
-    if (!colaborador?.id || eventoSubmetido || guardandoCl) return
-    setGuardandoCl(true)
+  const guardarChecklist = async (checklistId) => {
+    if (!colaborador?.id || clSubmetidas.has(checklistId) || clGuardando.has(checklistId)) return
+    setClGuardando(prev => new Set([...prev, checklistId]))
     const { error } = await supabase.from('checklist_submissoes').insert({
-      evento_id: evento.id,
-      tecnico_id: colaborador.id,
+      evento_id:    evento.id,
+      tecnico_id:   colaborador.id,
+      checklist_id: checklistId,
     })
-    if (!error) setEventoSubmetido(true)
+    if (!error) setClSubmetidas(prev => new Set([...prev, checklistId]))
     else console.error('checklist_submissoes insert error:', error)
-    setGuardandoCl(false)
+    setClGuardando(prev => { const s = new Set(prev); s.delete(checklistId); return s })
   }
 
   const goAba = (novaAba, direcao) => {
@@ -342,65 +342,71 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
           ) : aba === 'checklist' ? (
             <div className="flex flex-col gap-3 py-2">
-              {eventoSubmetido && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <Lock size={11} className="text-green-400 shrink-0" />
-                  <p className="text-green-400 font-semibold" style={{ fontSize: 11 }}>Checklist submetida — leitura</p>
-                </div>
-              )}
               {eventoListas.length === 0 && (
                 <p className="text-center italic py-6" style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>Sem checklists neste evento.</p>
               )}
-              {eventoListas.map(lista => (
-                <div key={lista.clId} className="border border-white/10 rounded-xl overflow-hidden">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
-                    <ListChecks size={12} className="text-amber-400 shrink-0" />
-                    <p className="font-semibold text-amber-400" style={{ fontSize: 12 }}>{lista.nome}</p>
-                  </div>
-                  <div className="flex flex-col">
-                    {lista.itens.map((item) => {
-                      const checked = eventoChecks.has(item.id)
-                      return (
-                        <button key={item.id}
-                          onClick={() => toggleCheck(item.id)}
-                          disabled={!isAtribuido || eventoSubmetido}
-                          className={clsx(
-                            'flex items-center gap-3 px-3 py-2.5 border-b border-white/5 last:border-0 text-left transition-colors',
-                            checked ? 'bg-green-500/10' : 'hover:bg-white/5',
-                            (!isAtribuido || eventoSubmetido) ? 'cursor-default' : 'cursor-pointer'
-                          )}>
-                          <span className={clsx(
-                            'w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors',
-                            checked ? 'bg-green-500/30 border-green-500/60' : 'border-white/20'
-                          )}>
-                            {checked && <Check size={12} className="text-green-400" />}
-                          </span>
-                          <span className={clsx('flex-1', checked ? 'line-through opacity-50' : 'opacity-80')} style={{ fontSize: 13 }}>
-                            {item.texto}
-                          </span>
+              {eventoListas.map(lista => {
+                const submetida = clSubmetidas.has(lista.clId)
+                const aGuardar  = clGuardando.has(lista.clId)
+                const total     = lista.itens.length
+                const feitos    = lista.itens.filter(it => eventoChecks.has(it.id)).length
+                return (
+                  <div key={lista.clId} className="border border-white/10 rounded-xl overflow-hidden">
+                    {/* Cabeçalho do card */}
+                    <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
+                      <ListChecks size={12} className={submetida ? 'text-green-400 shrink-0' : 'text-amber-400 shrink-0'} />
+                      <p className={clsx('font-semibold flex-1', submetida ? 'text-green-400' : 'text-amber-400')} style={{ fontSize: 12 }}>
+                        {lista.nome}
+                      </p>
+                      {submetida ? (
+                        <span className="inline-flex items-center gap-1 text-green-400" style={{ fontSize: 10 }}>
+                          <Lock size={10} /> Guardado
+                        </span>
+                      ) : isAtribuido && total > 0 && (
+                        <button
+                          onClick={() => guardarChecklist(lista.clId)}
+                          disabled={aGuardar}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 disabled:opacity-50 transition-all"
+                          style={{ fontSize: 10 }}>
+                          <Lock size={10} />
+                          {aGuardar ? '…' : `Guardar ${feitos}/${total}`}
                         </button>
-                      )
-                    })}
-                    {lista.itens.length === 0 && (
-                      <p className="px-3 py-2 italic opacity-30" style={{ fontSize: 12 }}>Sem itens.</p>
-                    )}
+                      )}
+                    </div>
+                    {/* Itens */}
+                    <div className="flex flex-col">
+                      {lista.itens.map((item) => {
+                        const checked = eventoChecks.has(item.id)
+                        return (
+                          <button key={item.id}
+                            onClick={() => toggleCheck(item.id, lista.clId)}
+                            disabled={!isAtribuido || submetida}
+                            className={clsx(
+                              'flex items-center gap-3 px-3 py-2.5 border-b border-white/5 last:border-0 text-left transition-colors',
+                              checked ? 'bg-green-500/10' : 'hover:bg-white/5',
+                              (!isAtribuido || submetida) ? 'cursor-default' : 'cursor-pointer'
+                            )}>
+                            <span className={clsx(
+                              'w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors',
+                              checked ? 'bg-green-500/30 border-green-500/60' : 'border-white/20'
+                            )}>
+                              {checked && <Check size={12} className="text-green-400" />}
+                            </span>
+                            <span className={clsx('flex-1', checked ? 'line-through opacity-50' : 'opacity-80')} style={{ fontSize: 13 }}>
+                              {item.texto}
+                            </span>
+                          </button>
+                        )
+                      })}
+                      {lista.itens.length === 0 && (
+                        <p className="px-3 py-2 italic opacity-30" style={{ fontSize: 12 }}>Sem itens.</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {!isAtribuido && (
+                )
+              })}
+              {!isAtribuido && eventoListas.length > 0 && (
                 <p className="text-center opacity-40 italic" style={{ fontSize: 12 }}>Só técnicos atribuídos podem marcar itens.</p>
-              )}
-              {isAtribuido && !eventoSubmetido && eventoListas.length > 0 && (
-                <button onClick={guardarChecklist} disabled={guardandoCl}
-                  className="mt-1 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-green-500/15 border border-green-500/30 text-green-400 font-semibold hover:bg-green-500/25 disabled:opacity-50 transition-all"
-                  style={{ fontSize: 13 }}>
-                  <Lock size={13} />
-                  {guardandoCl ? 'A guardar…' : (() => {
-                    const total  = eventoListas.reduce((s, l) => s + l.itens.length, 0)
-                    const feitos = eventoListas.reduce((s, l) => s + l.itens.filter(it => eventoChecks.has(it.id)).length, 0)
-                    return `Guardar (${feitos}/${total})`
-                  })()}
-                </button>
               )}
             </div>
 
