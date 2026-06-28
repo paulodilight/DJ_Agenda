@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, MapPin, CalendarDays, Ban,
   Settings, LogOut, Mic2, Bell, Music2, Scale, Send, Wallet,
-  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw, Building2,
+  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw, Building2, Clock,
 } from 'lucide-react'
 import { useAuthStore, useMesStore, useAppStore } from '@/store'
 import { configuracoesApi } from '@/lib/api'
@@ -27,7 +27,8 @@ const ROTAS = [
   { path: '/artistas',      label: 'Artistas' },
   { path: '/espacos',       label: 'Clientes' },
   { path: '/bloqueios',     label: 'Bloqueios' },
-  { path: '/apoio-tecnico', label: 'Apoio T.' },
+  { path: '/apoio-tecnico',  label: 'Apoio T.' },
+  { path: '/pontualidades', label: 'Pontualidades' },
   { path: '/configuracoes', label: 'Configurações' },
 ]
 
@@ -58,8 +59,9 @@ const navPrincipal = [
   { para: '/comunicacao',   icone: Send,            label: 'Comunicação' },
   { para: '/contas',        icone: Wallet,          label: 'Contas' },
   { para: '/pagamentos',    icone: Wallet,          label: 'Pagamentos' },
-  { para: '/apoio-tecnico', icone: Headphones,      label: 'Apoio T.' },
-  { para: '/club',          icone: Building2,        label: 'Club' },
+  { para: '/apoio-tecnico',   icone: Headphones, label: 'Apoio T.' },
+  { para: '/club',            icone: Building2,  label: 'Club' },
+  { para: '/pontualidades',   icone: Clock,      label: 'Pontualidades' },
 ]
 
 const navGestao = [

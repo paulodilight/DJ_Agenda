@@ -27,6 +27,7 @@ import { DJConvidados } from '@/pages/DJConvidados'
 import { Artistas } from '@/pages/Artistas'
 import { ArtistaPerfil } from '@/pages/ArtistaPerfil'
 import { Club } from '@/pages/Club'
+import { Pontualidades } from '@/pages/Pontualidades'
 import { ResetPassword } from '@/pages/ResetPassword'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { UndoProvider } from '@/contexts/UndoContext'
@@ -97,6 +98,7 @@ export default function App() {
           </Route>
           <Route path="pagamentos" element={<Pagamentos />} />
           <Route path="club" element={<Club />} />
+          <Route path="pontualidades" element={<Pontualidades />} />
           <Route path="configuracoes" element={<Configuracoes />} />
         </Route>
         {/* ── Área dos colaboradores (Apoio T) ── */}
