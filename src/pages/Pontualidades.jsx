@@ -140,16 +140,19 @@ function TabTecnicos() {
     })
   }, [])
 
+  const dataLinha = (l) =>
+    l.evento?.data_evento ?? l.entrada?.registado_em?.slice(0,10) ?? l.saida?.registado_em?.slice(0,10)
+
   const nomes  = useMemo(() => [...new Set(todas.map(l => l.nome).filter(n => n !== '—'))].sort(), [todas])
   const meses  = useMemo(() => {
-    const set = new Set(todas.map(l => anoMesDeStr(l.evento?.data_evento)).filter(Boolean))
+    const set = new Set(todas.map(l => anoMesDeStr(dataLinha(l))).filter(Boolean))
     return [...set].sort().reverse()
   }, [todas])
 
   const linhas = useMemo(() => {
     let r = todas
     if (nomeSel) r = r.filter(l => l.nome === nomeSel)
-    if (mesSel)  r = r.filter(l => anoMesDeStr(l.evento?.data_evento) === mesSel)
+    if (mesSel)  r = r.filter(l => anoMesDeStr(dataLinha(l)) === mesSel)
     return r.sort((a, b) => {
       const ta = a.entrada?.registado_em ?? a.saida?.registado_em ?? ''
       const tb = b.entrada?.registado_em ?? b.saida?.registado_em ?? ''
@@ -173,9 +176,9 @@ function TabTecnicos() {
               const geo = l.entrada ?? l.saida
               return (
                 <Linha key={i} cells={[
-                  fmtData(l.evento?.data_evento),
+                  fmtData(dataLinha(l)),
                   <span className="font-semibold text-accent">{l.nome}</span>,
-                  l.evento?.evento ?? '—',
+                  l.evento?.evento ?? <span className="text-accent-subtle/40 italic">evento apagado</span>,
                   <span className={clsx('font-mono', l.entrada ? 'text-green-400' : 'text-accent-subtle/40')}>
                     {l.entrada ? fmt(l.entrada.registado_em) : '—'}
                   </span>,
