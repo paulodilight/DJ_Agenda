@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Check, ListChecks } from 'lucide-react'
+import { ChevronLeft, Check, ListChecks, Lock } from 'lucide-react'
 import { clsx } from 'clsx'
 import { supabase } from '@/lib/supabase'
 import { useColaboradorStore } from '@/store'
@@ -11,12 +11,14 @@ export function ChecklistEvento() {
   const navigate       = useNavigate()
   const colaborador    = useColaboradorStore(s => s.colaborador)
 
-  const [evento,    setEvento]    = useState(null)
-  const [listas,    setListas]    = useState([]) // [{ clId, nome, itens:[{id,texto}] }]
-  const [checks,    setChecks]    = useState(new Set()) // itemIds checked by this tech
-  const [loading,   setLoading]   = useState(true)
-  const [idx,       setIdx]       = useState(0)  // índice da checklist activa
-  const [dir,       setDir]       = useState('right')
+  const [evento,      setEvento]      = useState(null)
+  const [listas,      setListas]      = useState([])
+  const [checks,      setChecks]      = useState(new Set())
+  const [submetido,   setSubmetido]   = useState(false)
+  const [loading,     setLoading]     = useState(true)
+  const [guardando,   setGuardando]   = useState(false)
+  const [idx,         setIdx]         = useState(0)
+  const [dir,         setDir]         = useState('right')
   const touchX = useRef(null)
 
   const evId = Number(eventoId)
@@ -39,7 +41,14 @@ export function ChecklistEvento() {
             .eq('evento_id', evId)
             .eq('tecnico_id', colaborador.id)
         : Promise.resolve({ data: [] }),
-    ]).then(([{ data: ev }, { data: ecs }, { data: chks }]) => {
+      colaborador?.id
+        ? supabase.from('checklist_submissoes')
+            .select('id')
+            .eq('evento_id', evId)
+            .eq('tecnico_id', colaborador.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]).then(([{ data: ev }, { data: ecs }, { data: chks }, { data: sub }]) => {
       if (!active) return
       setEvento(ev)
       setListas((ecs ?? []).map(ec => ({
@@ -48,13 +57,14 @@ export function ChecklistEvento() {
         itens: (ec.checklists?.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem),
       })))
       setChecks(new Set((chks ?? []).map(c => c.checklist_item_id)))
+      setSubmetido(!!sub)
       setLoading(false)
     })
     return () => { active = false }
   }, [evId, colaborador?.id])
 
   const toggleCheck = async (itemId) => {
-    if (!colaborador?.id) return
+    if (!colaborador?.id || submetido) return
     const checked = checks.has(itemId)
     setChecks(prev => { const s = new Set(prev); if (checked) s.delete(itemId); else s.add(itemId); return s })
     if (!checked) {
@@ -66,6 +76,18 @@ export function ChecklistEvento() {
       await supabase.from('checklist_checks').delete()
         .eq('evento_id', evId).eq('checklist_item_id', itemId).eq('tecnico_id', colaborador.id)
     }
+  }
+
+  const guardarEFechar = async () => {
+    if (!colaborador?.id || submetido || guardando) return
+    setGuardando(true)
+    await supabase.from('checklist_submissoes').insert({
+      evento_id: evId,
+      tecnico_id: colaborador.id,
+    })
+    setSubmetido(true)
+    setGuardando(false)
+    navigate(-1)
   }
 
   const goIdx = (novoIdx, direcao) => {
@@ -102,6 +124,10 @@ export function ChecklistEvento() {
   const horaInstal = hhmm(evento.hora_instalacao)
   const horaInicio = hhmm(evento.hora_inicio)
 
+  // total de itens em todas as listas para o botão guardar
+  const totalItens = listas.reduce((s, l) => s + l.itens.length, 0)
+  const totalFeitos = listas.reduce((s, l) => s + l.itens.filter(it => checks.has(it.id)).length, 0)
+
   return (
     <div className="flex flex-col min-h-screen bg-surface-1">
 
@@ -119,8 +145,20 @@ export function ChecklistEvento() {
               .filter(Boolean).join(' · ')}
           </p>
         </div>
-        <ListChecks size={18} className="text-accent-subtle shrink-0" />
+        {submetido
+          ? <Lock size={16} className="text-green-400 shrink-0" />
+          : <ListChecks size={18} className="text-accent-subtle shrink-0" />}
       </div>
+
+      {/* Banner de bloqueado */}
+      {submetido && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-green-500/10 border-b border-green-500/20">
+          <Lock size={13} className="text-green-400 shrink-0" />
+          <p className="text-green-400 font-semibold" style={{ fontSize: 12 }}>
+            Checklist submetida — em modo leitura
+          </p>
+        </div>
+      )}
 
       {/* Tabs das checklists (só se mais de uma) */}
       {listas.length > 1 && (
@@ -173,9 +211,10 @@ export function ChecklistEvento() {
               return (
                 <button key={item.id}
                   onClick={() => toggleCheck(item.id)}
+                  disabled={submetido}
                   className={clsx(
                     'flex items-center gap-3 w-full px-4 py-3.5 border-b border-white/5 last:border-0 text-left transition-colors',
-                    checked ? 'bg-green-500/10' : 'hover:bg-white/5 active:bg-white/10'
+                    submetido ? 'cursor-default' : checked ? 'bg-green-500/10' : 'hover:bg-white/5 active:bg-white/10'
                   )}>
                   <span className={clsx(
                     'w-6 h-6 rounded-md border flex items-center justify-center shrink-0 transition-colors',
@@ -194,9 +233,9 @@ export function ChecklistEvento() {
 
           {/* Progresso */}
           {(lista?.itens ?? []).length > 0 && (() => {
-            const total    = lista.itens.length
-            const feitos   = lista.itens.filter(it => checks.has(it.id)).length
-            const pct      = Math.round((feitos / total) * 100)
+            const total  = lista.itens.length
+            const feitos = lista.itens.filter(it => checks.has(it.id)).length
+            const pct    = Math.round((feitos / total) * 100)
             return (
               <div className="mt-1">
                 <div className="flex justify-between text-accent-subtle mb-1.5" style={{ fontSize: 11 }}>
@@ -223,6 +262,20 @@ export function ChecklistEvento() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Botão guardar — só quando não submetido e há itens */}
+      {!submetido && totalItens > 0 && (
+        <div className="shrink-0 px-4 py-4 border-t border-border bg-surface-1">
+          <button
+            onClick={guardarEFechar}
+            disabled={guardando}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-green-500/20 border border-green-500/40 text-green-400 font-bold hover:bg-green-500/30 active:scale-[0.98] transition-all disabled:opacity-50"
+            style={{ fontSize: 15 }}>
+            <Lock size={16} />
+            {guardando ? 'A guardar…' : `Guardar e Fechar (${totalFeitos}/${totalItens})`}
+          </button>
         </div>
       )}
     </div>
