@@ -450,60 +450,68 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
         {/* Rodapé — assinatura de início de evento + presença + fechar */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 shrink-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            {mostrarInicioEvento && (
-              <button onClick={() => assinarEvento('evento_entrada')} disabled={assinandoEvento}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-green-400/30 bg-green-400/[0.07] text-green-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
-                <PenLine size={13} />
-                {assinandoEvento ? 'A registar…' : 'Início de Evento'}
-              </button>
+          <div className="flex flex-col gap-1.5 items-start">
+            {/* Botões de assinatura de evento */}
+            {(mostrarInicioEvento || mostrarFimEvento) && (
+              <div className="flex items-center gap-2">
+                {mostrarInicioEvento && (
+                  <button onClick={() => assinarEvento('evento_entrada')} disabled={assinandoEvento}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-green-400/30 bg-green-400/[0.07] text-green-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
+                    <PenLine size={13} />
+                    {assinandoEvento ? 'A registar…' : 'Início de Evento'}
+                  </button>
+                )}
+                {mostrarFimEvento && (
+                  <button onClick={() => assinarEvento('evento_saida')} disabled={assinandoEvento}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-400/30 bg-red-400/[0.07] text-red-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
+                    <PenLine size={13} />
+                    {assinandoEvento ? 'A registar…' : 'Fim de Evento'}
+                  </button>
+                )}
+              </div>
             )}
-            {mostrarFimEvento && (
-              <button onClick={() => assinarEvento('evento_saida')} disabled={assinandoEvento}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-400/30 bg-red-400/[0.07] text-red-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
-                <PenLine size={13} />
-                {assinandoEvento ? 'A registar…' : 'Fim de Evento'}
-              </button>
-            )}
-            {!mostrarInicioEvento && !mostrarFimEvento && feitasAssin.some(f => f.tipo === 'evento_saida') && (
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-status-confirmado">
-                <Check size={16} /> Terminado · {new Date(feitasAssin.find(f => f.tipo === 'evento_saida').registado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            )}
-            {isResponsavel && pres.status === 'signed' && pres.presenca ? (
-              <span
-                title={`Presente · ${new Date(pres.presenca.signed_at).toLocaleString('pt-PT')}${pres.presenca.latitude != null ? ` · ${Number(pres.presenca.latitude).toFixed(5)}, ${Number(pres.presenca.longitude).toFixed(5)}${pres.presenca.accuracy_m != null ? ` (±${pres.presenca.accuracy_m}m)` : ''}` : ' · sem GPS'}`}
-                className={clsx('inline-flex items-center gap-1.5 text-sm font-medium', presAtrasada ? 'text-status-cancelado' : 'text-status-confirmado')}>
-                <Check size={16} /> Presente · {new Date(pres.presenca.signed_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            ) : isResponsavel && pres.status === 'loading' ? (
-              <span className="inline-flex items-center gap-1.5 text-accent-subtle text-sm">
-                <Loader2 size={15} className="animate-spin" /> A localizar…
-              </span>
-            ) : isResponsavel && pres.status === 'error' ? (
-              <button onClick={() => pres.assinar()} title={pres.erro || ''}
-                className="inline-flex items-center gap-1.5 text-status-cancelado text-sm hover:opacity-80">
-                <AlertCircle size={15} /> Erro — repetir
-              </button>
-            ) : isResponsavel && aConfirmarPres ? (
-              <span className="inline-flex items-center gap-2">
-                <button onClick={() => { setConfirmarPres(false); pres.assinar() }}
-                  className="px-3 py-1.5 rounded-lg bg-status-confirmado/15 border border-status-confirmado/40 text-status-confirmado text-xs font-medium hover:bg-status-confirmado/25 transition-colors">
-                  Confirmar presença
+            {/* Badges de estado: Presente e Terminado na mesma linha */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {isResponsavel && pres.status === 'signed' && pres.presenca ? (
+                <span
+                  title={`Presente · ${new Date(pres.presenca.signed_at).toLocaleString('pt-PT')}${pres.presenca.latitude != null ? ` · ${Number(pres.presenca.latitude).toFixed(5)}, ${Number(pres.presenca.longitude).toFixed(5)}${pres.presenca.accuracy_m != null ? ` (±${pres.presenca.accuracy_m}m)` : ''}` : ' · sem GPS'}`}
+                  className={clsx('inline-flex items-center gap-1.5 text-sm font-medium', presAtrasada ? 'text-status-cancelado' : 'text-status-confirmado')}>
+                  <Check size={16} /> Presente · {new Date(pres.presenca.signed_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              ) : isResponsavel && pres.status === 'loading' ? (
+                <span className="inline-flex items-center gap-1.5 text-accent-subtle text-sm">
+                  <Loader2 size={15} className="animate-spin" /> A localizar…
+                </span>
+              ) : isResponsavel && pres.status === 'error' ? (
+                <button onClick={() => pres.assinar()} title={pres.erro || ''}
+                  className="inline-flex items-center gap-1.5 text-status-cancelado text-sm hover:opacity-80">
+                  <AlertCircle size={15} /> Erro — repetir
                 </button>
-                <button onClick={() => setConfirmarPres(false)}
-                  className="px-2 py-1.5 rounded-lg border border-border text-accent-subtle text-xs hover:text-accent transition-colors">
-                  Cancelar
+              ) : isResponsavel && aConfirmarPres ? (
+                <span className="inline-flex items-center gap-2">
+                  <button onClick={() => { setConfirmarPres(false); pres.assinar() }}
+                    className="px-3 py-1.5 rounded-lg bg-status-confirmado/15 border border-status-confirmado/40 text-status-confirmado text-xs font-medium hover:bg-status-confirmado/25 transition-colors">
+                    Confirmar presença
+                  </button>
+                  <button onClick={() => setConfirmarPres(false)}
+                    className="px-2 py-1.5 rounded-lg border border-border text-accent-subtle text-xs hover:text-accent transition-colors">
+                    Cancelar
+                  </button>
+                </span>
+              ) : isResponsavel && presDisponivel ? (
+                <button onClick={() => setConfirmarPres(true)} disabled={!colaborador}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-medium hover:bg-amber-400/20 transition-colors disabled:opacity-40">
+                  <MapPin size={14} /> Marcar presença
                 </button>
-              </span>
-            ) : isResponsavel && presDisponivel ? (
-              <button onClick={() => setConfirmarPres(true)} disabled={!colaborador}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-medium hover:bg-amber-400/20 transition-colors disabled:opacity-40">
-                <MapPin size={14} /> Marcar presença
-              </button>
-            ) : isResponsavel ? (
-              <span className="text-accent-subtle/60 text-xs">Disponível {TOLERANCIA_MIN} min antes do início</span>
-            ) : null}
+              ) : isResponsavel ? (
+                <span className="text-accent-subtle/60 text-xs">Disponível {TOLERANCIA_MIN} min antes do início</span>
+              ) : null}
+              {!mostrarInicioEvento && !mostrarFimEvento && feitasAssin.some(f => f.tipo === 'evento_saida') && (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-status-confirmado">
+                  <Check size={16} /> Terminado · {new Date(feitasAssin.find(f => f.tipo === 'evento_saida').registado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
           </div>
           <button onClick={onFechar}
             className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
