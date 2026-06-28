@@ -96,22 +96,25 @@ export function useAssinaturaDia(tecnicoId) {
       // 3. Assinaturas já feitas hoje
       const { data: assin } = await supabase
         .from('assinaturas_tecnico')
-        .select('tipo')
+        .select('tipo, evento_id')
         .eq('tecnico_id', tecnicoId)
         .gte('registado_em', inicioHoje())
         .lte('registado_em', fimHoje())
 
-      const tipos = new Set((assin ?? []).map(a => a.tipo))
+      // LMD: olha para todos os tipos do dia
+      const tiposGeral  = new Set((assin ?? []).map(a => a.tipo))
+      // Evento: olha apenas para assinaturas do evento de hoje
+      const tiposEvento = new Set((assin ?? []).filter(a => a.evento_id === eventoId).map(a => a.tipo))
 
       // 4. Próxima acção
       let proxima = null
-      if (temLmd && !tipos.has('lmd_entrada')) {
+      if (temLmd && !tiposGeral.has('lmd_entrada')) {
         proxima = { tipo: 'lmd_entrada', agendamentoId }
-      } else if (temEvento && !tipos.has('evento_entrada')) {
+      } else if (temEvento && !tiposEvento.has('evento_entrada')) {
         proxima = { tipo: 'evento_entrada', eventoId }
-      } else if (temEvento && tipos.has('evento_entrada') && !tipos.has('evento_saida')) {
+      } else if (temEvento && tiposEvento.has('evento_entrada') && !tiposEvento.has('evento_saida')) {
         proxima = { tipo: 'evento_saida', eventoId }
-      } else if (temLmd && tipos.has('lmd_entrada') && !tipos.has('lmd_saida')) {
+      } else if (temLmd && tiposGeral.has('lmd_entrada') && !tiposGeral.has('lmd_saida')) {
         proxima = { tipo: 'lmd_saida', agendamentoId }
       }
 

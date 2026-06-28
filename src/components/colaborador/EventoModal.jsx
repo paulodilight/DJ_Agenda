@@ -84,10 +84,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading } = useAssinaturaDia(colaborador?.id ?? null)
   const [assinandoEvento, setAssinandoEvento] = useState(false)
   const mostrarInicioEvento = !assinLoading && proximaAssin?.tipo === 'evento_entrada' && proximaAssin?.eventoId === evento.id
+  const mostrarFimEvento   = !assinLoading && proximaAssin?.tipo === 'evento_saida'   && proximaAssin?.eventoId === evento.id
 
-  const assinarEvento = async () => {
+  const assinarEvento = async (tipo) => {
     setAssinandoEvento(true)
-    await registarAssin('evento_entrada', { eventoId: evento.id })
+    await registarAssin(tipo, { eventoId: evento.id })
     setAssinandoEvento(false)
   }
 
@@ -411,10 +412,17 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
             {mostrarInicioEvento && (
-              <button onClick={assinarEvento} disabled={assinandoEvento}
+              <button onClick={() => assinarEvento('evento_entrada')} disabled={assinandoEvento}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-green-400/30 bg-green-400/[0.07] text-green-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
                 <PenLine size={13} />
-                {assinandoEvento ? 'A registar…' : 'In Evento'}
+                {assinandoEvento ? 'A registar…' : 'Início de Evento'}
+              </button>
+            )}
+            {mostrarFimEvento && (
+              <button onClick={() => assinarEvento('evento_saida')} disabled={assinandoEvento}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-400/30 bg-red-400/[0.07] text-red-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
+                <PenLine size={13} />
+                {assinandoEvento ? 'A registar…' : 'Fim de Evento'}
               </button>
             )}
             {isResponsavel && pres.status === 'signed' && pres.presenca ? (
