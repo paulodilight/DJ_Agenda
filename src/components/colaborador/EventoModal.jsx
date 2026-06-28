@@ -453,7 +453,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               </span>
             ) : isResponsavel && presDisponivel ? (
               <button onClick={() => setConfirmarPres(true)} disabled={!colaborador}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-accent-muted text-xs font-medium hover:text-accent hover:border-white/25 transition-colors disabled:opacity-40">
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-medium hover:bg-amber-400/20 transition-colors disabled:opacity-40">
                 <MapPin size={14} /> Marcar presença
               </button>
             ) : isResponsavel ? (
