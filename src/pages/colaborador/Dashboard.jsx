@@ -35,20 +35,20 @@ function BotaoAssinatura({ proxima, registar }) {
   const podeAssinar = proxima && LABELS_ASSIN[proxima.tipo]
 
   return (
-    <div className="mt-3 flex flex-col gap-1.5">
+    <div className="mt-3 flex flex-col gap-1.5 items-end">
       {registados.map(({ tipo, hora }) => {
         const cfg = LABELS_ASSIN[tipo]
         return (
-          <span key={tipo} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold ${cfg?.cor ?? ''}`}>
-            <PenLine size={13} />
+          <span key={tipo} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${cfg?.cor ?? ''}`}>
+            <PenLine size={11} />
             {cfg?.label} · {hora}
           </span>
         )
       })}
       {podeAssinar && (
         <button onClick={onClick} disabled={loading}
-          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-opacity disabled:opacity-50 ${LABELS_ASSIN[proxima.tipo].cor}`}>
-          <PenLine size={13} />
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-opacity disabled:opacity-50 ${LABELS_ASSIN[proxima.tipo].cor}`}>
+          <PenLine size={11} />
           {loading ? 'A registar…' : LABELS_ASSIN[proxima.tipo].label}
         </button>
       )}
