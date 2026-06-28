@@ -38,6 +38,8 @@ import { ColaboradorTarefas } from '@/pages/colaborador/Tarefas'
 import { ColaboradorFolgas } from '@/pages/colaborador/Folgas'
 import { ColaboradorAgenda } from '@/pages/colaborador/Agenda'
 import { ColaboradorOcorrencias } from '@/pages/colaborador/Ocorrencias'
+import { ChecklistEvento } from '@/pages/colaborador/ChecklistEvento'
+import { ColaboradorChecklists } from '@/pages/colaborador/Checklists'
 
 function RotaProtegida({ children }) {
   const { session, loading } = useAuthStore()
@@ -113,6 +115,8 @@ export default function App() {
           <Route path="tarefas" element={<ColaboradorTarefas />} />
           <Route path="folgas"      element={<ColaboradorFolgas />} />
           <Route path="ocorrencias" element={<ColaboradorOcorrencias />} />
+          <Route path="checklists" element={<ColaboradorChecklists />} />
+          <Route path="checklist/:eventoId" element={<ChecklistEvento />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

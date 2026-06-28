@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react'
-import { X, Database, Star, Plus, Check, Trash2 } from 'lucide-react'
+import { X, Database, Star, Plus, Check, Trash2, ListChecks } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
@@ -174,6 +174,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   const [espacos, setEspacos]   = useState([])
   const [tecnicos, setTecnicos] = useState([])
   const [artistas, setArtistas] = useState([])
+  const [eventoChecklists, setEventoChecklists] = useState([]) // [{ _key, ecId, clId, nome, tipo_evento_id, itens, removed, _deletedItemIds }]
+  const [allChecklists,    setAllChecklists]    = useState([]) // templates disponíveis
   // Estado billing (itens de faturação ligados ao evento)
   const [billing, setBilling] = useState({
     equipamentos_alugado: [],
@@ -190,6 +192,11 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
       .then(({ data }) => setTecnicos(data ?? []))
       .catch(console.error)
     artistasApi.listar().then(setArtistas).catch(console.error)
+    supabase.from('checklists')
+      .select('id, nome, tipo_evento_id, checklist_itens(id, texto, ordem)')
+      .order('nome')
+      .then(({ data }) => setAllChecklists(data ?? []))
+      .catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -229,6 +236,21 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             extras:                data.filter(r => r.tipo === 'extra').map(toItem),
           })
         })
+      // Carregar checklists do evento
+      supabase.from('evento_checklists')
+        .select('id, checklist_id, checklists(id, nome, tipo_evento_id, checklist_itens(id, texto, ordem))')
+        .eq('evento_id', evento.id)
+        .then(({ data }) => {
+          setEventoChecklists((data ?? []).map(ec => ({
+            _key: uidF(), ecId: ec.id, clId: ec.checklist_id,
+            nome: ec.checklists.nome, tipo_evento_id: ec.checklists.tipo_evento_id,
+            itens: (ec.checklists.checklist_itens ?? [])
+              .sort((a, b) => a.ordem - b.ordem)
+              .map(it => ({ _key: uidF(), id: it.id, texto: it.texto })),
+            removed: false, _deletedItemIds: [],
+          })))
+        })
+        .catch(console.error)
     } else {
       setForm({
         ...VAZIO,
@@ -236,6 +258,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         espaco_id:   evento?.espaco_id || '',
         tipo:        evento?.tipo      || '',
       })
+      setEventoChecklists([])
     }
   }, [aberto, evento, dataInicial])
 
@@ -302,6 +325,45 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         if (inserts.length > 0) await supabase.from('contas_clientes').insert(inserts)
       }
 
+      // Guardar checklists
+      if (savedId) {
+        for (const ec of eventoChecklists) {
+          if (ec.removed) {
+            if (ec.ecId) await supabase.from('evento_checklists').delete().eq('id', ec.ecId)
+            continue
+          }
+          let clId = ec.clId
+          if (!clId) {
+            const { data: newCl } = await supabase.from('checklists')
+              .insert({ nome: ec.nome, tipo_evento_id: ec.tipo_evento_id ?? null })
+              .select('id').single()
+            clId = newCl?.id
+          }
+          if (!clId) continue
+          // Apagar itens removidos
+          for (const itemId of (ec._deletedItemIds || [])) {
+            await supabase.from('checklist_itens').delete().eq('id', itemId)
+          }
+          // Upsert itens actuais
+          for (let i = 0; i < ec.itens.length; i++) {
+            const item = ec.itens[i]
+            if (!item.texto.trim()) continue
+            if (!item.id) {
+              await supabase.from('checklist_itens').insert({ checklist_id: clId, texto: item.texto, ordem: i })
+            } else {
+              await supabase.from('checklist_itens').update({ texto: item.texto, ordem: i }).eq('id', item.id)
+            }
+          }
+          // Associar ao evento
+          if (!ec.ecId) {
+            await supabase.from('evento_checklists').upsert(
+              { evento_id: savedId, checklist_id: clId },
+              { onConflict: 'evento_id,checklist_id' }
+            )
+          }
+        }
+      }
+
       onGuardado?.()
       onFechar()
     } catch (e) {
@@ -346,9 +408,20 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               <span className="text-[10px] font-mono text-violet-400 tracking-tight">supa_eventos</span>
             </div>
           </div>
-          <button onClick={onFechar} className="text-accent-subtle hover:text-accent transition-colors">
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            {evento?.id && (
+              <button
+                onClick={() => window.open(`/apoiot/checklist/${evento.id}`, '_blank')}
+                title="Ver checklists deste evento"
+                className="text-accent-subtle hover:text-status-confirmado transition-colors"
+              >
+                <ListChecks size={16} />
+              </button>
+            )}
+            <button onClick={onFechar} className="text-accent-subtle hover:text-accent transition-colors">
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Abas */}
@@ -358,6 +431,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             { id: 'tecnico',    label: 'Técnico & Notas' },
             { id: 'faturacao',  label: 'Faturação' },
             { id: 'contas',     label: 'Contas' },
+            { id: 'checklist',  label: 'Checklist' },
           ].map((aba) => (
             <button
               key={aba.id}
@@ -397,7 +471,32 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   <select
                     className={inputCls}
                     value={form.tipo}
-                    onChange={(e) => set('tipo', e.target.value)}
+                    onChange={(e) => {
+                      const nome = e.target.value
+                      set('tipo', nome)
+                      const tipoObj = tipos.find(t => t.nome === nome)
+                      if (tipoObj) {
+                        const matching = allChecklists.filter(c => c.tipo_evento_id === tipoObj.id)
+                        if (matching.length > 0) {
+                          setEventoChecklists(prev => {
+                            let next = [...prev]
+                            matching.forEach(cl => {
+                              if (!next.some(ec => ec.clId === cl.id && !ec.removed)) {
+                                next = [...next, {
+                                  _key: uidF(), ecId: null, clId: cl.id,
+                                  nome: cl.nome, tipo_evento_id: cl.tipo_evento_id,
+                                  itens: (cl.checklist_itens ?? [])
+                                    .sort((a, b) => a.ordem - b.ordem)
+                                    .map(it => ({ _key: uidF(), id: it.id, texto: it.texto })),
+                                  removed: false, _deletedItemIds: [],
+                                }]
+                              }
+                            })
+                            return next
+                          })
+                        }
+                      }
+                    }}
                   >
                     <option value="">— Seleccionar —</option>
                     {tipos.map((t) => (
@@ -736,6 +835,104 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               </div>
             )
           })()}
+
+          {/* ── Aba Checklist ── */}
+          {abaActiva === 'checklist' && (
+            <div className="flex flex-col gap-4">
+              {eventoChecklists.filter(ec => !ec.removed).map((ec) => (
+                <div key={ec._key} className="border border-border rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-surface-2 border-b border-border/50">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <ListChecks size={13} className="text-accent-subtle shrink-0" />
+                      <input
+                        className="flex-1 text-[13px] font-semibold text-accent bg-transparent outline-none min-w-0"
+                        value={ec.nome}
+                        onChange={e => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? { ...x, nome: e.target.value } : x))}
+                      />
+                    </div>
+                    <button
+                      onClick={() => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? { ...x, removed: true } : x))}
+                      className="text-accent-subtle/30 hover:text-status-cancelado transition-colors ml-2 shrink-0"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                  <div className="px-3 py-2.5 flex flex-col gap-1.5">
+                    {ec.itens.map((item, idx) => (
+                      <div key={item._key} className="flex items-center gap-2">
+                        <span className="text-accent-subtle/30 text-[11px] w-4 text-right shrink-0">{idx + 1}.</span>
+                        <input
+                          className="flex-1 text-[12px] text-accent bg-transparent border-b border-border/30 focus:border-accent/40 outline-none py-0.5"
+                          value={item.texto}
+                          placeholder={`Item ${idx + 1}…`}
+                          onChange={e => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? {
+                            ...x, itens: x.itens.map(it => it._key === item._key ? { ...it, texto: e.target.value } : it)
+                          } : x))}
+                        />
+                        <button
+                          onClick={() => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? {
+                            ...x,
+                            itens: x.itens.filter(it => it._key !== item._key),
+                            _deletedItemIds: item.id ? [...(x._deletedItemIds || []), item.id] : (x._deletedItemIds || []),
+                          } : x))}
+                          className="text-accent-subtle/25 hover:text-status-cancelado transition-colors shrink-0"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? {
+                        ...x, itens: [...x.itens, { _key: uidF(), id: null, texto: '' }]
+                      } : x))}
+                      className="flex items-center gap-1 text-[11px] text-accent-subtle/40 hover:text-status-confirmado/70 transition-colors mt-1"
+                    >
+                      <Plus size={11} />Adicionar item
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Adicionar template existente */}
+              <div className="flex flex-col gap-2">
+                <p className="text-[11px] font-medium text-accent-subtle uppercase tracking-wider">Adicionar checklist</p>
+                <select
+                  className={inputCls}
+                  value=""
+                  onChange={e => {
+                    const clId = e.target.value
+                    if (!clId) return
+                    const cl = allChecklists.find(c => String(c.id) === clId)
+                    if (!cl) return
+                    setEventoChecklists(prev => [...prev, {
+                      _key: uidF(), ecId: null, clId: cl.id,
+                      nome: cl.nome, tipo_evento_id: cl.tipo_evento_id,
+                      itens: (cl.checklist_itens ?? [])
+                        .sort((a, b) => a.ordem - b.ordem)
+                        .map(it => ({ _key: uidF(), id: it.id, texto: it.texto })),
+                      removed: false, _deletedItemIds: [],
+                    }])
+                  }}
+                >
+                  <option value="">— Seleccionar template —</option>
+                  {allChecklists
+                    .filter(cl => !eventoChecklists.some(ec => ec.clId === cl.id && !ec.removed))
+                    .map(cl => <option key={cl.id} value={cl.id}>{cl.nome}</option>)
+                  }
+                </select>
+                <button
+                  onClick={() => setEventoChecklists(prev => [...prev, {
+                    _key: uidF(), ecId: null, clId: null,
+                    nome: 'Nova Checklist', tipo_evento_id: null,
+                    itens: [], removed: false, _deletedItemIds: [],
+                  }])}
+                  className="flex items-center gap-1 text-[11px] text-accent-subtle/40 hover:text-status-confirmado/70 transition-colors"
+                >
+                  <Plus size={11} />Criar nova checklist
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

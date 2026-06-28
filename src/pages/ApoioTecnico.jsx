@@ -1,11 +1,12 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addDays, parseISO, isSameMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, List, CalendarDays, ChevronLeft, ChevronRight, Plus, Wrench, CalendarRange, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { X, Search, Columns2, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, List, CalendarDays, ChevronLeft, ChevronRight, Plus, Wrench, CalendarRange, Clock, CheckCircle, AlertCircle, ArrowLeftRight, ListChecks, Trash2, Save } from 'lucide-react'
 import { OcorrenciaDetalhe } from '@/components/ocorrencias/OcorrenciaDetalhe'
 import { ModalNovaOcorrencia } from '@/components/ocorrencias/ModalNovaOcorrencia'
 import { useMesStore } from '@/store'
 import { supabase } from '@/lib/supabase'
+import { supaEventosApi } from '@/lib/supaEventosApi'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
@@ -83,6 +84,201 @@ function ModalConflito({ conflitos, nomeTecnico, onConfirmar, onCancelar }) {
           >
             Atribuir mesmo assim
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal trocar / substituir técnico ────────────────────────────────────────
+function ModalTroca({ srcTecNome, dstTecNome, dstEvNome, podeTrocar, onSubstituir, onTrocar, onCancelar }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-surface-1 border border-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center gap-3">
+          <span className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+            <ArrowLeftRight size={16} className="text-accent" />
+          </span>
+          <div>
+            <p className="text-sm font-bold text-accent">{dstEvNome}</p>
+            <p className="text-[11px] text-accent-subtle mt-0.5">Já tem <span className="font-semibold text-accent">{dstTecNome}</span> atribuído</p>
+          </div>
+        </div>
+        <div className="px-5 py-4 flex flex-col gap-2">
+          <button onClick={onSubstituir}
+            className="w-full px-4 py-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-left transition-colors">
+            <p className="text-[13px] font-semibold text-accent">Substituir</p>
+            <p className="text-[11px] text-accent-subtle mt-0.5">{dstTecNome} é retirado · {srcTecNome} entra</p>
+          </button>
+          {podeTrocar && (
+            <button onClick={onTrocar}
+              className="w-full px-4 py-3 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/30 text-left transition-colors">
+              <p className="text-[13px] font-semibold text-accent">Trocar</p>
+              <p className="text-[11px] text-accent-subtle mt-0.5">{srcTecNome} ↔ {dstTecNome} trocam de evento</p>
+            </button>
+          )}
+        </div>
+        <div className="px-5 py-3 border-t border-border flex justify-end">
+          <Button variante="secundario" onClick={onCancelar}>Cancelar</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal Checklist por evento ────────────────────────────────────────────────
+function ModalChecklistApoio({ eventoId, eventoNome, tecIds, tecnicos, tecCorMap, onFechar }) {
+  const [listas,    setListas]    = useState([])  // [{ ecId, clId, nome, itens:[{id,texto,ordem}] }]
+  const [checks,    setChecks]    = useState({})  // { [itemId]: Set<tecId> }
+  const [templates, setTemplates] = useState([])
+  const [loading,   setLoading]   = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: ecs }, { data: chks }, { data: tpls }] = await Promise.all([
+        supabase.from('evento_checklists')
+          .select('id, checklist_id, checklists(id, nome, checklist_itens(id, texto, ordem))')
+          .eq('evento_id', eventoId),
+        supabase.from('checklist_checks')
+          .select('checklist_item_id, tecnico_id')
+          .eq('evento_id', eventoId),
+        supabase.from('checklists').select('id, nome').order('nome'),
+      ])
+      setListas((ecs ?? []).map(ec => ({
+        ecId: ec.id, clId: ec.checklist_id, nome: ec.checklists?.nome ?? '?',
+        itens: (ec.checklists?.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem),
+      })))
+      const m = {}
+      for (const c of (chks ?? [])) {
+        if (!m[c.checklist_item_id]) m[c.checklist_item_id] = new Set()
+        m[c.checklist_item_id].add(c.tecnico_id)
+      }
+      setChecks(m)
+      setTemplates(tpls ?? [])
+      setLoading(false)
+    }
+    load()
+  }, [eventoId])
+
+  const toggle = async (itemId, tecId) => {
+    const current = checks[itemId]?.has(tecId) ?? false
+    setChecks(prev => {
+      const s = new Set(prev[itemId] ?? [])
+      if (current) s.delete(tecId); else s.add(tecId)
+      return { ...prev, [itemId]: s }
+    })
+    if (!current) {
+      await supabase.from('checklist_checks').upsert(
+        { evento_id: eventoId, checklist_item_id: itemId, tecnico_id: tecId },
+        { onConflict: 'evento_id,checklist_item_id,tecnico_id' }
+      )
+    } else {
+      await supabase.from('checklist_checks').delete()
+        .eq('evento_id', eventoId).eq('checklist_item_id', itemId).eq('tecnico_id', tecId)
+    }
+  }
+
+  const addTemplate = async (clId) => {
+    if (listas.some(l => l.clId === clId)) return
+    const { data: ec } = await supabase.from('evento_checklists')
+      .upsert({ evento_id: eventoId, checklist_id: clId }, { onConflict: 'evento_id,checklist_id' })
+      .select('id, checklist_id, checklists(id, nome, checklist_itens(id, texto, ordem))').single()
+    if (ec) {
+      setListas(prev => [...prev, {
+        ecId: ec.id, clId: ec.checklist_id, nome: ec.checklists?.nome ?? '?',
+        itens: (ec.checklists?.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem),
+      }])
+    }
+  }
+
+  const assignedTecs = tecIds.map(id => tecnicos.find(t => t.id === id)).filter(Boolean)
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-surface-1 border border-border rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-border flex items-center gap-3 shrink-0">
+          <span className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+            <ListChecks size={16} className="text-accent" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-accent truncate">{eventoNome}</p>
+            <p className="text-[11px] text-accent-subtle mt-0.5">Checklist</p>
+          </div>
+          <button onClick={onFechar} className="text-accent-subtle hover:text-accent transition-colors shrink-0">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+          {loading && <p className="text-sm text-accent-subtle text-center py-4">A carregar…</p>}
+
+          {!loading && listas.length === 0 && (
+            <p className="text-[12px] text-accent-subtle/50 text-center py-4 italic">Sem checklists associadas a este evento.</p>
+          )}
+
+          {listas.map(lista => (
+            <div key={lista.clId} className="border border-border rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 bg-surface-2 border-b border-border/50">
+                <ListChecks size={12} className="text-accent-subtle shrink-0" />
+                <p className="text-[12px] font-semibold text-accent">{lista.nome}</p>
+              </div>
+              <div className="flex flex-col">
+                {lista.itens.map((item, idx) => {
+                  const checkedBy = checks[item.id] ?? new Set()
+                  const allChecked = assignedTecs.length > 0 && assignedTecs.every(t => checkedBy.has(t.id))
+                  return (
+                    <div key={item.id} className={clsx(
+                      'flex items-center gap-2 px-3 py-2 border-b border-border/30 last:border-0',
+                      allChecked ? 'bg-status-confirmado/5' : ''
+                    )}>
+                      <span className="text-[10px] text-accent-subtle/40 w-4 text-right shrink-0">{idx + 1}.</span>
+                      <p className={clsx('flex-1 text-[12px]', allChecked ? 'text-accent-subtle/50 line-through' : 'text-accent')}>{item.texto}</p>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {assignedTecs.length === 0
+                          ? <span className="text-[10px] text-accent-subtle/30 italic">sem técnico</span>
+                          : assignedTecs.map(tec => {
+                              const checked = checkedBy.has(tec.id)
+                              const cor = tecCorMap[tec.id]
+                              return (
+                                <button key={tec.id}
+                                  onClick={() => toggle(item.id, tec.id)}
+                                  title={`${checked ? 'Desmarcar' : 'Marcar'} — ${tec.nome}`}
+                                  className={clsx(
+                                    'px-2 py-0.5 rounded-md text-[11px] font-semibold border transition-colors',
+                                    checked
+                                      ? (cor?.chip ?? 'bg-status-confirmado/20 text-status-confirmado border-status-confirmado/40')
+                                      : 'bg-surface-2 text-accent-subtle/40 border-border/40 hover:border-accent/30 hover:text-accent-subtle'
+                                  )}>
+                                  {tec.nome.split(' ')[0]}
+                                </button>
+                              )
+                            })
+                        }
+                      </div>
+                    </div>
+                  )
+                })}
+                {lista.itens.length === 0 && (
+                  <p className="text-[11px] text-accent-subtle/30 italic px-3 py-2">Sem itens.</p>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Adicionar checklist */}
+          {templates.filter(t => !listas.some(l => l.clId === t.id)).length > 0 && (
+            <div className="border border-dashed border-border/50 rounded-xl px-3 py-3">
+              <p className="text-[10px] text-accent-subtle/50 uppercase tracking-wider mb-2">Adicionar checklist</p>
+              <select className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-[12px] text-accent outline-none"
+                value="" onChange={e => { if (e.target.value) addTemplate(e.target.value) }}>
+                <option value="">— Seleccionar template —</option>
+                {templates.filter(t => !listas.some(l => String(l.clId) === String(t.id)))
+                  .map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+              </select>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -414,19 +610,26 @@ function VistaEstatisticas({ tecnicos, eventos, agendamentos, tecCorMap }) {
 }
 
 // ── FolgaChip — chip draggable para folgas ────────────────────────────────────
-function FolgaChip({ tecnico, cor, dataStr, onDragStart, isDragging }) {
+function FolgaChip({ tecnico, cor, dataStr, onDragStart, isDragging, onRemover }) {
   return (
     <span
       draggable
-      onDragStart={e => onDragStart(e, dataStr, tecnico.id)}
+      onDragStart={e => { if (e.target.closest('button')) { e.preventDefault(); return } onDragStart(e, dataStr, tecnico.id) }}
       onDragEnd={() => {}}
       className={clsx(
-        'inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold border select-none cursor-grab active:cursor-grabbing transition-opacity',
+        'group/fchip inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-semibold border select-none cursor-grab active:cursor-grabbing transition-opacity',
         cor?.chip ?? 'bg-orange-400/15 text-orange-400 border-orange-400/30',
         isDragging ? 'opacity-30' : 'opacity-100'
       )}
     >
       {tecnico.nome}
+      {onRemover && (
+        <button
+          onMouseDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); e.preventDefault(); onRemover() }}
+          className="opacity-0 group-hover/fchip:opacity-100 text-[14px] leading-none hover:opacity-100 transition-opacity"
+        >×</button>
+      )}
     </span>
   )
 }
@@ -664,6 +867,181 @@ function VistaOcorrencias({ espacos }) {
   )
 }
 
+// ── Vista Checklists (Admin) ──────────────────────────────────────────────────
+function VistaChecklists() {
+  const [checklists, setChecklists] = useState([])  // [{ id, nome, tipo_evento_id, _tipoNome, itens:[{id,texto,ordem,_key}], _editNome, _deletedItems, _dirty }]
+  const [tipos,      setTipos]      = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [saving,     setSaving]     = useState(null) // id being saved
+
+  const uidL = () => Math.random().toString(36).slice(2)
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('checklists').select('id, nome, tipo_evento_id, checklist_itens(id, texto, ordem)').order('nome'),
+      supabase.from('tipo_eventos').select('id, nome').order('nome'),
+    ]).then(([{ data: cls }, { data: tps }]) => {
+      setTipos(tps ?? [])
+      setChecklists((cls ?? []).map(cl => ({
+        ...cl,
+        _tipoNome: (tps ?? []).find(t => t.id === cl.tipo_evento_id)?.nome ?? '',
+        _editNome: cl.nome,
+        _tipoSel: cl.tipo_evento_id ?? '',
+        itens: (cl.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem).map(it => ({ ...it, _key: uidL() })),
+        _deletedItems: [],
+        _dirty: false,
+        _open: false,
+      })))
+      setLoading(false)
+    })
+  }, [])
+
+  const update = (id, patch) => setChecklists(prev => prev.map(cl => cl.id === id ? { ...cl, ...patch, _dirty: true } : cl))
+
+  const updateItem = (clId, key, patch) => setChecklists(prev => prev.map(cl => {
+    if (cl.id !== clId) return cl
+    return { ...cl, itens: cl.itens.map(it => it._key === key ? { ...it, ...patch } : it), _dirty: true }
+  }))
+
+  const addItem = (clId) => setChecklists(prev => prev.map(cl =>
+    cl.id === clId ? { ...cl, itens: [...cl.itens, { id: null, texto: '', ordem: cl.itens.length, _key: uidL() }], _dirty: true } : cl
+  ))
+
+  const removeItem = (clId, key) => setChecklists(prev => prev.map(cl => {
+    if (cl.id !== clId) return cl
+    const item = cl.itens.find(it => it._key === key)
+    return {
+      ...cl,
+      itens: cl.itens.filter(it => it._key !== key),
+      _deletedItems: item?.id ? [...cl._deletedItems, item.id] : cl._deletedItems,
+      _dirty: true,
+    }
+  }))
+
+  const saveChecklist = async (cl) => {
+    setSaving(cl.id)
+    try {
+      await supabase.from('checklists').update({ nome: cl._editNome, tipo_evento_id: cl._tipoSel || null }).eq('id', cl.id)
+      for (const itemId of cl._deletedItems) {
+        await supabase.from('checklist_itens').delete().eq('id', itemId)
+      }
+      const newItens = []
+      for (let i = 0; i < cl.itens.length; i++) {
+        const it = cl.itens[i]
+        if (!it.texto.trim()) continue
+        if (it.id) {
+          await supabase.from('checklist_itens').update({ texto: it.texto, ordem: i }).eq('id', it.id)
+          newItens.push({ ...it, ordem: i })
+        } else {
+          const { data } = await supabase.from('checklist_itens').insert({ checklist_id: cl.id, texto: it.texto, ordem: i }).select('id').single()
+          newItens.push({ ...it, id: data?.id, ordem: i })
+        }
+      }
+      setChecklists(prev => prev.map(c => c.id === cl.id ? {
+        ...c, nome: cl._editNome, tipo_evento_id: cl._tipoSel || null,
+        _tipoNome: tipos.find(t => t.id === cl._tipoSel)?.nome ?? '',
+        itens: newItens, _deletedItems: [], _dirty: false,
+      } : c))
+    } catch (e) { console.error(e) }
+    setSaving(null)
+  }
+
+  const deleteChecklist = async (id) => {
+    if (!window.confirm('Apagar esta checklist?')) return
+    await supabase.from('checklists').delete().eq('id', id)
+    setChecklists(prev => prev.filter(cl => cl.id !== id))
+  }
+
+  const createChecklist = async () => {
+    const { data } = await supabase.from('checklists').insert({ nome: 'Nova Checklist' }).select('id, nome, tipo_evento_id').single()
+    if (data) {
+      setChecklists(prev => [...prev, {
+        ...data, _editNome: data.nome, _tipoSel: '', _tipoNome: '',
+        itens: [], _deletedItems: [], _dirty: false, _open: true,
+      }])
+    }
+  }
+
+  if (loading) return <div className="p-8 text-center text-accent-subtle text-sm">A carregar…</div>
+
+  return (
+    <div className="p-4 flex flex-col gap-3 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-sm font-bold text-accent">Checklists</p>
+        <button onClick={createChecklist}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-xs text-accent-subtle hover:text-accent transition-colors">
+          <Plus size={12} /> Nova checklist
+        </button>
+      </div>
+
+      {checklists.length === 0 && (
+        <p className="text-center text-accent-subtle/40 italic text-sm py-8">Sem checklists. Cria a primeira.</p>
+      )}
+
+      {checklists.map(cl => (
+        <div key={cl.id} className="border border-border rounded-xl overflow-hidden bg-surface-1">
+          {/* Header */}
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-surface-2 border-b border-border/50">
+            <ListChecks size={13} className="text-accent-subtle shrink-0" />
+            <input
+              className="flex-1 text-[13px] font-semibold text-accent bg-transparent outline-none min-w-0"
+              value={cl._editNome}
+              onChange={e => update(cl.id, { _editNome: e.target.value })}
+            />
+            <select
+              className="text-[11px] bg-surface-3 border border-border/50 rounded px-2 py-0.5 text-accent-subtle outline-none"
+              value={cl._tipoSel}
+              onChange={e => update(cl.id, { _tipoSel: e.target.value })}
+            >
+              <option value="">— Tipo —</option>
+              {tipos.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+            </select>
+            <button onClick={() => setChecklists(prev => prev.map(c => c.id === cl.id ? { ...c, _open: !c._open } : c))}
+              className="text-accent-subtle/50 hover:text-accent transition-colors text-[11px] px-1">
+              {cl._open ? '▲' : '▼'}
+            </button>
+            {cl._dirty && (
+              <button onClick={() => saveChecklist(cl)} disabled={saving === cl.id}
+                className="flex items-center gap-1 px-2 py-0.5 rounded bg-status-confirmado/15 border border-status-confirmado/30 text-status-confirmado text-[11px] hover:bg-status-confirmado/25 transition-colors disabled:opacity-50">
+                <Save size={11} />{saving === cl.id ? '…' : 'Guardar'}
+              </button>
+            )}
+            <button onClick={() => deleteChecklist(cl.id)}
+              className="text-accent-subtle/30 hover:text-status-cancelado transition-colors shrink-0">
+              <Trash2 size={13} />
+            </button>
+          </div>
+
+          {/* Itens */}
+          {cl._open && (
+            <div className="px-3 py-2 flex flex-col gap-1.5">
+              {cl.itens.map((item, idx) => (
+                <div key={item._key} className="flex items-center gap-2">
+                  <span className="text-[10px] text-accent-subtle/40 w-4 text-right shrink-0">{idx + 1}.</span>
+                  <input
+                    className="flex-1 text-[12px] text-accent bg-transparent border-b border-border/30 focus:border-accent/40 outline-none py-0.5"
+                    value={item.texto}
+                    placeholder={`Item ${idx + 1}…`}
+                    onChange={e => updateItem(cl.id, item._key, { texto: e.target.value })}
+                  />
+                  <button onClick={() => removeItem(cl.id, item._key)}
+                    className="text-accent-subtle/25 hover:text-status-cancelado transition-colors shrink-0">
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+              <button onClick={() => addItem(cl.id)}
+                className="flex items-center gap-1 text-[11px] text-accent-subtle/40 hover:text-status-confirmado/70 transition-colors mt-1">
+                <Plus size={11} /> Adicionar item
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function ApoioTecnico() {
   const { anoMes } = useMesStore()
   const [loading, setLoading]           = useState(true)
@@ -680,9 +1058,9 @@ export function ApoioTecnico() {
   const [filtroTecnico, setFiltroTecnico] = useState('')
   const [pesquisa, setPesquisa]           = useState('')
   const [vista, setVista]                 = useState('lista') // lista | semana | mes | colunas | stats | ocorrencias
-  const [ocultarVazios, setOcultarVazios] = useState(true)
   const [semanaRef, setSemanaRef]         = useState(hojeStr)
   const [modalDia, setModalDia]           = useState(null)
+  const [modalChecklist, setModalChecklist] = useState(null) // { eventoId, eventoNome, tecIds }
 
   // ── Scroll refs ─────────────────────────────────────────────────────────────
   const scrollRef   = useRef(null)
@@ -696,13 +1074,21 @@ export function ApoioTecnico() {
   // ── Drag state (folga) ──────────────────────────────────────────────────────
   const [dragFolga, setDragFolga]         = useState(null)
   const [dragOverFolga, setDragOverFolga] = useState(null)
+  const [dragOverLmd,   setDragOverLmd]   = useState(null)
 
-  const { dataInicio, dataFim, dias } = useMemo(() => {
+  const { dataInicio, dataFim, dias, dataInicioExt, dataFimExt, diasExt } = useMemo(() => {
     const [ano, mes] = anoMes.split('-').map(Number)
     const ref    = new Date(ano, mes - 1, 1)
     const inicio = startOfMonth(ref)
     const fim    = endOfMonth(ref)
-    return { dataInicio: isoData(inicio), dataFim: isoData(fim), dias: eachDayOfInterval({ start: inicio, end: fim }) }
+    const inicioExt = startOfWeek(inicio, { weekStartsOn: 1 })
+    const fimExt    = endOfWeek(fim, { weekStartsOn: 1 })
+    return {
+      dataInicio: isoData(inicio), dataFim: isoData(fim),
+      dias: eachDayOfInterval({ start: inicio, end: fim }),
+      dataInicioExt: isoData(inicioExt), dataFimExt: isoData(fimExt),
+      diasExt: eachDayOfInterval({ start: inicioExt, end: fimExt }),
+    }
   }, [anoMes])
 
   const carregar = useCallback(async () => {
@@ -710,13 +1096,13 @@ export function ApoioTecnico() {
     const [tRes, eRes, agRes, evRes, slRes] = await Promise.all([
       supabase.from('tecnicos').select('id, nome, ativo, tipo').eq('ativo', true).order('nome'),
       supabase.from('espacos').select('id, nome').eq('activo', true).order('nome'),
-      supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicio).lte('data', dataFim),
+      supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicioExt).lte('data', dataFimExt),
       supabase.from('supa_eventos')
-        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_instalacao, status, tecnico_id, valor_apoio_tecnico')
-        .gte('data_evento', dataInicio).lte('data_evento', dataFim).neq('status', 'cancelado'),
+        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_instalacao, status, tecnico_id, valor_apoio_tecnico, tipo')
+        .gte('data_evento', dataInicioExt).lte('data_evento', dataFimExt).neq('status', 'cancelado'),
       supabase.from('agenda')
         .select('id, espaco_id, data, dj_nome, dj_id, tipo_slot, estado, djs(nome, nome_artistico)')
-        .gte('data', dataInicio).lte('data', dataFim)
+        .gte('data', dataInicioExt).lte('data', dataFimExt)
         .not('estado', 'in', '("cancelado","sem_efeito","faltou")'),
     ])
     if (!tRes.error) setTecnicos(tRes.data ?? [])
@@ -738,10 +1124,11 @@ export function ApoioTecnico() {
     }
     if (!slRes.error) setSlots(slRes.data ?? [])
     setLoading(false)
-  }, [dataInicio, dataFim])
+  }, [dataInicioExt, dataFimExt])
 
   useEffect(() => { carregar() }, [carregar])
   useEffect(() => { setFiltroEspaco(''); setFiltroTecnico(''); setPesquisa('') }, [anoMes])
+
 
   const carregarComScroll = useCallback(() => {
     if (scrollRef.current) {
@@ -863,6 +1250,34 @@ export function ApoioTecnico() {
   const tecnicosFixos = useMemo(() => tecnicos.filter(t => t.tipo === 'fixo'), [tecnicos])
   const i4djEspacoId  = useMemo(() => espacos.find(e => e.nome?.trim().toLowerCase() === 'lmd')?.id ?? null, [espacos])
 
+  const handleLmdDrop = useCallback(async (e, dataStr, linhasLmdDia) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverLmd(null)
+    const tecIdFromTransfer = e.dataTransfer.getData('tecnicoId')
+    const tecId = tecIdFromTransfer || dragSourceRef.current?.tecnicoId
+    if (!tecId || !i4djEspacoId) return
+    const srcEvento = e.dataTransfer.getData('eventoId') || dragSourceRef.current?.eventoId || null
+    const srcAgId   = dragSourceRef.current?.agId || null
+    dragSourceRef.current = null; setDragSource(null)
+    try {
+      if (srcEvento) await supabase.from('evento_tecnicos').delete().eq('evento_id', srcEvento).eq('tecnico_id', tecId)
+      else if (srcAgId) await supabase.from('agendamentos_tecnicos').update({ tecnico_id: null }).eq('id', srcAgId)
+      const existingEv = linhasLmdDia?.find(l => l.ev)?.ev
+      if (existingEv) {
+        await supabase.from('evento_tecnicos')
+          .upsert({ evento_id: existingEv.id, tecnico_id: tecId }, { onConflict: 'evento_id,tecnico_id' })
+      } else {
+        await supaEventosApi.criar({
+          espaco_id: i4djEspacoId, data_evento: dataStr,
+          evento: 'Trabalho LMD', hora_instalacao: '10:00:00', hora_inicio: '19:00:00',
+          status: 'confirmado', tecnico_id: tecId,
+        })
+      }
+      carregarComScroll()
+    } catch (err) { console.error('LMD drop:', err) }
+  }, [i4djEspacoId, carregarComScroll])
+
   // Semana view: 7 dias a partir de 2ª feira da semana que contém semanaRef
   const semana7 = useMemo(() => {
     const ref = parseISO(semanaRef)
@@ -873,7 +1288,7 @@ export function ApoioTecnico() {
   // LMD por dia: data → tecIds (técnicos fixos livres = no LMD)
   const lmdPorDia = useMemo(() => {
     const m = {}
-    dias.forEach(dia => {
+    diasExt.forEach(dia => {
       const dataStr    = isoData(dia)
       const folgasHoje = new Set(folgasIdx[dataStr] ?? [])
       // Técnicos já atribuídos a qualquer evento neste dia
@@ -892,11 +1307,11 @@ export function ApoioTecnico() {
       m[dataStr] = [...new Set([...lmdTecs, ...livres])]
     })
     return m
-  }, [dias, folgasIdx, evTecnicos, eventos, evTecIdx, evIdx, tecnicosFixos, i4djEspacoId])
+  }, [diasExt, folgasIdx, evTecnicos, eventos, evTecIdx, evIdx, tecnicosFixos, i4djEspacoId])
 
   const linhasBrutas = useMemo(() => {
     const result = []
-    dias.forEach(dia => {
+    diasExt.forEach(dia => {
       const dataStr = isoData(dia)
       const linhas  = []
       // LMD é cliente real: entra nas linhas como qualquer outro espaço
@@ -913,7 +1328,7 @@ export function ApoioTecnico() {
       result.push({ dataStr, dia, linhas, folgas: folgasIdx[dataStr] ?? [] })
     })
     return result
-  }, [dias, espacos, evIdx, djIdx, agIdx, folgasIdx, evTecIdx, i4djEspacoId])
+  }, [diasExt, espacos, evIdx, djIdx, agIdx, folgasIdx, evTecIdx, i4djEspacoId])
 
   const linhasPorDia = useMemo(() => {
     const q = pesquisa.trim().toLowerCase()
@@ -921,7 +1336,7 @@ export function ApoioTecnico() {
       ? tecnicos.find(t => t.nome === filtroTecnico)?.id ?? null
       : null
 
-    return linhasBrutas.map(grupo => {
+    return linhasBrutas.filter(grupo => grupo.dataStr >= dataInicio && grupo.dataStr <= dataFim).map(grupo => {
       let linhas = grupo.linhas
 
       if (filtroEspaco) linhas = linhas.filter(l => l.espaco_id === filtroEspaco)
@@ -938,21 +1353,9 @@ export function ApoioTecnico() {
           tecNomes.toLowerCase().includes(q)
       })
 
-      // Ocultar espaços vazios (sem evento e sem técnico) dentro de cada dia
-      if (ocultarVazios) {
-        linhas = linhas.filter(l => l.ev !== null || (l.tecIds ?? []).length > 0)
-      }
-
-      const temEventos = linhas.some(l => l.ev !== null)
-      const hasActiveFilter = !!(filtroEspaco || tecFiltroId || q)
-      // Só ocultar dias inteiros quando há um filtro activo (espaço, técnico ou pesquisa)
-      // Folgas não contam para manter o dia visível — filtrar só onde o técnico trabalha
-      if (!temEventos && ocultarVazios && hasActiveFilter) return null
-      if (linhas.length === 0 && ocultarVazios && hasActiveFilter) return null
-
       return { ...grupo, linhas }
     }).filter(Boolean)
-  }, [linhasBrutas, filtroEspaco, filtroTecnico, pesquisa, tecnicos, ocultarVazios])
+  }, [linhasBrutas, dataInicio, dataFim, filtroEspaco, filtroTecnico, pesquisa, tecnicos])
 
   // Estatísticas por técnico — filtradas pelo espaço seleccionado
   const tecStats = useMemo(() => {
@@ -1016,6 +1419,26 @@ export function ApoioTecnico() {
     setDragOver(null)
   }, [])
 
+  const removerFolga = useCallback(async (dataStr, tecnicoId) => {
+    const ag = agendamentos.find(a => a.data === dataStr && a.tecnico_id === tecnicoId && a.folga)
+    if (!ag) return
+    try {
+      await supabase.from('agendamentos_tecnicos').delete().eq('id', ag.id)
+      carregarComScroll()
+    } catch (err) { console.error(err) }
+  }, [agendamentos, carregarComScroll])
+
+  const removerTecSlot = useCallback(async (linha, tecnicoId) => {
+    try {
+      if (linha.ev?.id) {
+        await supabase.from('evento_tecnicos').delete().eq('evento_id', linha.ev.id).eq('tecnico_id', tecnicoId)
+      } else if (linha.ag?.id) {
+        await supabase.from('agendamentos_tecnicos').update({ tecnico_id: null }).eq('id', linha.ag.id)
+      }
+      carregarComScroll()
+    } catch (err) { console.error(err) }
+  }, [carregarComScroll])
+
   const handleDragOver = useCallback((e, key) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
@@ -1030,26 +1453,29 @@ export function ApoioTecnico() {
   // Pendente de confirmação de conflito no drag
   const [conflitoDrag, setConflitoDrag] = useState(null) // { src, linha, conflitos }
 
-  const executarDrop = useCallback(async (src, linha) => {
+  const executarDrop = useCallback(async (src, linha, modo = 'mover') => {
     try {
-      const dstTecIds    = linha.tecIds ?? []
-      const vemDeEvento  = src.eventoId && src.dropKey !== null
-      const dstTemUm     = dstTecIds.length === 1 && !dstTecIds.includes(src.tecnicoId)
-      const isSwap       = vemDeEvento && linha.ev?.id && dstTemUm
+      const dstTecIds   = linha.tecIds ?? []
+      const vemDeEvento = src.eventoId && src.dropKey !== null
 
-      if (isSwap) {
-        // ── SWAP: Marcio ↔ Wilson ───────────────────────────────────────────
-        const dstTecId = dstTecIds[0]
-        // Remove ambos das posições actuais
+      if (modo === 'trocar') {
+        const dstTecId = dstTecIds.find(tid => tid !== src.tecnicoId)
         await Promise.all([
           supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId),
           supabase.from('evento_tecnicos').delete().eq('evento_id', linha.ev.id).eq('tecnico_id', dstTecId),
         ])
-        // Insere em posições trocadas
         await Promise.all([
           supabase.from('evento_tecnicos').upsert({ evento_id: linha.ev.id,  tecnico_id: src.tecnicoId }, { onConflict: 'evento_id,tecnico_id' }),
           supabase.from('evento_tecnicos').upsert({ evento_id: src.eventoId, tecnico_id: dstTecId      }, { onConflict: 'evento_id,tecnico_id' }),
         ])
+      } else if (modo === 'substituir') {
+        const dstTecId = dstTecIds.find(tid => tid !== src.tecnicoId)
+        if (dstTecId && linha.ev?.id)
+          await supabase.from('evento_tecnicos').delete().eq('evento_id', linha.ev.id).eq('tecnico_id', dstTecId)
+        if (linha.ev?.id)
+          await supabase.from('evento_tecnicos').upsert({ evento_id: linha.ev.id, tecnico_id: src.tecnicoId }, { onConflict: 'evento_id,tecnico_id' })
+        if (vemDeEvento)
+          await supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId)
       } else {
         // ── MOVER / ADICIONAR ───────────────────────────────────────────────
         if (linha.ev?.id) {
@@ -1060,7 +1486,6 @@ export function ApoioTecnico() {
         } else {
           await supabase.from('agendamentos_tecnicos').insert({ data: linha.dataStr, espaco_id: linha.espaco_id, tecnico_id: src.tecnicoId, folga: false })
         }
-        // Remove da origem se veio de um slot (não da paleta)
         if (vemDeEvento) {
           await supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId)
         } else if (src.agId && src.dropKey !== null) {
@@ -1080,6 +1505,15 @@ export function ApoioTecnico() {
     if (!src?.tecnicoId) return
     const dstKey = `${linha.dataStr}|${linha.espaco_id}`
     if (src.dropKey === dstKey) return
+
+    const dstTecIds = linha.tecIds ?? []
+    const outroTec  = dstTecIds.find(tid => tid !== src.tecnicoId)
+
+    // Destino já tem um técnico diferente → modal substituir / trocar
+    if (outroTec && dstTecIds.length === 1 && linha.ev?.id) {
+      setConflitoDrag({ src, linha, conflitos: [], troca: { dstTecId: outroTec } })
+      return
+    }
 
     // Verificar conflitos antes de executar
     const cs = detectarConflitos(src.tecnicoId, linha.dataStr, linha.ev?.id, eventos, agendamentos, tecnicos)
@@ -1294,13 +1728,11 @@ export function ApoioTecnico() {
                 className={clsx('p-1.5 rounded transition-colors', vista === 'ocorrencias' ? 'bg-surface-4 text-amber-400' : 'text-accent-muted hover:text-accent')}>
                 <AlertTriangle size={13} />
               </button>
+              <button onClick={() => setVista('checklists')} title="Checklists"
+                className={clsx('p-1.5 rounded transition-colors', vista === 'checklists' ? 'bg-surface-4 text-teal-400' : 'text-accent-muted hover:text-accent')}>
+                <ListChecks size={13} />
+              </button>
             </div>
-            {/* Ocultar vazios */}
-            <button onClick={() => setOcultarVazios(v => !v)}
-              className={clsx('px-2.5 py-1.5 rounded text-xs border transition-all',
-                ocultarVazios ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
-              {ocultarVazios ? '☰ Todos' : '⊟ Ocultar vazios'}
-            </button>
             {/* Pesquisa */}
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent-subtle pointer-events-none" />
@@ -1639,64 +2071,182 @@ export function ApoioTecnico() {
             {/* 7 cartões */}
             <div className="flex-1 overflow-auto p-3 grid grid-cols-7 gap-2 min-h-0">
               {semana7.map(dataStr => {
-                const grupo = linhasBrutas.find(g => g.dataStr === dataStr) ?? { linhas: [], folgas: [] }
-                const linhasDia = grupo.linhas.filter(l => l.ev !== null && (!filtroEspaco || l.espaco_id === filtroEspaco))
-                const folgaIds  = folgasIdx[dataStr] ?? []
-                const lmdTecsDia = lmdPorDia[dataStr] ?? []
-                const isHoje    = dataStr === hojeStr
-                const isNoMes   = dataStr >= dataInicio && dataStr <= dataFim
+                const grupo       = linhasBrutas.find(g => g.dataStr === dataStr) ?? { linhas: [], folgas: [] }
+                const linhasDia   = grupo.linhas.filter(l => l.ev !== null && (!filtroEspaco || l.espaco_id === filtroEspaco))
+                const linhasEv    = linhasDia.filter(l => l.espacoNome?.toLowerCase() !== 'lmd')
+                                             .sort((a, b) => (a.ev?.hora_instalacao ?? '99') < (b.ev?.hora_instalacao ?? '99') ? -1 : 1)
+                const linhasLmd   = linhasDia.filter(l => l.espacoNome?.toLowerCase() === 'lmd')
+                const lmdTecsDia  = lmdPorDia[dataStr] ?? []
+                const lmdEvTecIds = new Set(linhasLmd.flatMap(l => l.tecIds ?? []))
+                const lmdLivres   = lmdTecsDia.filter(tid => !lmdEvTecIds.has(tid))
+                const folgaIds    = folgasIdx[dataStr] ?? []
+                const isHoje      = dataStr === hojeStr
+                const isDropFolga = dragOverFolga === dataStr
                 return (
                   <div key={dataStr} className={clsx(
-                    'flex flex-col gap-0.5 rounded-xl border overflow-hidden',
-                    isHoje ? 'border-accent/40 bg-accent/[0.04]' : 'border-border bg-surface-1',
-                    !isNoMes && 'opacity-40'
+                    'flex flex-col rounded-xl border overflow-hidden',
+                    isHoje ? 'border-accent/40 bg-accent/[0.04]' : 'border-border bg-surface-1'
                   )}>
-                    <div className={clsx('px-2 py-1.5 text-center text-[10px] font-bold border-b border-border/40 shrink-0', isHoje ? 'text-amber-400' : 'text-accent-muted')}>
+                    {/* Cabeçalho */}
+                    <div className={clsx('px-2 py-1.5 text-center text-[12px] font-bold border-b border-border/40 shrink-0', isHoje ? 'text-amber-400' : 'text-accent-muted')}>
                       {cap(format(new Date(dataStr + 'T00:00:00'), 'EEE d', { locale: pt }))}
                     </div>
-                    {lmdTecsDia.length > 0 && (
-                      <div className="px-1.5 pt-1 flex flex-wrap gap-0.5">
-                        {lmdTecsDia.slice(0, 2).map(tid => {
-                          const tec = tecnicos.find(t => t.id === tid)
-                          const cor = tecCorMap[tid]
-                          return tec ? <span key={tid} className={clsx('text-[9px] font-bold px-1 py-0.5 rounded border', cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30')}>{tec.nome.split(' ')[0]}</span> : null
-                        })}
-                        {lmdTecsDia.length > 2 && <span className="text-[9px] text-accent-subtle">+{lmdTecsDia.length - 2}</span>}
-                      </div>
-                    )}
-                    <div className="flex-1 overflow-y-auto px-1.5 pb-1.5 flex flex-col gap-0.5">
-                      {linhasDia.map(linha => {
-                        const tecNomes = (linha.tecIds ?? []).map(id => tecnicos.find(t => t.id === id)?.nome?.split(' ')[0] ?? '?').join(', ')
+
+                    {/* Slots */}
+                    <div className="flex-1 overflow-y-auto px-1.5 py-1 flex flex-col gap-1 min-h-0">
+
+                      {/* Eventos normais */}
+                      {linhasEv.map(linha => {
+                        const dropKey = `${linha.dataStr}|${linha.espaco_id}`
+                        const isDst   = dragOver === dropKey && dragSource && dragSource.dropKey !== dropKey
                         return (
-                          <div key={linha.espaco_id} onClick={() => setModalEditEvento(linha.ev)}
-                            className="cursor-pointer px-1.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border/50 transition-colors">
-                            <p className="text-[9px] font-bold text-accent-subtle truncate">{linha.espacoNome}</p>
-                            <div className="flex items-center gap-0.5">
-                              {(linha.tecIds ?? []).slice(0, 2).map(tid => {
-                                const cor = tecCorMap[tid]
-                                return cor ? <span key={tid} className={clsx('w-1.5 h-1.5 rounded-full shrink-0', cor.dot)} /> : null
-                              })}
-                              <p className="text-[10px] text-accent truncate">{linha.ev?.evento ?? ''}</p>
+                          <div key={linha.espaco_id}
+                            onDragOver={e => handleDragOver(e, dropKey)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={e => handleDrop(e, linha)}
+                            onClick={() => setModalEditEvento(linha.ev)}
+                            className={clsx(
+                              'px-1.5 py-1 rounded-lg border cursor-pointer transition-colors',
+                              isDst ? 'bg-accent/10 border-accent/40' : 'bg-surface-2 border-border/50 hover:bg-surface-3'
+                            )}
+                          >
+                            <p className="text-[11px] font-semibold text-white/90 truncate leading-tight uppercase tracking-wide">{linha.espacoNome}</p>
+                            {linha.ev?.evento && <p className="text-[11px] text-blue-300/90 truncate leading-tight">{linha.ev.evento}</p>}
+                            {(linha.ev?.hora_instalacao || linha.ev?.hora_inicio) && (
+                              <div className="flex items-center gap-1.5 text-[12px] text-white/55 tabular-nums leading-tight flex-wrap">
+                                {linha.ev?.hora_instalacao && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Wrench size={9} className="shrink-0 opacity-70" />{hhmm(linha.ev.hora_instalacao)}
+                                  </span>
+                                )}
+                                {linha.ev?.hora_inicio && <span>{hhmm(linha.ev.hora_inicio)}</span>}
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-1 mt-0.5 justify-end items-center">
+                              {linha.ev?.id && (
+                                <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); window.open(`/apoiot/checklist/${linha.ev.id}`, '_blank') }}
+                                  className="text-white/25 hover:text-white/70 transition-colors">
+                                  <ListChecks size={11} />
+                                </button>
+                              )}
+                              {(linha.tecIds ?? []).length > 0
+                                ? (linha.tecIds ?? []).map(tid => {
+                                    const tec = tecnicos.find(t => t.id === tid)
+                                    const cor = tecCorMap[tid]
+                                    if (!tec) return null
+                                    return (
+                                      <span key={tid} draggable
+                                        onDragStart={e => { if (e.target.closest('button')) { e.preventDefault(); return } e.stopPropagation(); handleDragStart(e, linha, tid) }}
+                                        onDragEnd={handleDragEnd}
+                                        className={clsx('group/chip inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border select-none cursor-grab active:cursor-grabbing', cor?.chip ?? 'bg-accent/10 text-accent border-accent/20')}
+                                      >
+                                        {tec.nome.split(' ')[0]}
+                                        <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); e.preventDefault(); removerTecSlot(linha, tid) }}
+                                          className="opacity-0 group-hover/chip:opacity-100 text-[14px] leading-none transition-opacity">×</button>
+                                      </span>
+                                    )
+                                  })
+                                : <p className="text-[11px] italic text-accent-subtle/40">sem técnico</p>
+                              }
                             </div>
-                            {tecNomes
-                              ? <p className="text-[9px] text-accent-muted truncate">{tecNomes}</p>
-                              : <p className="text-[9px] italic text-red-400/60">sem técnico</p>}
                           </div>
                         )
                       })}
+
                       <button onClick={() => setModalEditEvento({ data_evento: dataStr })}
-                        className="w-full text-center text-[9px] text-accent-subtle/40 hover:text-accent-subtle py-0.5 transition-colors">
+                        className="w-full text-center text-[11px] text-accent-subtle/40 hover:text-accent-subtle py-0.5 transition-colors">
                         + evento
                       </button>
                     </div>
-                    {folgaIds.length > 0 && (
-                      <div className="px-1.5 pb-1 flex flex-wrap gap-0.5 shrink-0 border-t border-border/20 pt-0.5">
+
+                    {/* LMD — zona fixa, aceita drop → cria evento 10h-19h */}
+                    {(() => {
+                      const isDropLmd = dragOverLmd === dataStr
+                      const hasTecs   = lmdTecsDia.length > 0
+                      const evLmd     = linhasLmd.find(l => l.ev)?.ev
+                      return (
+                        <div
+                          onDragOver={e => { e.preventDefault(); setDragOverLmd(dataStr) }}
+                          onDragLeave={() => setDragOverLmd(null)}
+                          onDrop={e => handleLmdDrop(e, dataStr, linhasLmd)}
+                          onClick={() => {
+                            if (evLmd) setModalEditEvento(evLmd)
+                            else setModalEditEvento({ espaco_id: i4djEspacoId, data_evento: dataStr })
+                          }}
+                          className={clsx(
+                            'shrink-0 border-t px-1.5 py-1 h-[64px] overflow-hidden transition-colors cursor-pointer',
+                            isDropLmd ? 'bg-red-500/20 border-red-500/40' :
+                            hasTecs   ? 'bg-red-500/[0.06] border-red-700/20' :
+                            'bg-transparent border-border/15'
+                          )}
+                        >
+                          <p className="text-[10px] font-semibold text-red-400/50 uppercase tracking-wide leading-tight">LMD</p>
+                          {evLmd?.evento && <p className="text-[11px] text-white/70 truncate leading-tight">{evLmd.evento}</p>}
+                          {(evLmd?.hora_inicio || evLmd?.hora_instalacao) && (
+                            <p className="text-[10px] text-accent-subtle/50 tabular-nums leading-tight">
+                              {[evLmd?.hora_inicio, evLmd?.hora_instalacao].filter(Boolean).map(h => hhmm(h)).join(' - ')}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-1 justify-end mt-0.5">
+                            {lmdTecsDia.map(tid => {
+                              const tec = tecnicos.find(t => t.id === tid)
+                              const cor = tecCorMap[tid]
+                              if (!tec) return null
+                              const linhaLmd = linhasLmd.find(l => (l.tecIds ?? []).includes(tid))
+                              return (
+                                <span key={tid}
+                                  draggable={!!linhaLmd}
+                                  onDragStart={linhaLmd ? e => { if (e.target.closest('button')) { e.preventDefault(); return } e.stopPropagation(); handleDragStart(e, linhaLmd, tid) } : undefined}
+                                  onDragEnd={linhaLmd ? handleDragEnd : undefined}
+                                  className={clsx('group/lmdchip inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border select-none', linhaLmd ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer', cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30')}
+                                >
+                                  {tec.nome.split(' ')[0]}
+                                  <button
+                                    onMouseDown={e => e.stopPropagation()}
+                                    onClick={e => {
+                                      e.stopPropagation(); e.preventDefault()
+                                      if (linhaLmd) removerTecSlot(linhaLmd, tid)
+                                      else {
+                                        const ag = agendamentos.find(a => a.espaco_id === i4djEspacoId && a.data === dataStr && a.tecnico_id === tid)
+                                        if (ag) supabase.from('agendamentos_tecnicos').update({ tecnico_id: null }).eq('id', ag.id).then(carregarComScroll)
+                                      }
+                                    }}
+                                    className="opacity-0 group-hover/lmdchip:opacity-100 text-[14px] leading-none transition-opacity"
+                                  >×</button>
+                                </span>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Folga — sempre no fundo, aceita drop */}
+                    <div
+                      onDragOver={e => { e.preventDefault(); setDragOverFolga(dataStr) }}
+                      onDragLeave={() => setDragOverFolga(null)}
+                      onDrop={e => handleFolgaDrop(e, dataStr)}
+                      className={clsx(
+                        'shrink-0 border-t px-1.5 py-1 h-[64px] overflow-hidden transition-colors',
+                        isDropFolga ? 'bg-teal-500/15 border-teal-500/30' :
+                        folgaIds.length > 0 ? 'bg-teal-900/[0.15] border-teal-700/20' :
+                        'bg-transparent border-border/15'
+                      )}
+                    >
+                      <p className="text-[10px] font-semibold text-teal-400/50 uppercase tracking-wide leading-tight">Boa Folga!</p>
+                      <div className="flex flex-wrap gap-0.5 mt-0.5 justify-end">
                         {folgaIds.map(tid => {
                           const tec = tecnicos.find(t => t.id === tid)
-                          return tec ? <span key={tid} className="text-[8px] px-1 py-0.5 rounded bg-orange-400/10 text-orange-400/80 border border-orange-400/20">{tec.nome.split(' ')[0]}</span> : null
+                          if (!tec) return null
+                          return (
+                            <FolgaChip key={tid} tecnico={tec} cor={tecCorMap[tid]}
+                              dataStr={dataStr} onDragStart={handleFolgaDragStart}
+                              isDragging={dragFolga?.data === dataStr && dragFolga?.tecnicoId === tid}
+                              onRemover={() => removerFolga(dataStr, tid)} />
+                          )
                         })}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )
               })}
@@ -1818,6 +2368,10 @@ export function ApoioTecnico() {
           <VistaOcorrencias espacos={espacos} />
         )}
 
+        {vista === 'checklists' && (
+          <VistaChecklists />
+        )}
+
         {/* ════ VISTA ESTATÍSTICAS ════ */}
         {vista === 'stats' && (
           <VistaEstatisticas
@@ -1879,11 +2433,34 @@ export function ApoioTecnico() {
 
       {/* Modal conflito drag & drop */}
       {conflitoDrag && (
-        <ModalConflito
-          conflitos={conflitoDrag.conflitos}
-          nomeTecnico={tecnicos.find(t => t.id === conflitoDrag.src.tecnicoId)?.nome ?? ''}
-          onConfirmar={() => { const { src, linha } = conflitoDrag; setConflitoDrag(null); executarDrop(src, linha) }}
-          onCancelar={() => setConflitoDrag(null)}
+        conflitoDrag.troca ? (
+          <ModalTroca
+            srcTecNome={tecnicos.find(t => t.id === conflitoDrag.src.tecnicoId)?.nome?.split(' ')[0] ?? ''}
+            dstTecNome={tecnicos.find(t => t.id === conflitoDrag.troca.dstTecId)?.nome?.split(' ')[0] ?? ''}
+            dstEvNome={conflitoDrag.linha.ev?.evento ?? conflitoDrag.linha.espacoNome ?? ''}
+            podeTrocar={!!conflitoDrag.src.eventoId && !!conflitoDrag.linha.ev?.id}
+            onSubstituir={() => { const { src, linha } = conflitoDrag; setConflitoDrag(null); executarDrop(src, linha, 'substituir') }}
+            onTrocar={() => { const { src, linha } = conflitoDrag; setConflitoDrag(null); executarDrop(src, linha, 'trocar') }}
+            onCancelar={() => setConflitoDrag(null)}
+          />
+        ) : (
+          <ModalConflito
+            conflitos={conflitoDrag.conflitos}
+            nomeTecnico={tecnicos.find(t => t.id === conflitoDrag.src.tecnicoId)?.nome ?? ''}
+            onConfirmar={() => { const { src, linha } = conflitoDrag; setConflitoDrag(null); executarDrop(src, linha) }}
+            onCancelar={() => setConflitoDrag(null)}
+          />
+        )
+      )}
+
+      {modalChecklist && (
+        <ModalChecklistApoio
+          eventoId={modalChecklist.eventoId}
+          eventoNome={modalChecklist.eventoNome}
+          tecIds={modalChecklist.tecIds}
+          tecnicos={tecnicos}
+          tecCorMap={tecCorMap}
+          onFechar={() => setModalChecklist(null)}
         />
       )}
     </div>

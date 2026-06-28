@@ -286,6 +286,12 @@ function fmtDates(items, dateKey = 'data_evento', horaKey = 'hora_inicio') {
   return parts.slice(0, -1).join(', ') + ' e ' + parts[parts.length - 1]
 }
 
+function fmtDiasSem(dias) {
+  if (!dias.length) return ''
+  if (dias.length === 1) return dias[0]
+  return dias.slice(0, -1).join(', ') + ' e ' + dias[dias.length - 1]
+}
+
 function fmtDayNums(slots) {
   const days = slots
     .map(s => s.data ? String(new Date(s.data + 'T12:00:00').getDate()).padStart(2, '0') : null)
@@ -882,12 +888,15 @@ function initCard(servicos) {
 }
 
 // ── Card por Cliente ──────────────────────────────────────────────────────────
-const DJ_META = [
-  { key: 'residentes',    label: 'Residentes',    tipos: ['residente_anl', 'residente', 'residente_st'] },
-  { key: 'convidado_int', label: 'Convidados INT', tipos: ['convidado_int'] },
-  { key: 'convidado_ext', label: 'Convidados EXT', tipos: ['convidado_ext'] },
-  { key: 'premium',       label: 'Premium',        tipos: ['premium'] },
-]
+const TIPO_LABELS = {
+  residente_anl: 'DJ Residente ANL',
+  residente:     'DJ Residentes',
+  residente_st:  'DJ Residentes ST',
+  convidado_int: 'DJ Convidados INT',
+  convidado_ext: 'DJ Convidados EXT',
+  premium:       'Premium',
+}
+const DIAS_ABR = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const PRINT_MAP = {
   'prev':        { comAgenda: false, titulo: 'AGENDA PROPOSTA', docTipo: 'PREVISÃO'    },
   'prev-agenda': { comAgenda: true,  titulo: 'AGENDA PROPOSTA', docTipo: 'PREVISÃO'    },
@@ -908,43 +917,44 @@ function PrintToggle({ k, isPrinted, togglePrint }) {
 }
 
 function SpaceCard({ espaco, slots, eventos, cardState, onCardChange, onSave, saving, catTotals, subtiposConfig, turnos, mes, layoutView }) {
-  // DJ hierarchy: meta-grupo (Residentes/Convidados) → turno → DJ
+  // DJ hierarchy: tipo_slot → turno → DJ
   const djHier = useMemo(() => {
-    return DJ_META.map(meta => {
+    return CAT_DEFS.map(cat => {
       const turnosMap = {}
-      let metaBilling = 0
-      let metaN = 0
-      const daysSet = new Set()
+      let catBilling = 0
+      let catN = 0
       slots.forEach(slot => {
         const tipoKey = mapTipoSlot(slot.tipo_slot)
-        if (!meta.tipos.includes(tipoKey)) return
-        let turnoLabel
-        if (slot.turno_id) {
-          const t = turnos.find(t => t.id === slot.turno_id)
-          turnoLabel = t?.nome ?? `${slot.hora_inicio?.slice(0,5) ?? '?'}–${slot.hora_fim?.slice(0,5) ?? '?'}`
-        } else {
-          const h = [slot.hora_inicio?.slice(0,5), slot.hora_fim?.slice(0,5)].filter(Boolean).join('–')
-          turnoLabel = h || 'Sem horário'
-        }
+        if (tipoKey !== cat.key) return
+        // 1. match by turno_id (com coercão de tipo); 2. fallback: match por hora_inicio+hora_fim
+        const turnoRef = slot.turno_id
+          ? turnos.find(t => String(t.id) === String(slot.turno_id))
+          : turnos.find(t => t.hora_inicio?.slice(0,5) === slot.hora_inicio?.slice(0,5) && t.hora_fim?.slice(0,5) === slot.hora_fim?.slice(0,5))
+        const turnoLabel = turnoRef?.nome
+          ?? ([slot.hora_inicio?.slice(0,5), slot.hora_fim?.slice(0,5)].filter(Boolean).join('–') || 'Sem horário')
+        const horaInicio = turnoRef?.hora_inicio?.slice(0,5) ?? slot.hora_inicio?.slice(0,5) ?? null
+        const horaFim    = turnoRef?.hora_fim?.slice(0,5)    ?? slot.hora_fim?.slice(0,5)    ?? null
         const djNome = slot.dj_nome || slot.djs?.nome_artistico || slot.djs?.nome || 'DJ'
         const rate = slotRate(slot, subtiposConfig, catTotals)
-        metaBilling += rate
-        metaN++
-        if (slot.data) daysSet.add(String(new Date(slot.data + 'T12:00:00').getDate()).padStart(2, '0'))
-        if (!turnosMap[turnoLabel]) turnosMap[turnoLabel] = { label: turnoLabel, billing: 0, djs: {}, daysSet: new Set() }
+        catBilling += rate
+        catN++
+        const dayNum = slot.data ? String(new Date(slot.data + 'T12:00:00').getDate()).padStart(2, '0') : null
+        if (!turnosMap[turnoLabel]) turnosMap[turnoLabel] = { label: turnoLabel, billing: 0, djs: {}, daysSet: new Set(), diasSemana: turnoRef?.dias_semana ?? null, horaInicio, horaFim }
         turnosMap[turnoLabel].billing += rate
-        if (slot.data) turnosMap[turnoLabel].daysSet.add(String(new Date(slot.data + 'T12:00:00').getDate()).padStart(2, '0'))
+        if (dayNum) turnosMap[turnoLabel].daysSet.add(dayNum)
         if (!turnosMap[turnoLabel].djs[djNome]) turnosMap[turnoLabel].djs[djNome] = { nome: djNome, slots: [], billing: 0 }
         turnosMap[turnoLabel].djs[djNome].slots.push(slot)
         turnosMap[turnoLabel].djs[djNome].billing += rate
       })
-      const days = [...daysSet].sort((a, b) => Number(a) - Number(b))
       const turnosList = Object.values(turnosMap).map(t => {
-        const tDays = [...t.daysSet].sort((a, b) => Number(a) - Number(b))
-        return { label: t.label, billing: t.billing, djs: Object.values(t.djs), days: tDays }
+        const days = [...t.daysSet].sort((a, b) => Number(a) - Number(b))
+        const diasSem = Array.isArray(t.diasSemana) && t.diasSemana.length > 0
+          ? [...t.diasSemana].sort((a, b) => a - b).map(d => DIAS_ABR[d])
+          : []
+        return { label: t.label, billing: t.billing, djs: Object.values(t.djs), days, diasSem, horaInicio: t.horaInicio, horaFim: t.horaFim }
       })
-      return { key: meta.key, label: meta.label, n: metaN, days, billing: metaBilling, turnos: turnosList }
-    }).filter(g => g.billing > 0)
+      return { key: cat.key, label: TIPO_LABELS[cat.key] ?? cat.label, n: catN, billing: catBilling, turnos: turnosList }
+    }).filter(g => g.n > 0)
   }, [slots, turnos, subtiposConfig, catTotals])
 
   // Build APOIO hierarchy: tipo → nome (merged)
@@ -1040,24 +1050,25 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
       <hr style="border:none;border-top:1.5px solid #111;margin:0 0 18px">
     `
 
-    // ARTISTAS: linha DJs sempre visível; grupos só se toggle ON (com DJs dentro)
-    const printedGrupos = djHier.filter(g => isPrinted(`artistas:${g.key}`))
-    const djTotalPrint = printedGrupos.reduce((a, g) => a + g.billing, 0)
+    // ARTISTAS: tipo DJ → turno → DJ
+    const printedTipos = djHier.filter(g => isPrinted(`artistas:${g.key}`))
+    const djTotalPrint = printedTipos.reduce((a, g) => a + g.billing, 0)
     const musicosPrint = totalMusicos > 0 && isPrinted('artistas:musicos')
     const artistasTotal = djTotalPrint + (musicosPrint ? totalMusicos : 0)
-    const djsRow = totalDJs > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:12px;font-weight:600;color:#555"><span>DJs <span style="font-weight:normal">${totalDJsN}</span></span><span>${fmtE(totalDJs)}</span></div>` : ''
-    const grupRows = printedGrupos.map(g => {
-      const printedTurnos = g.turnos.filter(t => isPrinted(`artistas:${g.key}:${t.label}`))
-      const djsHtml = printedTurnos.map(t => {
-        const tLabel = t.days.length > 0 ? `${t.label} (${t.days.join(', ')})` : t.label
-        const djRows = t.djs.map(dj =>
-          `<tr><td style="padding-left:20px">${dj.nome}</td><td class="r">${fmtE(dj.billing)}</td></tr>`
-        ).join('')
-        return `<tr><td style="padding-left:10px;font-size:10px;color:#aaa;font-weight:600;padding-top:4px">${tLabel}</td><td class="r" style="font-size:10px;color:#aaa">${fmtE(t.billing)}</td></tr>${djRows}`
+    const tipoRows = printedTipos.map(tipo => {
+      const printedTurnos = tipo.turnos.filter(t => isPrinted(`artistas:${tipo.key}:${t.label}`))
+      const turnoBilling = printedTurnos.reduce((a, t) => a + t.billing, 0)
+      const turnoHtml = printedTurnos.map(t => {
+        const turnoTitle = t.diasSem?.length > 0 ? `${t.label} (${fmtDiasSem(t.diasSem)})` : t.label
+        const horaDatas = [t.horaInicio && t.horaFim ? `${t.horaInicio}–${t.horaFim}` : null, t.days.length > 0 ? `dias ${t.days.join(', ')}` : null].filter(Boolean).join(' · ')
+        const djRows = tipo.key === 'convidado_ext'
+          ? t.djs.map(dj => `<tr><td style="padding-left:20px;font-size:11px;color:#666">${dj.nome}</td><td class="r" style="font-size:11px;color:#666">${fmtE(dj.billing)}</td></tr>`).join('')
+          : ''
+        return `<tr><td style="padding-left:10px"><div style="font-size:11px;color:#555;font-weight:600">${turnoTitle}</div>${horaDatas ? `<div style="font-size:10px;color:#aaa;margin-top:1px">${horaDatas}</div>` : ''}</td><td class="r" style="font-size:11px;color:#666;vertical-align:top;padding-top:3px">${fmtE(t.billing)}</td></tr>${djRows}`
       }).join('')
-      return `<div class="sub-sec"><div class="sub-hdr"><span>${g.label}${g.n > 0 ? ` <span style="font-weight:normal">${g.n}</span>` : ''}</span><span>${fmtE(g.billing)}</span></div>${djsHtml ? `<table class="items"><tbody>${djsHtml}</tbody></table>` : ''}</div>`
+      return `<div class="sub-sec"><div class="sub-hdr"><span>${tipo.label}${tipo.n > 0 ? ` <span style="font-weight:normal">${tipo.n}</span>` : ''}</span><span>${fmtE(turnoBilling)}</span></div>${turnoHtml ? `<table class="items"><tbody>${turnoHtml}</tbody></table>` : ''}</div>`
     }).join('')
-    const artistasSec = artistasTotal > 0 ? `<div class="sec"><div class="sec-hdr"><span>Artistas</span><span>${fmtE(artistasTotal)}</span></div>${djsRow}${grupRows}${musicosPrint ? `<div class="item-row"><span style="padding-left:12px">Músicos / Bandas</span><span>${fmtE(totalMusicos)}</span></div>` : ''}</div>` : ''
+    const artistasSec = artistasTotal > 0 ? `<div class="sec"><div class="sec-hdr"><span>Artistas</span><span>${fmtE(artistasTotal)}</span></div>${tipoRows}${musicosPrint ? `<div class="item-row"><span style="padding-left:12px">Músicos / Bandas</span><span>${fmtE(totalMusicos)}</span></div>` : ''}</div>` : ''
 
     // APOIO TÉCNICO: tipos sempre visíveis; grupos dentro seguem toggle
     const apoioSecs = apoioHier.map(at => {
@@ -1200,57 +1211,43 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
         </div>
         {artistasAberto && (
           <div>
-            {/* DJs label — clique abre/fecha Residentes e Convidados */}
-            <div className="flex items-center gap-2 px-6 py-1.5 cursor-pointer hover:bg-white/2 transition-colors"
-              onClick={() => {
-                const allOpen = djHier.every(g => gruposAbertos[g.key])
-                if (allOpen) {
-                  setGruposAbertos({})
-                } else {
-                  const next = {}
-                  djHier.forEach(g => { next[g.key] = true })
-                  setGruposAbertos(next)
-                }
-              }}>
-              <ChevronRight size={10} className={clsx('text-white/20 transition-transform shrink-0', djHier.every(g => gruposAbertos[g.key]) && 'rotate-90')} />
-              <span className="text-[11px] font-semibold text-white/25 uppercase tracking-widest flex-1">
-                DJs {totalDJsN > 0 && <span className="font-normal text-white/20">{totalDJsN}</span>}
-              </span>
-              <span className="text-[11px] text-white/35 tabular-nums">{formatarEuro(totalDJs)}</span>
-            </div>
-
-            {djHier.map(grupo => (
-              <div key={grupo.key}>
-                {/* Residentes / Convidados */}
+            {djHier.map(tipo => (
+              <div key={tipo.key}>
                 <div className="flex items-center gap-2 px-6 py-2.5 cursor-pointer hover:bg-white/2 transition-colors"
-                  onClick={() => togGrupo(grupo.key)}>
-                  <ChevronRight size={10} className={clsx('text-white/20 transition-transform shrink-0', gruposAbertos[grupo.key] && 'rotate-90')} />
+                  onClick={() => togGrupo(tipo.key)}>
+                  <ChevronRight size={10} className={clsx('text-white/20 transition-transform shrink-0', gruposAbertos[tipo.key] && 'rotate-90')} />
                   <div className="flex-1 flex items-baseline gap-1.5 min-w-0">
-                    <span className="text-xs font-medium text-white/75">{grupo.label}</span>
-                    {grupo.n > 0 && <span className="text-[10px] text-white/35 tabular-nums">{grupo.n}</span>}
+                    <span className="text-xs font-medium text-white/75">{tipo.label}</span>
+                    {tipo.n > 0 && <span className="text-[10px] text-white/35 tabular-nums">{tipo.n}</span>}
                   </div>
-                  {toggle(`artistas:${grupo.key}`)}
-                  <span className="text-xs text-white/65 tabular-nums">{formatarEuro(grupo.billing)}</span>
+                  {toggle(`artistas:${tipo.key}`)}
+                  <span className="text-xs text-white/65 tabular-nums">{formatarEuro(tipo.billing)}</span>
                 </div>
-                {gruposAbertos[grupo.key] && grupo.turnos.map(turno => {
-                  const tKey = `${grupo.key}:${turno.label}`
+                {gruposAbertos[tipo.key] && tipo.turnos.map(turno => {
+                  const tKey = `${tipo.key}:${turno.label}`
                   return (
                     <div key={turno.label}>
-                      {/* Turno — cinzento, sem linha separadora branca */}
                       <div className="flex items-center gap-2 px-9 py-2 cursor-pointer hover:bg-white/2 transition-colors"
                         onClick={() => togTurno(tKey)}>
                         <ChevronRight size={8} className={clsx('text-white/15 transition-transform shrink-0', turnosAbertos[tKey] && 'rotate-90')} />
-                        <span className="text-[11px] text-white/30 flex-1">
-                          {turno.label}
-                          {turno.days.length > 0 && <span className="text-[10px] text-white/20 ml-1.5">({turno.days.join(', ')})</span>}
-                        </span>
-                        {toggle(`artistas:${grupo.key}:${turno.label}`)}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-[11px] text-white/40">
+                              {turno.label}{turno.diasSem.length > 0 ? ` (${fmtDiasSem(turno.diasSem)})` : ''}
+                            </span>
+                          </div>
+                          {(turno.horaInicio || turno.days.length > 0) && (
+                            <div className="text-[10px] text-white/20 mt-0.5">
+                              {[turno.horaInicio && turno.horaFim ? `${turno.horaInicio}–${turno.horaFim}` : null, turno.days.length > 0 ? `dias ${turno.days.join(', ')}` : null].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
+                        </div>
+                        {toggle(`artistas:${tipo.key}:${turno.label}`)}
                         <span className="text-[11px] text-white/30 tabular-nums">{formatarEuro(turno.billing)}</span>
                       </div>
-                      {/* DJs — sem toggle individual, sempre imprimíveis */}
                       {turnosAbertos[tKey] && turno.djs.map(dj => (
                         <div key={dj.nome} className="flex items-center gap-2 px-12 py-1.5">
-                          <span className="text-xs text-white/55 flex-1">{dj.nome}{fmtDayNums(dj.slots) ? ` (Dias ${fmtDayNums(dj.slots)})` : ''}</span>
+                          <span className="text-xs text-white/55 flex-1">{dj.nome}</span>
                           <span className="text-xs text-white/50 tabular-nums">{formatarEuro(dj.billing)}</span>
                         </div>
                       ))}
@@ -1260,8 +1257,6 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
               </div>
             ))}
             {djHier.length === 0 && <p className="px-6 py-3 text-xs text-white/15 italic">Sem atuações DJ</p>}
-
-            {/* Músicos / Bandas — mesmo formato que DJs, oculto se 0 */}
             {totalMusicos > 0 && (
               <div className="flex items-center gap-2 px-6 py-2.5">
                 <span className="text-xs font-medium text-white/75 flex-1">Músicos / Bandas</span>
@@ -1679,7 +1674,7 @@ export function ContasClientes() {
       supabase.from('contas_clientes')
         .select('*').eq('mes', mes),
       supabase.from('configuracoes').select('chave, valor'),
-      supabase.from('turnos_espaco').select('id, espaco_id, nome, ordem').order('ordem'),
+      supabase.from('turnos_espaco').select('id, espaco_id, nome, ordem, hora_inicio, hora_fim, dias_semana').order('ordem'),
     ])
     if (!sRes.error)      setSlots(sRes.data ?? [])
     if (!eRes.error)      setEventos(eRes.data ?? [])

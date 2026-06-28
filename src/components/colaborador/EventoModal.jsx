@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks } from 'lucide-react'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
@@ -66,6 +66,8 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [guardado, setGuardado]   = useState(false)
   const [erro, setErro]           = useState(null)
   const touchX = useRef(null)
+  const [eventoListas, setEventoListas] = useState([]) // [{ clId, nome, itens:[{id,texto}] }]
+  const [eventoChecks, setEventoChecks] = useState({}) // Set of checked itemIds
 
   // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
@@ -104,6 +106,28 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     return () => { activo = false }
   }, [evento?.id, colaborador?.id, isAtribuido])
 
+  useEffect(() => {
+    if (!evento?.id) return
+    let activo = true
+    Promise.all([
+      supabase.from('evento_checklists')
+        .select('checklist_id, checklists(id, nome, checklist_itens(id, texto, ordem))')
+        .eq('evento_id', evento.id),
+      colaborador?.id ? supabase.from('checklist_checks')
+        .select('checklist_item_id')
+        .eq('evento_id', evento.id)
+        .eq('tecnico_id', colaborador.id) : Promise.resolve({ data: [] }),
+    ]).then(([{ data: ecs }, { data: chks }]) => {
+      if (!activo) return
+      setEventoListas((ecs ?? []).map(ec => ({
+        clId: ec.checklist_id, nome: ec.checklists?.nome ?? '?',
+        itens: (ec.checklists?.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem),
+      })))
+      setEventoChecks(new Set((chks ?? []).map(c => c.checklist_item_id)))
+    })
+    return () => { activo = false }
+  }, [evento?.id, colaborador?.id])
+
   const logo    = evento.espacos?.logo_url
   const cliente = evento.espacos?.nome || evento.cliente || null
   const tecNomeResp = mapaTecnicos[evento.tecnico_id] || evento.responsavel || null
@@ -126,18 +150,35 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     finally { setGuardando(false) }
   }
 
+  const toggleCheck = async (itemId) => {
+    if (!colaborador?.id) return
+    const checked = eventoChecks.has(itemId)
+    setEventoChecks(prev => { const s = new Set(prev); if (checked) s.delete(itemId); else s.add(itemId); return s })
+    if (!checked) {
+      await supabase.from('checklist_checks').upsert(
+        { evento_id: evento.id, checklist_item_id: itemId, tecnico_id: colaborador.id },
+        { onConflict: 'evento_id,checklist_item_id,tecnico_id' }
+      )
+    } else {
+      await supabase.from('checklist_checks').delete()
+        .eq('evento_id', evento.id).eq('checklist_item_id', itemId).eq('tecnico_id', colaborador.id)
+    }
+  }
+
   const goAba = (novaAba, direcao) => {
     if (novaAba === aba) return
     setDir(direcao)
     setAba(novaAba)
   }
 
+  const ABAS_ORDER = ['detalhes', 'notas', 'checklist']
   const onTouchStart = (e) => { touchX.current = e.changedTouches[0].clientX }
   const onTouchEnd   = (e) => {
     if (touchX.current === null) return
-    const d = e.changedTouches[0].clientX - touchX.current
-    if (d < -60) goAba('notas', 'right')
-    if (d >  60) goAba('detalhes', 'left')
+    const d   = e.changedTouches[0].clientX - touchX.current
+    const idx = ABAS_ORDER.indexOf(aba)
+    if (d < -60 && idx < ABAS_ORDER.length - 1) goAba(ABAS_ORDER[idx + 1], 'right')
+    if (d >  60 && idx > 0)                      goAba(ABAS_ORDER[idx - 1], 'left')
     touchX.current = null
   }
 
@@ -164,10 +205,14 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
         {/* Abas */}
         <div className="flex border-b border-border px-5 shrink-0 items-center">
-          {[{ id: 'detalhes', label: 'Detalhes', d: 'left' }, { id: 'notas', label: 'Notas & Equipamento', d: 'right' }].map(t => (
+          {[
+            { id: 'detalhes',  label: 'Detalhes',           d: 'left' },
+            { id: 'notas',     label: 'Notas & Equip.',     d: 'right' },
+            { id: 'checklist', label: 'Checklist',          d: 'right' },
+          ].map(t => (
             <button key={t.id} onClick={() => goAba(t.id, t.d)}
               className={clsx(
-                'px-4 py-2.5 font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap',
+                'px-3 py-2.5 font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap',
                 aba === t.id ? 'border-amber-400 text-amber-400' : 'border-transparent text-accent-muted hover:text-accent',
               )}
               style={{ fontSize: 12 }}>{t.label}</button>
@@ -257,6 +302,52 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 {/* Morada — coluna única */}
                 <Campo rotulo="Morada" valor={evento.morada} isLink full />
               </div>
+            </div>
+
+          ) : aba === 'checklist' ? (
+            <div className="flex flex-col gap-3 py-2">
+              {eventoListas.length === 0 && (
+                <p className="text-center italic py-6" style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>Sem checklists neste evento.</p>
+              )}
+              {eventoListas.map(lista => (
+                <div key={lista.clId} className="border border-white/10 rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
+                    <ListChecks size={12} className="text-amber-400 shrink-0" />
+                    <p className="font-semibold text-amber-400" style={{ fontSize: 12 }}>{lista.nome}</p>
+                  </div>
+                  <div className="flex flex-col">
+                    {lista.itens.map((item, idx) => {
+                      const checked = eventoChecks.has(item.id)
+                      return (
+                        <button key={item.id}
+                          onClick={() => toggleCheck(item.id)}
+                          disabled={!isAtribuido}
+                          className={clsx(
+                            'flex items-center gap-3 px-3 py-2.5 border-b border-white/5 last:border-0 text-left transition-colors',
+                            checked ? 'bg-green-500/10' : 'hover:bg-white/5',
+                            !isAtribuido ? 'cursor-default' : 'cursor-pointer'
+                          )}>
+                          <span className={clsx(
+                            'w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors',
+                            checked ? 'bg-green-500/30 border-green-500/60' : 'border-white/20'
+                          )}>
+                            {checked && <Check size={12} className="text-green-400" />}
+                          </span>
+                          <span className={clsx('flex-1', checked ? 'line-through opacity-50' : 'opacity-80')} style={{ fontSize: 13 }}>
+                            {item.texto}
+                          </span>
+                        </button>
+                      )
+                    })}
+                    {lista.itens.length === 0 && (
+                      <p className="px-3 py-2 italic opacity-30" style={{ fontSize: 12 }}>Sem itens.</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {!isAtribuido && (
+                <p className="text-center opacity-40 italic" style={{ fontSize: 12 }}>Só técnicos atribuídos podem marcar itens.</p>
+              )}
             </div>
 
           ) : (
