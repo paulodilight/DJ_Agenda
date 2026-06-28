@@ -295,23 +295,22 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 <Campo rotulo="Tipo"   valor={evento.tipo} />
                 <Campo rotulo="Status" valor={labelEstado(evento.status) || evento.status} />
 
-                {/* LOCAL | Contacto */}
-                {cliente && (
-                  <div className="flex flex-col gap-0.5 py-2 border-b border-border/30">
-                    <p className="font-semibold uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>Local</p>
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="break-words text-accent-muted" style={{ fontSize: 14 }}>{cliente}</p>
-                      {eventoListas.length > 0 && (
-                        <button onClick={() => goAba('checklist', 'right')}
-                          title="Ver checklists"
-                          className="text-amber-400/70 hover:text-amber-400 transition-colors shrink-0">
-                          <ListChecks size={28} />
-                        </button>
-                      )}
-                    </div>
+                {/* LOCAL | ícone checklist centrado na coluna direita */}
+                <Campo rotulo="Local" valor={cliente} />
+                {eventoListas.length > 0 && cliente ? (
+                  <div className="flex items-center justify-center py-2 border-b border-border/30">
+                    <button onClick={() => goAba('checklist', 'right')}
+                      title="Ver checklists"
+                      className="text-amber-400/70 hover:text-amber-400 transition-colors">
+                      <ListChecks size={32} />
+                    </button>
                   </div>
+                ) : (
+                  <Campo rotulo="Contacto" valor={evento.contacto_pelo_evento} />
                 )}
-                <Campo rotulo="Contacto" valor={evento.contacto_pelo_evento} />
+                {eventoListas.length > 0 && cliente && (
+                  <Campo rotulo="Contacto" valor={evento.contacto_pelo_evento} />
+                )}
 
                 {/* Morada — coluna única */}
                 <Campo rotulo="Morada" valor={evento.morada} isLink full />
