@@ -297,7 +297,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
                 {/* LOCAL | Contacto */}
                 {cliente && (
-                  <div className="col-span-2 flex flex-col gap-0.5 py-2 border-b border-border/30">
+                  <div className="flex flex-col gap-0.5 py-2 border-b border-border/30">
                     <p className="font-semibold uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>Local</p>
                     <div className="flex items-center justify-between gap-3">
                       <p className="break-words text-accent-muted" style={{ fontSize: 14 }}>{cliente}</p>
