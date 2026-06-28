@@ -37,6 +37,7 @@ const fimHoje   = () => `${hojeISO()}T23:59:59.999Z`
 
 export function useAssinaturaDia(tecnicoId) {
   const [proxima, setProxima] = useState(null)
+  const [feitas,  setFeitas]  = useState([])
   const [loading, setLoading] = useState(true)
   const [versao,  setVersao]  = useState(0)
 
@@ -96,7 +97,7 @@ export function useAssinaturaDia(tecnicoId) {
       // 3. Assinaturas já feitas hoje
       const { data: assin } = await supabase
         .from('assinaturas_tecnico')
-        .select('tipo, evento_id')
+        .select('tipo, evento_id, registado_em')
         .eq('tecnico_id', tecnicoId)
         .gte('registado_em', inicioHoje())
         .lte('registado_em', fimHoje())
@@ -104,7 +105,10 @@ export function useAssinaturaDia(tecnicoId) {
       // LMD: olha para todos os tipos do dia
       const tiposGeral  = new Set((assin ?? []).map(a => a.tipo))
       // Evento: olha apenas para assinaturas do evento de hoje
-      const tiposEvento = new Set((assin ?? []).filter(a => a.evento_id === eventoId).map(a => a.tipo))
+      const assinEvento = (assin ?? []).filter(a => a.evento_id === eventoId)
+      const tiposEvento = new Set(assinEvento.map(a => a.tipo))
+
+      setFeitas(assinEvento.map(a => ({ tipo: a.tipo, registado_em: a.registado_em })))
 
       // 4. Próxima acção
       let proxima = null
@@ -138,5 +142,5 @@ export function useAssinaturaDia(tecnicoId) {
     setVersao(v => v + 1)
   }, [tecnicoId])
 
-  return { proxima, registar, loading }
+  return { proxima, registar, loading, feitas }
 }

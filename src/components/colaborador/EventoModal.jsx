@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock } from 'lucide-react'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
@@ -66,8 +66,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [guardado, setGuardado]   = useState(false)
   const [erro, setErro]           = useState(null)
   const touchX = useRef(null)
-  const [eventoListas, setEventoListas] = useState([]) // [{ clId, nome, itens:[{id,texto}] }]
-  const [eventoChecks, setEventoChecks] = useState({}) // Set of checked itemIds
+  const [eventoListas,    setEventoListas]    = useState([])
+  const [eventoChecks,    setEventoChecks]    = useState(new Set())
+  const [eventoSubmetido, setEventoSubmetido] = useState(false)
+  const [guardandoCl,     setGuardandoCl]     = useState(false)
 
   // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
@@ -81,7 +83,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const isResponsavel = colaborador?.id === evento.tecnico_id
 
   // ── Assinatura de início/fim de evento ──
-  const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading } = useAssinaturaDia(colaborador?.id ?? null)
+  const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading, feitas: feitasAssin } = useAssinaturaDia(colaborador?.id ?? null)
   const [assinandoEvento, setAssinandoEvento] = useState(false)
   const mostrarInicioEvento = !assinLoading && proximaAssin?.tipo === 'evento_entrada' && proximaAssin?.eventoId === evento.id
   const mostrarFimEvento   = !assinLoading && proximaAssin?.tipo === 'evento_saida'   && proximaAssin?.eventoId === evento.id
@@ -118,13 +120,19 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
         .select('checklist_item_id')
         .eq('evento_id', evento.id)
         .eq('tecnico_id', colaborador.id) : Promise.resolve({ data: [] }),
-    ]).then(([{ data: ecs }, { data: chks }]) => {
+      colaborador?.id ? supabase.from('checklist_submissoes')
+        .select('id')
+        .eq('evento_id', evento.id)
+        .eq('tecnico_id', colaborador.id)
+        .maybeSingle() : Promise.resolve({ data: null }),
+    ]).then(([{ data: ecs }, { data: chks }, { data: sub }]) => {
       if (!activo) return
       setEventoListas((ecs ?? []).map(ec => ({
         clId: ec.checklist_id, nome: ec.checklists?.nome ?? '?',
         itens: (ec.checklists?.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem),
       })))
       setEventoChecks(new Set((chks ?? []).map(c => c.checklist_item_id)))
+      setEventoSubmetido(!!sub)
     })
     return () => { activo = false }
   }, [evento?.id, colaborador?.id])
@@ -152,18 +160,32 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   }
 
   const toggleCheck = async (itemId) => {
-    if (!colaborador?.id) return
+    if (!colaborador?.id || eventoSubmetido) return
     const checked = eventoChecks.has(itemId)
     setEventoChecks(prev => { const s = new Set(prev); if (checked) s.delete(itemId); else s.add(itemId); return s })
     if (!checked) {
-      await supabase.from('checklist_checks').upsert(
+      const { error } = await supabase.from('checklist_checks').upsert(
         { evento_id: evento.id, checklist_item_id: itemId, tecnico_id: colaborador.id },
         { onConflict: 'evento_id,checklist_item_id,tecnico_id' }
       )
+      if (error) console.error('checklist_checks upsert error:', error)
     } else {
-      await supabase.from('checklist_checks').delete()
+      const { error } = await supabase.from('checklist_checks').delete()
         .eq('evento_id', evento.id).eq('checklist_item_id', itemId).eq('tecnico_id', colaborador.id)
+      if (error) console.error('checklist_checks delete error:', error)
     }
+  }
+
+  const guardarChecklist = async () => {
+    if (!colaborador?.id || eventoSubmetido || guardandoCl) return
+    setGuardandoCl(true)
+    const { error } = await supabase.from('checklist_submissoes').insert({
+      evento_id: evento.id,
+      tecnico_id: colaborador.id,
+    })
+    if (!error) setEventoSubmetido(true)
+    else console.error('checklist_submissoes insert error:', error)
+    setGuardandoCl(false)
   }
 
   const goAba = (novaAba, direcao) => {
@@ -320,6 +342,12 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
           ) : aba === 'checklist' ? (
             <div className="flex flex-col gap-3 py-2">
+              {eventoSubmetido && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <Lock size={11} className="text-green-400 shrink-0" />
+                  <p className="text-green-400 font-semibold" style={{ fontSize: 11 }}>Checklist submetida — leitura</p>
+                </div>
+              )}
               {eventoListas.length === 0 && (
                 <p className="text-center italic py-6" style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>Sem checklists neste evento.</p>
               )}
@@ -330,16 +358,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                     <p className="font-semibold text-amber-400" style={{ fontSize: 12 }}>{lista.nome}</p>
                   </div>
                   <div className="flex flex-col">
-                    {lista.itens.map((item, idx) => {
+                    {lista.itens.map((item) => {
                       const checked = eventoChecks.has(item.id)
                       return (
                         <button key={item.id}
                           onClick={() => toggleCheck(item.id)}
-                          disabled={!isAtribuido}
+                          disabled={!isAtribuido || eventoSubmetido}
                           className={clsx(
                             'flex items-center gap-3 px-3 py-2.5 border-b border-white/5 last:border-0 text-left transition-colors',
                             checked ? 'bg-green-500/10' : 'hover:bg-white/5',
-                            !isAtribuido ? 'cursor-default' : 'cursor-pointer'
+                            (!isAtribuido || eventoSubmetido) ? 'cursor-default' : 'cursor-pointer'
                           )}>
                           <span className={clsx(
                             'w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors',
@@ -361,6 +389,18 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               ))}
               {!isAtribuido && (
                 <p className="text-center opacity-40 italic" style={{ fontSize: 12 }}>Só técnicos atribuídos podem marcar itens.</p>
+              )}
+              {isAtribuido && !eventoSubmetido && eventoListas.length > 0 && (
+                <button onClick={guardarChecklist} disabled={guardandoCl}
+                  className="mt-1 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-green-500/15 border border-green-500/30 text-green-400 font-semibold hover:bg-green-500/25 disabled:opacity-50 transition-all"
+                  style={{ fontSize: 13 }}>
+                  <Lock size={13} />
+                  {guardandoCl ? 'A guardar…' : (() => {
+                    const total  = eventoListas.reduce((s, l) => s + l.itens.length, 0)
+                    const feitos = eventoListas.reduce((s, l) => s + l.itens.filter(it => eventoChecks.has(it.id)).length, 0)
+                    return `Guardar (${feitos}/${total})`
+                  })()}
+                </button>
               )}
             </div>
 
@@ -424,6 +464,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 <PenLine size={13} />
                 {assinandoEvento ? 'A registar…' : 'Fim de Evento'}
               </button>
+            )}
+            {!mostrarInicioEvento && !mostrarFimEvento && feitasAssin.some(f => f.tipo === 'evento_saida') && (
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-status-confirmado">
+                <Check size={16} /> Terminado · {new Date(feitasAssin.find(f => f.tipo === 'evento_saida').registado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+              </span>
             )}
             {isResponsavel && pres.status === 'signed' && pres.presenca ? (
               <span
