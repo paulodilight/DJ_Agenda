@@ -296,7 +296,21 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 <Campo rotulo="Status" valor={labelEstado(evento.status) || evento.status} />
 
                 {/* LOCAL | Contacto */}
-                <Campo rotulo="Local"    valor={cliente} />
+                {cliente && (
+                  <div className="flex flex-col gap-0.5 py-2 border-b border-border/30">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>Local</p>
+                      {eventoListas.length > 0 && (
+                        <button onClick={() => goAba('checklist', 'right')}
+                          title="Ver checklists"
+                          className="text-amber-400/70 hover:text-amber-400 transition-colors">
+                          <ListChecks size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <p className="break-words text-accent-muted" style={{ fontSize: 14 }}>{cliente}</p>
+                  </div>
+                )}
                 <Campo rotulo="Contacto" valor={evento.contacto_pelo_evento} />
 
                 {/* Morada — coluna única */}

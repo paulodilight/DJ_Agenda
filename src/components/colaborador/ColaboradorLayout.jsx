@@ -32,7 +32,6 @@ const navItens = [
   { to: '/apoiot/eventos',             rotulo: 'Eventos', Icone: CalendarDays },
   { to: '/apoiot/tarefas',             rotulo: 'Tarefas',     Icone: ClipboardList },
   { to: '/apoiot/ocorrencias',         rotulo: 'Ocorrências', Icone: AlertTriangle },
-  { to: '/apoiot/checklists',          rotulo: 'Checklists',  Icone: ListChecks },
 ]
 
 function LogoXclusive() {
