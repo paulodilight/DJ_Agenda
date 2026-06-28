@@ -210,18 +210,34 @@ function TabDJs() {
       .select('dj_id, agenda_id, signed_at, latitude, longitude, accuracy_m')
       .then(async ({ data: presencas }) => {
         const agendaIds = [...new Set((presencas ?? []).map(p => p.agenda_id).filter(Boolean))]
-        let agendas = {}
-        if (agendaIds.length > 0) {
-          const { data: ags } = await supabase.from('agenda')
-            .select('id, data, hora_inicio, hora_fim, dj_nome, espaco_nome').in('id', agendaIds)
-          ;(ags ?? []).forEach(a => { agendas[a.id] = a })
-        }
-        setTodas((presencas ?? []).map(p => ({ ...p, ag: agendas[p.agenda_id] ?? null })))
+        const djIds     = [...new Set((presencas ?? []).map(p => p.dj_id).filter(Boolean))]
+
+        const [agRes, djRes] = await Promise.all([
+          agendaIds.length > 0
+            ? supabase.from('agenda').select('id, dj_id, data, hora_inicio, hora_fim, dj_nome, espaco_nome').in('id', agendaIds)
+            : Promise.resolve({ data: [] }),
+          djIds.length > 0
+            ? supabase.from('djs').select('id, nome, nome_artistico').in('id', djIds)
+            : Promise.resolve({ data: [] }),
+        ])
+
+        const agendas = {}
+        ;(agRes.data ?? []).forEach(a => { agendas[a.id] = a })
+
+        const djNomes = {}
+        ;(djRes.data ?? []).forEach(d => { djNomes[d.id] = d.nome_artistico || d.nome })
+
+        setTodas((presencas ?? []).map(p => {
+          const ag = agendas[p.agenda_id] ?? null
+          // dj_nome: campo texto da agenda → nome do DJ pelo dj_id da agenda → nome pelo dj_id da presença
+          const djNome = ag?.dj_nome || djNomes[ag?.dj_id] || djNomes[p.dj_id] || null
+          return { ...p, ag, djNome }
+        }))
         setLoading(false)
       })
   }, [])
 
-  const nomes = useMemo(() => [...new Set(todas.map(l => l.ag?.dj_nome).filter(Boolean))].sort(), [todas])
+  const nomes = useMemo(() => [...new Set(todas.map(l => l.djNome).filter(Boolean))].sort(), [todas])
   const meses = useMemo(() => {
     const set = new Set(todas.map(l => anoMesDeStr(l.ag?.data)).filter(Boolean))
     return [...set].sort().reverse()
@@ -229,7 +245,7 @@ function TabDJs() {
 
   const linhas = useMemo(() => {
     let r = todas
-    if (nomeSel) r = r.filter(l => l.ag?.dj_nome === nomeSel)
+    if (nomeSel) r = r.filter(l => l.djNome === nomeSel)
     if (mesSel)  r = r.filter(l => anoMesDeStr(l.ag?.data) === mesSel)
     return r.sort((a, b) => {
       const ta = a.signed_at ?? ''
@@ -261,7 +277,7 @@ function TabDJs() {
               return (
                 <Linha key={i} atrasado={atrasado} cells={[
                   fmtData(ag?.data),
-                  <span className="font-semibold text-accent">{ag?.dj_nome ?? '—'}</span>,
+                  <span className="font-semibold text-accent">{l.djNome ?? '—'}</span>,
                   ag?.espaco_nome ?? '—',
                   <span className="font-mono text-accent-muted">{ag?.hora_inicio?.slice(0,5) ?? '—'}</span>,
                   <span className="font-mono text-accent-muted">{ag?.hora_fim?.slice(0,5) ?? '—'}</span>,
