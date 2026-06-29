@@ -68,13 +68,15 @@ export function ChecklistEvento() {
     const checked = checks.has(itemId)
     setChecks(prev => { const s = new Set(prev); if (checked) s.delete(itemId); else s.add(itemId); return s })
     if (!checked) {
-      await supabase.from('checklist_checks').upsert(
+      const { error } = await supabase.from('checklist_checks').upsert(
         { evento_id: evId, checklist_item_id: itemId, tecnico_id: colaborador.id },
         { onConflict: 'evento_id,checklist_item_id,tecnico_id' }
       )
+      if (error) console.error('checklist upsert error:', error)
     } else {
-      await supabase.from('checklist_checks').delete()
+      const { error } = await supabase.from('checklist_checks').delete()
         .eq('evento_id', evId).eq('checklist_item_id', itemId).eq('tecnico_id', colaborador.id)
+      if (error) console.error('checklist delete error:', error)
     }
   }
 
