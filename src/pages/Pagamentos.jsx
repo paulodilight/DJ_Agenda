@@ -404,7 +404,7 @@ export function Pagamentos() {
     try {
       const [resPag, resReg, resPago] = await Promise.all([
         supabase.from('agenda').select(SELECT)
-          .in('estado_pagamento', ['auto_pagamento', 'em_pagamento'])
+          .in('estado_pagamento', ['auto_pagamento', 'auto_pagamento_penalizacao', 'em_pagamento'])
           .gte('data', dataInicio).lte('data', dataFim).order('data'),
         supabase.from('agenda').select(SELECT)
           .eq('estado_pagamento', 'em_regularizacao')
