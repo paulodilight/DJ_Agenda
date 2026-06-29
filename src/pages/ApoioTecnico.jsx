@@ -2116,10 +2116,16 @@ export function ApoioTecnico() {
                               <div className="flex items-center gap-1.5 text-[12px] text-white/55 tabular-nums leading-tight flex-wrap">
                                 {linha.ev?.hora_instalacao && (
                                   <span className="flex items-center gap-0.5">
-                                    <Wrench size={9} className="shrink-0 opacity-70" />{hhmm(linha.ev.hora_instalacao)}
+                                    <Wrench size={9} className="shrink-0 opacity-70" />
+                                    <span className="text-white/35 text-[10px] mr-0.5">Dia {parseInt(dataStr.slice(8, 10))}</span>
+                                    {hhmm(linha.ev.hora_instalacao)}
                                   </span>
                                 )}
-                                {linha.ev?.hora_inicio && <span>{hhmm(linha.ev.hora_inicio)}</span>}
+                                {linha.ev?.hora_inicio && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Clock size={9} className="shrink-0 opacity-70" />{hhmm(linha.ev.hora_inicio)}
+                                  </span>
+                                )}
                               </div>
                             )}
                             <div className="flex flex-wrap gap-1 mt-0.5 justify-end items-center">
