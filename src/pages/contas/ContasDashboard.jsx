@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { formatarEuro } from '@/utils/formatacao'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { clsx } from 'clsx'
+import { OverviewPagamentos } from '@/components/contas/OverviewPagamentos'
 
 const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
 
@@ -123,6 +124,9 @@ export function ContasDashboard() {
 
   return (
     <div className="p-6 flex flex-col gap-6">
+
+      {/* ── Pagamentos em aberto ── */}
+      <OverviewPagamentos onSelectDJ={(id) => navigate('/contas/djs?dj=' + id)} />
 
       {/* ── KPIs principais ── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
