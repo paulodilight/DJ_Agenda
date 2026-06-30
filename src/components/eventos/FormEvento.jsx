@@ -48,7 +48,9 @@ const VAZIO = {
   estado_pagamento: '',
   forma_pagamento: '',
   notas_contas: '',
-  tecnico_id: '',
+  tecnico_id:  '',
+  tecnico2_id: '',
+  rider_url:   '',
 }
 
 const ESTADO_PAG_OPCOES = [
@@ -220,7 +222,9 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         notas_faturacao:  evento.notas_faturacao  ?? '',
         xclusive:    evento.xclusive    ?? false,
         artista_id:  evento.artista_id  ?? '',
-        tecnico_id:      evento.tecnico_id ?? '',
+        tecnico_id:      evento.tecnico_id  ?? '',
+        tecnico2_id:     evento.tecnico2_id ?? '',
+        rider_url:       evento.rider_url   ?? '',
         hora_inicio:     evento.hora_inicio?.slice(0, 5)     ?? '',
         hora_fim:        evento.hora_fim?.slice(0, 5)        ?? '',
         hora_instalacao: evento.hora_instalacao?.slice(0, 5) ?? '',
@@ -597,6 +601,20 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     ))}
                   </select>
                 </Field>
+                <Field label="2º Técnico de Apoio">
+                  <select
+                    className={inputCls}
+                    value={form.tecnico2_id}
+                    onChange={(e) => set('tecnico2_id', e.target.value)}
+                  >
+                    <option value="">— Não atribuído —</option>
+                    {tecnicos.map(t => (
+                      <option key={t.id} value={t.id}>{t.nome}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
                 <Field label="Contacto pelo evento">
                   <input
                     className={inputCls}
@@ -624,7 +642,10 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     type="date"
                     className={inputCls}
                     value={form.data_evento}
-                    onChange={(e) => set('data_evento', e.target.value)}
+                    onChange={(e) => {
+                      set('data_evento', e.target.value)
+                      if (!form.dia_instalacao) set('dia_instalacao', e.target.value)
+                    }}
                   />
                 </Field>
                 <Field label="Hora início">
@@ -688,6 +709,52 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   onChange={(e) => set('notas_operacionais', e.target.value)}
                   placeholder="Informações operacionais do evento…"
                 />
+              </Field>
+
+              <Field label="Rider Técnico">
+                <div className="flex flex-col gap-2">
+                  {form.rider_url ? (
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={form.rider_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-accent underline truncate flex-1"
+                      >
+                        {form.rider_url.split('/').pop()}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => set('rider_url', '')}
+                        className="text-xs text-status-cancelado hover:opacity-70 flex-shrink-0"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ) : null}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className={`${inputCls} flex items-center gap-2 cursor-pointer text-accent-muted`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                      {form.rider_url ? 'Substituir ficheiro' : 'Carregar ficheiro (PDF, Word…)'}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const ext = file.name.split('.').pop()
+                        const path = `riders/${crypto.randomUUID()}.${ext}`
+                        const { error } = await supabase.storage.from('eventos-riders').upload(path, file)
+                        if (error) { alert('Erro ao carregar ficheiro: ' + error.message); return }
+                        const { data: pub } = supabase.storage.from('eventos-riders').getPublicUrl(path)
+                        set('rider_url', pub.publicUrl)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                </div>
               </Field>
             </>
           )}

@@ -1,29 +1,45 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 
+async function _carregarPermissoes(userId, set) {
+  if (!userId) { set({ permissoes: null, utilizadorNome: null }); return }
+  const { data } = await supabase
+    .from('user_permissoes')
+    .select('paginas, is_admin, nome')
+    .eq('user_id', userId)
+    .maybeSingle()
+  set({
+    permissoes: !data || data.is_admin ? null : (data.paginas ?? []),
+    utilizadorNome: data?.nome ?? null,
+  })
+}
+
 export const useAuthStore = create((set) => ({
   session: null,
   user: null,
+  permissoes: null,      // null = admin (acesso total), array = páginas permitidas
+  utilizadorNome: null,  // nome de exibição do utilizador
   loading: true,
 
   init: async () => {
     const { data: { session } } = await supabase.auth.getSession()
     set({ session, user: session?.user ?? null, loading: false })
+    await _carregarPermissoes(session?.user?.id, set)
 
-    supabase.auth.onAuthStateChange((event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        // Redireciona para a página de reset sem gravar sessão normal
-        set({ session: null, user: null, recoveryMode: true })
+        set({ session: null, user: null, recoveryMode: true, permissoes: null, utilizadorNome: null })
         window.location.hash = '/reset-password'
         return
       }
       set({ session, user: session?.user ?? null, recoveryMode: false })
+      await _carregarPermissoes(session?.user?.id, set)
     })
   },
 
   logout: async () => {
     await supabase.auth.signOut()
-    set({ session: null, user: null })
+    set({ session: null, user: null, permissoes: null, utilizadorNome: null })
   },
 }))
 

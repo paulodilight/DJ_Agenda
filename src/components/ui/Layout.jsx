@@ -1,9 +1,9 @@
 ﻿import { useState, useEffect } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, MapPin, CalendarDays, Ban,
   Settings, LogOut, Mic2, Bell, Music2, Scale, Send, Wallet,
-  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw, Building2, Clock,
+  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw, Building2, Clock, ShieldCheck,
 } from 'lucide-react'
 import { useAuthStore, useMesStore, useAppStore } from '@/store'
 import { configuracoesApi } from '@/lib/api'
@@ -29,6 +29,7 @@ const ROTAS = [
   { path: '/apoio-tecnico',  label: 'Apoio T.' },
   { path: '/pontualidades', label: 'Pontualidades' },
   { path: '/configuracoes', label: 'Configurações' },
+  { path: '/utilizadores',  label: 'Utilizadores' },
 ]
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -92,18 +93,46 @@ function NavItem({ para, icone: Icone, label, collapsed }) {
 }
 
 export function Layout() {
-  const logout = useAuthStore((s) => s.logout)
+  const { logout, permissoes, utilizadorNome, user } = useAuthStore((s) => ({
+    logout: s.logout,
+    permissoes: s.permissoes,
+    utilizadorNome: s.utilizadorNome,
+    user: s.user,
+  }))
   const { anoMes, navegar, setAnoMes } = useMesStore()
   const { executarUndo, podeDesfazer, executando } = useUndo()
   const headerAction = useAppStore((s) => s.headerAction)
   const { config, setConfig } = useAppStore((s) => ({ config: s.config, setConfig: s.setConfig }))
+  const navigate = useNavigate()
+
+  const isAdmin = permissoes === null
+  const displayName = utilizadorNome ?? user?.email?.split('@')[0] ?? 'Admin'
+  const displayInitial = displayName.charAt(0).toUpperCase()
+
+  const navPrincipalFiltrado = isAdmin ? navPrincipal : navPrincipal.filter(i => permissoes.includes(i.para))
+  const navGestaoFiltrado   = isAdmin ? navGestao   : navGestao.filter(i => permissoes.includes(i.para))
 
   useEffect(() => {
     if (Object.keys(config).length === 0) {
       configuracoesApi.listar().then(setConfig).catch(() => {})
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const location = useLocation()
+
+  // Redirecionar para a primeira página permitida se rota não autorizada
+  useEffect(() => {
+    if (permissoes === null) return // admin, sem restrições
+    const topLevel = location.pathname === '/' ? '/' : '/' + location.pathname.split('/')[1]
+    const rotasEspeciais = ['/configuracoes', '/utilizadores']
+    if (rotasEspeciais.includes(topLevel)) {
+      navigate(permissoes[0] ?? '/', { replace: true })
+      return
+    }
+    if (!permissoes.includes(topLevel)) {
+      navigate(permissoes[0] ?? '/', { replace: true })
+    }
+  }, [location.pathname, permissoes]) // eslint-disable-line react-hooks/exhaustive-deps
   const [collapsed, setCollapsed] = useState(false)
 
   const paginaLabel = ROTAS.find((r) =>
@@ -163,19 +192,19 @@ export function Layout() {
         {/* User */}
         <div className={clsx('border-b border-border/50', collapsed ? 'px-0 py-3 flex justify-center' : 'px-4 py-4')}>
           {collapsed ? (
-            <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-xs font-bold text-accent border border-border" title="Admin">
-              A
+            <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-xs font-bold text-accent border border-border" title={displayName}>
+              {displayInitial}
             </div>
           ) : (
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center text-sm font-bold text-accent border border-border shrink-0">
-                A
+                {displayInitial}
               </div>
               <div>
-                <p className="text-xs font-semibold text-accent leading-none">Admin</p>
+                <p className="text-xs font-semibold text-accent leading-none">{displayName}</p>
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-status-confirmado inline-block" />
-                  <p className="text-[10px] text-accent-subtle">Online</p>
+                  <p className="text-[10px] text-accent-subtle">{isAdmin ? 'Admin' : 'Online'}</p>
                 </div>
               </div>
             </div>
@@ -184,45 +213,67 @@ export function Layout() {
 
         {/* Nav */}
         <nav className={clsx('flex-1 py-4 flex flex-col gap-5 overflow-y-auto', collapsed ? 'px-1' : 'px-2')}>
-          <div>
-            {!collapsed && (
-              <p className="px-3 mb-2 text-[10px] font-semibold text-accent-subtle uppercase tracking-widest">
-                Principal
-              </p>
-            )}
-            <div className="flex flex-col gap-0.5">
-              {navPrincipal.map((item) => <NavItem key={item.para} {...item} collapsed={collapsed} />)}
+          {navPrincipalFiltrado.length > 0 && (
+            <div>
+              {!collapsed && (
+                <p className="px-3 mb-2 text-[10px] font-semibold text-accent-subtle uppercase tracking-widest">
+                  Principal
+                </p>
+              )}
+              <div className="flex flex-col gap-0.5">
+                {navPrincipalFiltrado.map((item) => <NavItem key={item.para} {...item} collapsed={collapsed} />)}
+              </div>
             </div>
-          </div>
-          <div>
-            {!collapsed && (
-              <p className="px-3 mb-2 text-[10px] font-semibold text-accent-subtle uppercase tracking-widest">
-                Gestão
-              </p>
-            )}
-            {collapsed && <div className="border-t border-border/30 mx-2 mb-2" />}
-            <div className="flex flex-col gap-0.5">
-              {navGestao.map((item) => <NavItem key={item.para} {...item} collapsed={collapsed} />)}
+          )}
+          {navGestaoFiltrado.length > 0 && (
+            <div>
+              {!collapsed && (
+                <p className="px-3 mb-2 text-[10px] font-semibold text-accent-subtle uppercase tracking-widest">
+                  Gestão
+                </p>
+              )}
+              {collapsed && <div className="border-t border-border/30 mx-2 mb-2" />}
+              <div className="flex flex-col gap-0.5">
+                {navGestaoFiltrado.map((item) => <NavItem key={item.para} {...item} collapsed={collapsed} />)}
+              </div>
             </div>
-          </div>
+          )}
         </nav>
 
         {/* Bottom */}
         <div className={clsx('py-3 border-t border-border flex flex-col gap-0.5', collapsed ? 'px-1' : 'px-2')}>
-          <NavLink
-            to="/configuracoes"
-            title={collapsed ? 'Configurações' : undefined}
-            className={({ isActive }) => clsx(
-              'flex items-center rounded text-xs tracking-wider transition-all',
-              collapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2',
-              isActive
-                ? 'bg-status-confirmado/15 text-status-confirmado font-semibold'
-                : 'text-accent-muted hover:text-accent hover:bg-surface-2'
-            )}
-          >
-            <Settings size={15} />
-            {!collapsed && <span className="uppercase">Configurações</span>}
-          </NavLink>
+          {isAdmin && (
+            <NavLink
+              to="/utilizadores"
+              title={collapsed ? 'Utilizadores' : undefined}
+              className={({ isActive }) => clsx(
+                'flex items-center rounded text-xs tracking-wider transition-all',
+                collapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2',
+                isActive
+                  ? 'bg-status-confirmado/15 text-status-confirmado font-semibold'
+                  : 'text-accent-muted hover:text-accent hover:bg-surface-2'
+              )}
+            >
+              <ShieldCheck size={15} />
+              {!collapsed && <span className="uppercase">Utilizadores</span>}
+            </NavLink>
+          )}
+          {isAdmin && (
+            <NavLink
+              to="/configuracoes"
+              title={collapsed ? 'Configurações' : undefined}
+              className={({ isActive }) => clsx(
+                'flex items-center rounded text-xs tracking-wider transition-all',
+                collapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2',
+                isActive
+                  ? 'bg-status-confirmado/15 text-status-confirmado font-semibold'
+                  : 'text-accent-muted hover:text-accent hover:bg-surface-2'
+              )}
+            >
+              <Settings size={15} />
+              {!collapsed && <span className="uppercase">Configurações</span>}
+            </NavLink>
+          )}
           <button
             onClick={logout}
             title={collapsed ? 'Sair' : undefined}
@@ -322,8 +373,8 @@ export function Layout() {
               )}>
               <Undo2 size={14} />
             </button>
-            <div className="w-7 h-7 rounded-full bg-status-confirmado/20 flex items-center justify-center text-xs font-bold text-status-confirmado border border-status-confirmado/30 select-none">
-              A
+            <div className="w-7 h-7 rounded-full bg-status-confirmado/20 flex items-center justify-center text-xs font-bold text-status-confirmado border border-status-confirmado/30 select-none" title={displayName}>
+              {displayInitial}
             </div>
           </div>
         </header>

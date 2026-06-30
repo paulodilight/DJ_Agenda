@@ -175,8 +175,10 @@ export function Configuracoes() {
   const [categorias, setCategorias]   = useState(CAT_DEFAULTS)
   const [subtipos, setSubtipos]       = useState(SUBTIPO_DEFAULTS)
   const [transportes, setTransportes] = useState(TRANSP_DEFAULTS)
-  const [descontos, setDescontos]     = useState(DESC_DEFAULTS)
-  const [descontoPct, setDescontoPct] = useState('25')
+  const [descontos, setDescontos]           = useState(DESC_DEFAULTS)
+  const [descontoPct, setDescontoPct]       = useState('25')
+  const [valorQualidade, setValorQualidade] = useState('2')
+  const [ativarValorQualidade, setAtivarValorQualidade] = useState(true)
   const [novidadeGeral, setNovidadeGeral] = useState({ id: null, titulo: '', texto: '', imagem_url: '', ativo: false })
   const [novidadeGeralSaving, setNovidadeGeralSaving] = useState(false)
 
@@ -200,6 +202,8 @@ export function Configuracoes() {
         setTransportes(safeParse(c.contas_transportes, TRANSP_DEFAULTS))
         setDescontos(safeParse(c.contas_descontos, DESC_DEFAULTS))
         setDescontoPct(c.contas_desconto_pct ?? '25')
+        setValorQualidade(c.contas_valor_qualidade ?? '2')
+        setAtivarValorQualidade(c.contas_valor_qualidade_ativo !== false)
         setPagEmpresa(c.pagamento_empresa    ?? 'LMD Laboratório de Música Digital, Unipessoal Lda')
         setPagMorada(c.pagamento_morada      ?? 'Praceta Maestro Ivo Cruz 12 C, 1500-501 Lisboa')
         setPagNif(c.pagamento_nif            ?? '516233726')
@@ -259,8 +263,10 @@ export function Configuracoes() {
         contas_categorias:    JSON.stringify(categorias),
         contas_subtipos:      JSON.stringify(subtipos),
         contas_transportes:   JSON.stringify(transportes),
-        contas_descontos:     JSON.stringify(descontos),
-        contas_desconto_pct:  descontoPct,
+        contas_descontos:        JSON.stringify(descontos),
+        contas_desconto_pct:     descontoPct,
+        contas_valor_qualidade:       valorQualidade,
+        contas_valor_qualidade_ativo: ativarValorQualidade,
         pagamento_empresa:    pagEmpresa,
         pagamento_morada:     pagMorada,
         pagamento_nif:        pagNif,
@@ -565,6 +571,25 @@ export function Configuracoes() {
               className="w-24 bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-right text-accent tabular-nums focus:outline-none focus:border-accent/40"
             />
             <span className="text-xs text-accent-muted">%</span>
+          </div>
+          <div className="flex items-center gap-3 border-t border-border/40 pt-4 px-1">
+            <span className="text-xs text-accent flex-1">Valor Qualidade (€ / atuação)</span>
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={valorQualidade}
+              onChange={e => setValorQualidade(e.target.value)}
+              className="w-24 bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-right text-accent tabular-nums focus:outline-none focus:border-accent/40"
+            />
+            <span className="text-xs text-accent-muted">€</span>
+            <button
+              type="button"
+              onClick={() => setAtivarValorQualidade(v => !v)}
+              className={`w-8 h-4 rounded-full transition-colors relative flex-shrink-0 ${ativarValorQualidade ? 'bg-status-confirmado' : 'bg-surface-3'}`}
+            >
+              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform shadow-sm ${ativarValorQualidade ? 'left-[18px]' : 'left-0.5'}`} />
+            </button>
           </div>
           <div className="flex items-center gap-3 border-t border-border/40 pt-4 px-1">
             <span className="text-xs text-accent flex-1">Valor hora extra (€/h)</span>

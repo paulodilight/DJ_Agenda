@@ -98,6 +98,30 @@ function BRow({ label, value, bold, accent }) {
   )
 }
 
+function ToggleSwitch({ checked, onChange }) {
+  return (
+    <button type="button" onClick={onChange}
+      className={clsx('w-8 h-4 rounded-full transition-colors relative flex-shrink-0',
+        checked ? 'bg-status-confirmado' : 'bg-surface-3'
+      )}>
+      <div className={clsx('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform shadow-sm',
+        checked ? 'left-[18px]' : 'left-0.5')} />
+    </button>
+  )
+}
+
+function ToggleRow({ label, sub, checked, onChange }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-xs text-accent">{label}</p>
+        {sub && <p className="text-[10px] text-accent-muted mt-0.5">{sub}</p>}
+      </div>
+      <ToggleSwitch checked={checked} onChange={onChange} />
+    </div>
+  )
+}
+
 // ─── Card Pagamentos por DJ ───────────────────────────────────────────────────
 
 function CardPagamentos({ djId, djNome, dataInicio, dataFim, refreshKey, onRefresh }) {
@@ -245,16 +269,19 @@ export function ContasDJs() {
   const [filtroEstado, setFiltroEstado] = useState('todos')
   const [refreshPag, setRefreshPag] = useState(0)
 
-  const cfgTransportes = useMemo(() => safeParse(storeConfig?.contas_transportes, [{ valor: 120 }]), [storeConfig])
-  const cfgDescontos   = useMemo(() => safeParse(storeConfig?.contas_descontos,   [{ valor: 2 }]),   [storeConfig])
-  const cfgRetencaoPct = Number(storeConfig?.contas_desconto_pct ?? 25)
-  const transporteRate = cfgTransportes[0]?.valor ?? 120
+  const cfgTransportes     = useMemo(() => safeParse(storeConfig?.contas_transportes, [{ valor: 120 }]), [storeConfig])
+  const cfgDescontos       = useMemo(() => safeParse(storeConfig?.contas_descontos,   [{ valor: 2 }]),   [storeConfig])
+  const cfgRetencaoPct     = Number(storeConfig?.contas_desconto_pct ?? 25)
+  const transporteRate     = cfgTransportes[0]?.valor ?? 120
+  const valorQualidadeRate  = Number(storeConfig?.contas_valor_qualidade ?? 0)
+  const valorQualidadeAtivo = storeConfig?.contas_valor_qualidade_ativo !== false
 
-  const [docTipo, setDocTipo]           = useState('recibo')
-  const [comRetencao, setComRetencao]   = useState(false)
-  const [retencaoPct, setRetencaoPct]   = useState(cfgRetencaoPct)
+  const [reciboVerde, setReciboVerde]       = useState(true)
+  const [comIva, setComIva]                 = useState(false)
+  const [comRetencao, setComRetencao]       = useState(false)
+  const [retencaoPct, setRetencaoPct]       = useState(cfgRetencaoPct)
   const [premioOverride, setPremioOverride] = useState(null)
-  const [descontoOp, setDescontoOp]     = useState(() => cfgDescontos[0]?.valor ?? 2)
+  const [descontoOp, setDescontoOp]         = useState(() => cfgDescontos[0]?.valor ?? 2)
 
   const { dataInicio, dataFim, titulo } = useMemo(() => {
     const [ano, mes] = anoMes.split('-').map(Number)
@@ -362,19 +389,40 @@ export function ContasDJs() {
     const valorHExt       = totalHExt * CFG.horaExtraRate
     const nTransp         = slotsRich.filter(s => s.transporte).length
     const valorTransp     = nTransp * transporteRate
-    const valorPremio     = premioAtivo ? n * CFG.premioRate : 0
+    const valorPremio     = premioAtivo && valorQualidadeRate > 0 ? n * valorQualidadeRate : 0
     const valorDesconto   = descontoOp * n
     const subtotal        = valorAtuacoes + valorHExt + valorTransp + valorPremio - valorDesconto
-    const ajuste          = docTipo === 'fatura'
-      ? subtotal * CFG.ivaRate
-      : comRetencao ? -(subtotal * retencaoPct / 100) : 0
-    const labelAjuste     = docTipo === 'fatura' ? 'IVA (23%)' : `Retenção (${retencaoPct}%)`
-    return { n, valorAtuacoes, totalHExt, valorHExt, nTransp, valorTransp, valorPremio, valorDesconto, subtotal, ajuste, labelAjuste, total: subtotal + ajuste }
-  }, [slotsRich, premioAtivo, descontoOp, docTipo, comRetencao, retencaoPct, transporteRate])
+    const ajusteIva       = comIva ? subtotal * CFG.ivaRate : 0
+    const ajusteRetencao  = comRetencao ? -(subtotal * retencaoPct / 100) : 0
+    return { n, valorAtuacoes, totalHExt, valorHExt, nTransp, valorTransp, valorPremio, valorDesconto, subtotal, ajusteIva, ajusteRetencao, total: subtotal + ajusteIva + ajusteRetencao }
+  }, [slotsRich, premioAtivo, descontoOp, comIva, comRetencao, retencaoPct, transporteRate, valorQualidadeRate])
 
   const selecionarDJ = (id) => {
-    setDjSel(prev => prev === id ? '' : id)
-    setPremioOverride(null)
+    const next = id === djSel ? '' : id
+    setDjSel(next)
+    if (next) {
+      try {
+        const s = JSON.parse(localStorage.getItem(`dj_contas_${next}`) || '{}')
+        setReciboVerde(s.reciboVerde  ?? true)
+        setComIva(s.comIva           ?? false)
+        setComRetencao(s.comRetencao ?? false)
+        setRetencaoPct(s.retencaoPct ?? cfgRetencaoPct)
+        setDescontoOp(s.descontoOp   ?? (cfgDescontos[0]?.valor ?? 2))
+        setPremioOverride(s.premioOverride ?? null)
+      } catch { setPremioOverride(null); setReciboVerde(true); setComIva(false); setComRetencao(false) }
+    } else {
+      setPremioOverride(null)
+      setReciboVerde(true)
+      setComIva(false)
+      setComRetencao(false)
+    }
+  }
+
+  const guardarOpcoes = () => {
+    if (!djSel) return
+    localStorage.setItem(`dj_contas_${djSel}`, JSON.stringify({
+      reciboVerde, comIva, comRetencao, retencaoPct, descontoOp, premioOverride
+    }))
   }
 
   if (loading) return <LoadingPage />
@@ -512,106 +560,66 @@ export function ContasDJs() {
 
                   {/* Documento */}
                   <div>
-                    <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Documento</p>
-                    <div className="flex gap-1 p-1 bg-surface-0 rounded-lg border border-border">
-                      {[['recibo', 'Recibo Verde'], ['fatura', 'Fatura']].map(([v, l]) => (
-                        <button key={v} onClick={() => setDocTipo(v)}
-                          className={clsx(
-                            'flex-1 text-xs py-1.5 rounded-md transition-colors font-medium',
-                            docTipo === v
-                              ? 'bg-surface-2 text-accent shadow-sm border border-border'
-                              : 'text-accent-muted hover:text-accent'
-                          )}>{l}</button>
-                      ))}
-                    </div>
-                    {docTipo === 'fatura' && (
-                      <p className="mt-2 text-[11px] text-status-proposta pl-1">+23% IVA aplicado ao total</p>
-                    )}
-                    {docTipo === 'recibo' && (
-                      <div className="mt-2.5 flex flex-col gap-2">
-                        <div className="flex gap-1 p-1 bg-surface-0 rounded-lg border border-border">
-                          <button onClick={() => setComRetencao(false)}
-                            className={clsx('flex-1 text-xs py-1.5 rounded-md transition-colors font-medium',
-                              !comRetencao ? 'bg-surface-2 text-accent shadow-sm border border-border' : 'text-accent-muted hover:text-accent')}>
-                            Sem retenção</button>
-                          <button onClick={() => setComRetencao(true)}
-                            className={clsx('flex-1 text-xs py-1.5 rounded-md transition-colors font-medium',
-                              comRetencao ? 'bg-surface-2 text-accent shadow-sm border border-border' : 'text-accent-muted hover:text-accent')}>
-                            Com retenção</button>
+                    <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-3">Documento</p>
+                    <div className="flex flex-col gap-3">
+                      <ToggleRow label="Recibo Verde" checked={reciboVerde} onChange={() => setReciboVerde(v => !v)} />
+                      <ToggleRow label="IVA (23%)" sub="+23% sobre o subtotal" checked={comIva} onChange={() => setComIva(v => !v)} />
+                      <ToggleRow label="Retenção na fonte" checked={comRetencao} onChange={() => setComRetencao(v => !v)} />
+                      {comRetencao && (
+                        <div className="flex items-center gap-2 pl-1">
+                          <span className="text-xs text-accent-muted">Percentagem</span>
+                          <input type="number" min={0} max={100} value={retencaoPct}
+                            onChange={e => setRetencaoPct(Number(e.target.value))}
+                            className="w-14 bg-surface-0 border border-border rounded-lg px-2 py-1 text-xs text-accent text-center focus:outline-none focus:ring-1 focus:ring-accent/30" />
+                          <span className="text-xs text-accent-muted">%</span>
                         </div>
-                        {comRetencao && (
-                          <div className="flex items-center gap-2 pl-1">
-                            <span className="text-xs text-accent-muted">Percentagem</span>
-                            <input type="number" min={0} max={100} value={retencaoPct}
-                              onChange={e => setRetencaoPct(Number(e.target.value))}
-                              className="w-14 bg-surface-0 border border-border rounded-lg px-2 py-1 text-xs text-accent text-center focus:outline-none focus:ring-1 focus:ring-accent/30" />
-                            <span className="text-xs text-accent-muted">%</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
 
-                  {/* Prémio assiduidade */}
-                  <div>
-                    <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Prémio Assiduidade</p>
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={clsx('text-[11px]', premioAtivo ? 'text-status-confirmado' : 'text-accent-muted')}>
-                        {premioOverride === null
+                  {/* Valor Qualidade */}
+                  {valorQualidadeAtivo && valorQualidadeRate > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-3">Valor Qualidade</p>
+                      <ToggleRow
+                        label="Ativar"
+                        sub={premioOverride === null
                           ? premioAuto ? 'Auto · elegível' : 'Auto · não elegível'
-                          : premioOverride ? 'Ativado manualmente' : 'Desativado manualmente'}
-                      </p>
-                      <button
-                        onClick={() => setPremioOverride(premioOverride !== null ? null : !premioAuto)}
-                        className={clsx(
-                          'text-[10px] px-2 py-0.5 rounded border flex-shrink-0 transition-colors',
-                          premioOverride !== null
-                            ? 'border-accent/40 bg-accent/5 text-accent'
-                            : 'border-border text-accent-muted hover:border-accent/30'
-                        )}>
-                        {premioOverride !== null ? 'auto' : 'forçar'}
-                      </button>
+                          : undefined}
+                        checked={premioAtivo}
+                        onChange={() => setPremioOverride(!premioAtivo)}
+                      />
                     </div>
-                    {premioOverride !== null && (
-                      <div className="mt-2 flex gap-2">
-                        <button onClick={() => setPremioOverride(true)}
-                          className={clsx('flex-1 text-[11px] py-1.5 rounded-lg border transition-colors',
-                            premioOverride ? 'bg-status-confirmado/10 border-status-confirmado/40 text-status-confirmado font-medium' : 'border-border text-accent-muted hover:border-border/80')}>
-                          Ativar</button>
-                        <button onClick={() => setPremioOverride(false)}
-                          className={clsx('flex-1 text-[11px] py-1.5 rounded-lg border transition-colors',
-                            !premioOverride ? 'bg-status-cancelado/10 border-status-cancelado/40 text-status-cancelado font-medium' : 'border-border text-accent-muted hover:border-border/80')}>
-                          Desativar</button>
-                      </div>
-                    )}
-                  </div>
+                  )}
 
                   {/* Desconto */}
                   {cfgDescontos.length > 0 && (
                     <div>
                       <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Desconto</p>
-                      <div className="flex flex-wrap gap-1.5">
+                      <select
+                        value={descontoOp}
+                        onChange={e => setDescontoOp(Number(e.target.value))}
+                        className="w-full appearance-none bg-surface-0 border border-border rounded-lg px-3 py-2 text-xs text-accent focus:outline-none focus:ring-1 focus:ring-accent/30 cursor-pointer"
+                      >
                         {cfgDescontos.map((d, i) => (
-                          <button key={i} type="button" onClick={() => setDescontoOp(d.valor)}
-                            className={clsx('px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
-                              descontoOp === d.valor
-                                ? 'bg-accent/10 border-accent/40 text-accent'
-                                : 'border-border text-accent-muted hover:border-border/80')}>
-                            {d.label || `Desconto ${i + 1}`} — {d.valor}€
-                          </button>
+                          <option key={i} value={d.valor}>{d.label || `Desconto ${i + 1}`} — {d.valor}€</option>
                         ))}
-                        <button type="button" onClick={() => setDescontoOp(0)}
-                          className={clsx('px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
-                            descontoOp === 0
-                              ? 'bg-accent/10 border-accent/40 text-accent'
-                              : 'border-border text-accent-muted hover:border-border/80')}>
-                          Sem desconto</button>
-                      </div>
+                        <option value={0}>Sem desconto</option>
+                      </select>
                       {calc && descontoOp > 0 && (
                         <span className="text-xs text-accent-subtle mt-1 block tabular-nums">= −{formatarEuro(calc.valorDesconto)}</span>
                       )}
                     </div>
                   )}
+
+                  {/* Guardar */}
+                  <button
+                    type="button"
+                    onClick={guardarOpcoes}
+                    className="w-full py-2 rounded-lg bg-surface-2 border border-border text-xs text-accent-muted hover:text-accent hover:border-accent/40 transition-colors"
+                  >
+                    Guardar preferências
+                  </button>
                 </div>
               </div>
 
@@ -629,16 +637,18 @@ export function ContasDJs() {
                     {calc.valorTransp > 0 && (
                       <BRow label={`Transporte (${calc.nTransp} × ${transporteRate}€)`} value={`+${formatarEuro(calc.valorTransp)}`} accent="text-status-proposta" />
                     )}
-                    {premioAtivo && (
-                      <BRow label={`Prémio assiduidade (${calc.n} × ${CFG.premioRate}€)`} value={`+${formatarEuro(calc.valorPremio)}`} accent="text-status-proposta" />
+                    {premioAtivo && valorQualidadeAtivo && valorQualidadeRate > 0 && (
+                      <BRow label={`Valor Qualidade (${calc.n} × ${valorQualidadeRate}€)`} value={`+${formatarEuro(calc.valorPremio)}`} accent="text-status-proposta" />
                     )}
                     {calc.valorDesconto > 0 && (
                       <BRow label={`Desconto operação (${descontoOp}€ × ${calc.n})`} value={`−${formatarEuro(calc.valorDesconto)}`} accent="text-status-cancelado" />
                     )}
                     <BRow label="Subtotal" value={formatarEuro(calc.subtotal)} bold />
-                    {calc.ajuste !== 0 && (
-                      <BRow label={calc.labelAjuste} value={`${calc.ajuste > 0 ? '+' : ''}${formatarEuro(calc.ajuste)}`}
-                        accent={calc.ajuste < 0 ? 'text-status-cancelado' : 'text-status-proposta'} />
+                    {calc.ajusteIva !== 0 && (
+                      <BRow label="IVA (23%)" value={`+${formatarEuro(calc.ajusteIva)}`} accent="text-status-proposta" />
+                    )}
+                    {calc.ajusteRetencao !== 0 && (
+                      <BRow label={`Retenção (${retencaoPct}%)`} value={formatarEuro(calc.ajusteRetencao)} accent="text-status-cancelado" />
                     )}
                     <div className="px-4 py-3.5 flex items-center justify-between bg-surface-2/40">
                       <span className="text-sm font-bold text-accent">Total a pagar</span>

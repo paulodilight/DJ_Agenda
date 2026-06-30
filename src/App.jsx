@@ -28,6 +28,7 @@ import { Artistas } from '@/pages/Artistas'
 import { ArtistaPerfil } from '@/pages/ArtistaPerfil'
 import { Club } from '@/pages/Club'
 import { Pontualidades } from '@/pages/Pontualidades'
+import { Utilizadores } from '@/pages/Utilizadores'
 import { ResetPassword } from '@/pages/ResetPassword'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { UndoProvider } from '@/contexts/UndoContext'
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="club" element={<Club />} />
           <Route path="pontualidades" element={<Pontualidades />} />
           <Route path="configuracoes" element={<Configuracoes />} />
+          <Route path="utilizadores" element={<Utilizadores />} />
         </Route>
         {/* ── Área dos colaboradores (Apoio T) ── */}
         <Route path="/apoiot/login" element={<ColaboradorLogin />} />

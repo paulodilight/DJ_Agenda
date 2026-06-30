@@ -92,6 +92,18 @@ function slugify(str) {
     .replace(/[^a-z0-9]/g, '')
 }
 
+function BoolToggle({ checked, onChange, label }) {
+  return (
+    <button type="button" onClick={onChange} aria-label={label}
+      className={clsx('w-8 h-4 rounded-full transition-colors relative flex-shrink-0',
+        checked ? 'bg-status-confirmado' : 'bg-surface-3'
+      )}>
+      <div className={clsx('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform shadow-sm',
+        checked ? 'left-[18px]' : 'left-0.5')} />
+    </button>
+  )
+}
+
 const APP_ABAS_OPCOES = [
   { id: 'agenda',           label: 'Agenda',           desc: 'Calendário de datas e actuações' },
   { id: 'dados',            label: 'Dados',             desc: 'Perfil e informação pessoal' },
@@ -279,7 +291,8 @@ export function DJPerfil() {
   const storeConfig     = useAppStore((s) => s.config)
   const [slotsContas, setSlotsContas]         = useState([])
   const [loadingContas, setLoadingContas]     = useState(false)
-  const [docTipo, setDocTipo]                 = useState('recibo')
+  const [reciboVerdeC, setReciboVerdeC]       = useState(true)
+  const [comIvaC, setComIvaC]                 = useState(false)
   const [comRetencao, setComRetencao]         = useState(false)
   const [retencaoPct, setRetencaoPct]         = useState(25)
   const [premioOverrideC, setPremioOverrideC] = useState(null)
@@ -341,9 +354,11 @@ export function DJPerfil() {
   }, [disponibilidades])
 
   // ── contas: config derivados ──
-  const cfgTransportesCon = useMemo(() => safeParseC(storeConfig?.contas_transportes, [{ valor: 120 }]), [storeConfig])
-  const cfgDescontosCon   = useMemo(() => safeParseC(storeConfig?.contas_descontos,   [{ valor: 2 }]),   [storeConfig])
-  const transporteRateCon = cfgTransportesCon[0]?.valor ?? 120
+  const cfgTransportesCon  = useMemo(() => safeParseC(storeConfig?.contas_transportes, [{ valor: 120 }]), [storeConfig])
+  const cfgDescontosCon    = useMemo(() => safeParseC(storeConfig?.contas_descontos,   [{ valor: 2 }]),   [storeConfig])
+  const transporteRateCon  = cfgTransportesCon[0]?.valor ?? 120
+  const valorQualidadeRate  = Number(storeConfig?.contas_valor_qualidade ?? 0)
+  const valorQualidadeAtivo = storeConfig?.contas_valor_qualidade_ativo !== false
 
   const { dataInicioCon, dataFimCon } = useMemo(() => {
     const [ano, mes] = anoMes.split('-').map(Number)
@@ -400,20 +415,19 @@ export function DJPerfil() {
     const valorHExt     = totalHExt * CFG_C.horaExtraRate
     const nTransp       = slotsRichCon.filter(s => s.transporte).length
     const valorTransp   = nTransp * transporteRateCon
-    const valorPremio   = premioAtivoC ? n * CFG_C.premioRate : 0
-    const valorDesconto = descontoOpC * n
-    const subtotal      = valorAtuacoes + valorHExt + valorTransp + valorPremio - valorDesconto
-    const ajuste        = docTipo === 'fatura'
-      ? subtotal * CFG_C.ivaRate
-      : comRetencao ? -(subtotal * retencaoPct / 100) : 0
-    const labelAjuste   = docTipo === 'fatura' ? 'IVA (23%)' : `Retenção (${retencaoPct}%)`
-    return { n, valorAtuacoes, totalHExt, valorHExt, nTransp, valorTransp, valorPremio, valorDesconto, subtotal, ajuste, labelAjuste, total: subtotal + ajuste }
-  }, [slotsRichCon, premioAtivoC, descontoOpC, docTipo, comRetencao, retencaoPct, transporteRateCon])
+    const valorPremio    = premioAtivoC && valorQualidadeRate > 0 ? n * valorQualidadeRate : 0
+    const valorDesconto  = descontoOpC * n
+    const subtotal       = valorAtuacoes + valorHExt + valorTransp + valorPremio - valorDesconto
+    const ajusteIva      = comIvaC ? subtotal * CFG_C.ivaRate : 0
+    const ajusteRetencao = comRetencao ? -(subtotal * retencaoPct / 100) : 0
+    return { n, valorAtuacoes, totalHExt, valorHExt, nTransp, valorTransp, valorPremio, valorDesconto, subtotal, ajusteIva, ajusteRetencao, total: subtotal + ajusteIva + ajusteRetencao }
+  }, [slotsRichCon, premioAtivoC, descontoOpC, comIvaC, comRetencao, retencaoPct, transporteRateCon, valorQualidadeRate])
 
   // reset + carrega opções das contas por DJ (evita que opções de outro DJ persistam)
   useEffect(() => {
     if (!id) return
-    setDocTipo('recibo')
+    setReciboVerdeC(true)
+    setComIvaC(false)
     setComRetencao(false)
     setRetencaoPct(25)
     setDescontoOpC(2)
@@ -424,7 +438,8 @@ export function DJPerfil() {
     if (!raw) return
     try {
       const s = JSON.parse(raw)
-      if (s.docTipo)             setDocTipo(s.docTipo)
+      if (s.reciboVerde != null) setReciboVerdeC(s.reciboVerde)
+      if (s.comIva != null)      setComIvaC(s.comIva)
       if (s.comRetencao != null) setComRetencao(s.comRetencao)
       if (s.retencaoPct != null) setRetencaoPct(s.retencaoPct)
       if (s.descontoOpC != null) setDescontoOpC(s.descontoOpC)
@@ -810,7 +825,7 @@ export function DJPerfil() {
                     <>
                       <button
                         onClick={() => {
-                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ docTipo, comRetencao, retencaoPct, descontoOpC }))
+                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ reciboVerde: reciboVerdeC, comIva: comIvaC, comRetencao, retencaoPct, descontoOpC }))
                           setContasSucesso(true)
                           setTimeout(() => setContasSucesso(false), 2500)
                         }}
@@ -2033,87 +2048,67 @@ LMD · XclusiveDJ`)
 
                     {/* Documento */}
                     <div>
-                      <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Documento</p>
-                      <div className="flex gap-1 p-1 bg-surface-0 rounded-lg border border-border">
-                        {[['recibo', 'Recibo Verde'], ['fatura', 'Fatura']].map(([v, l]) => (
-                          <button key={v} onClick={() => setDocTipo(v)}
-                            className={clsx('flex-1 text-xs py-1.5 rounded-md transition-colors font-medium',
-                              docTipo === v ? 'bg-surface-2 text-accent shadow-sm border border-border' : 'text-accent-muted hover:text-accent')}
-                          >{l}</button>
-                        ))}
-                      </div>
-                      {docTipo === 'fatura' && (
-                        <p className="mt-2 text-[11px] text-status-proposta pl-1">+23% IVA aplicado ao total</p>
-                      )}
-                      {docTipo === 'recibo' && (
-                        <div className="mt-2.5 flex flex-col gap-2">
-                          <div className="flex gap-1 p-1 bg-surface-0 rounded-lg border border-border">
-                            <button onClick={() => setComRetencao(false)}
-                              className={clsx('flex-1 text-xs py-1.5 rounded-md transition-colors font-medium',
-                                !comRetencao ? 'bg-surface-2 text-accent shadow-sm border border-border' : 'text-accent-muted hover:text-accent')}
-                            >Sem retenção</button>
-                            <button onClick={() => setComRetencao(true)}
-                              className={clsx('flex-1 text-xs py-1.5 rounded-md transition-colors font-medium',
-                                comRetencao ? 'bg-surface-2 text-accent shadow-sm border border-border' : 'text-accent-muted hover:text-accent')}
-                            >Com retenção</button>
-                          </div>
-                          {comRetencao && (
-                            <div className="flex items-center gap-2 pl-1">
-                              <span className="text-xs text-accent-muted">Percentagem</span>
-                              <input type="number" min={0} max={100} value={retencaoPct}
-                                onChange={e => setRetencaoPct(Number(e.target.value))}
-                                className="w-14 bg-surface-0 border border-border rounded-lg px-2 py-1 text-xs text-accent text-center focus:outline-none" />
-                              <span className="text-xs text-accent-muted">%</span>
-                            </div>
-                          )}
+                      <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-3">Documento</p>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-accent">Recibo Verde</p>
+                          <BoolToggle checked={reciboVerdeC} onChange={() => setReciboVerdeC(v => !v)} label="Recibo Verde" />
                         </div>
-                      )}
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs text-accent">IVA (23%)</p>
+                            <p className="text-[10px] text-accent-muted mt-0.5">+23% sobre o subtotal</p>
+                          </div>
+                          <BoolToggle checked={comIvaC} onChange={() => setComIvaC(v => !v)} label="IVA" />
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-accent">Retenção na fonte</p>
+                          <BoolToggle checked={comRetencao} onChange={() => setComRetencao(v => !v)} label="Retenção" />
+                        </div>
+                        {comRetencao && (
+                          <div className="flex items-center gap-2 pl-1">
+                            <span className="text-xs text-accent-muted">Percentagem</span>
+                            <input type="number" min={0} max={100} value={retencaoPct}
+                              onChange={e => setRetencaoPct(Number(e.target.value))}
+                              className="w-14 bg-surface-0 border border-border rounded-lg px-2 py-1 text-xs text-accent text-center focus:outline-none" />
+                            <span className="text-xs text-accent-muted">%</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Prémio assiduidade */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Prémio Assiduidade</p>
-                      <div className="flex items-start justify-between gap-2">
-                        <p className={clsx('text-[11px]', premioAtivoC ? 'text-status-confirmado' : 'text-accent-muted')}>
-                          {premioOverrideC === null
-                            ? premioAutoC ? 'Auto · elegível' : 'Auto · não elegível'
-                            : premioOverrideC ? 'Ativado manualmente' : 'Desativado manualmente'}
-                        </p>
-                        <button onClick={() => setPremioOverrideC(premioOverrideC !== null ? null : !premioAutoC)}
-                          className={clsx('text-[10px] px-2 py-0.5 rounded border flex-shrink-0 transition-colors',
-                            premioOverrideC !== null ? 'border-accent/40 bg-accent/5 text-accent' : 'border-border text-accent-muted hover:border-accent/30')}
-                        >{premioOverrideC !== null ? 'auto' : 'forçar'}</button>
-                      </div>
-                      {premioOverrideC !== null && (
-                        <div className="mt-2 flex gap-2">
-                          <button onClick={() => setPremioOverrideC(true)}
-                            className={clsx('flex-1 text-[11px] py-1.5 rounded-lg border transition-colors',
-                              premioOverrideC ? 'bg-status-confirmado/10 border-status-confirmado/40 text-status-confirmado font-medium' : 'border-border text-accent-muted')}
-                          >Ativar</button>
-                          <button onClick={() => setPremioOverrideC(false)}
-                            className={clsx('flex-1 text-[11px] py-1.5 rounded-lg border transition-colors',
-                              !premioOverrideC ? 'bg-status-cancelado/10 border-status-cancelado/40 text-status-cancelado font-medium' : 'border-border text-accent-muted')}
-                          >Desativar</button>
+                    {/* Valor Qualidade */}
+                    {valorQualidadeAtivo && valorQualidadeRate > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-3">Valor Qualidade</p>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs text-accent">Ativar</p>
+                            {premioOverrideC === null && (
+                              <p className="text-[10px] text-accent-muted mt-0.5">
+                                {premioAutoC ? 'Auto · elegível' : 'Auto · não elegível'}
+                              </p>
+                            )}
+                          </div>
+                          <BoolToggle checked={premioAtivoC} onChange={() => setPremioOverrideC(!premioAtivoC)} label="Valor Qualidade" />
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Desconto */}
                     {cfgDescontosCon.length > 0 && (
                       <div>
                         <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Desconto</p>
-                        <div className="flex flex-wrap gap-1.5">
+                        <select
+                          value={descontoOpC}
+                          onChange={e => setDescontoOpC(Number(e.target.value))}
+                          className="w-full appearance-none bg-surface-0 border border-border rounded-lg px-3 py-2 text-xs text-accent focus:outline-none cursor-pointer"
+                        >
                           {cfgDescontosCon.map((d, i) => (
-                            <button key={i} type="button" onClick={() => setDescontoOpC(d.valor)}
-                              className={clsx('px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
-                                descontoOpC === d.valor ? 'bg-accent/10 border-accent/40 text-accent' : 'border-border text-accent-muted')}
-                            >{d.label || `Desconto ${i + 1}`} — {d.valor}€</button>
+                            <option key={i} value={d.valor}>{d.label || `Desconto ${i + 1}`} — {d.valor}€</option>
                           ))}
-                          <button type="button" onClick={() => setDescontoOpC(0)}
-                            className={clsx('px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
-                              descontoOpC === 0 ? 'bg-accent/10 border-accent/40 text-accent' : 'border-border text-accent-muted')}
-                          >Sem desconto</button>
-                        </div>
+                          <option value={0}>Sem desconto</option>
+                        </select>
                         {calcCon && descontoOpC > 0 && (
                           <span className="text-xs text-accent-subtle mt-1 block tabular-nums">= −{formatarEuro(calcCon.valorDesconto)}</span>
                         )}
@@ -2129,7 +2124,7 @@ LMD · XclusiveDJ`)
                       )}
                       <button
                         onClick={() => {
-                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ docTipo, comRetencao, retencaoPct, descontoOpC }))
+                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ reciboVerde: reciboVerdeC, comIva: comIvaC, comRetencao, retencaoPct, descontoOpC }))
                           setContasSucesso(true)
                           setTimeout(() => setContasSucesso(false), 2500)
                         }}
@@ -2249,15 +2244,18 @@ LMD · XclusiveDJ`)
                       {calcCon.valorTransp > 0 && (
                         <BRow label={`Transporte (${calcCon.nTransp} × ${transporteRateCon}€)`} value={`+${formatarEuro(calcCon.valorTransp)}`} accent="text-status-proposta" />
                       )}
-                      {premioAtivoC && (
-                        <BRow label={`Prémio assiduidade (${calcCon.n} × ${CFG_C.premioRate}€)`} value={`+${formatarEuro(calcCon.valorPremio)}`} accent="text-status-proposta" />
+                      {premioAtivoC && valorQualidadeAtivo && valorQualidadeRate > 0 && (
+                        <BRow label={`Valor Qualidade (${calcCon.n} × ${valorQualidadeRate}€)`} value={`+${formatarEuro(calcCon.valorPremio)}`} accent="text-status-proposta" />
                       )}
                       {calcCon.valorDesconto > 0 && (
                         <BRow label={`Desconto operação (${descontoOpC}€ × ${calcCon.n})`} value={`−${formatarEuro(calcCon.valorDesconto)}`} accent="text-status-cancelado" />
                       )}
                       <BRow label="Subtotal" value={formatarEuro(calcCon.subtotal)} bold />
-                      {calcCon.ajuste !== 0 && (
-                        <BRow label={calcCon.labelAjuste} value={`${calcCon.ajuste > 0 ? '+' : ''}${formatarEuro(calcCon.ajuste)}`} accent={calcCon.ajuste < 0 ? 'text-status-cancelado' : 'text-status-proposta'} />
+                      {calcCon.ajusteIva !== 0 && (
+                        <BRow label="IVA (23%)" value={`+${formatarEuro(calcCon.ajusteIva)}`} accent="text-status-proposta" />
+                      )}
+                      {calcCon.ajusteRetencao !== 0 && (
+                        <BRow label={`Retenção (${retencaoPct}%)`} value={formatarEuro(calcCon.ajusteRetencao)} accent="text-status-cancelado" />
                       )}
                       <div className="px-4 py-3.5 flex items-center justify-between bg-surface-2/40">
                         <span className="text-sm font-bold text-accent">Total a pagar</span>
