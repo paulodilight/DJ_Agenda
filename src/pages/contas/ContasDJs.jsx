@@ -55,6 +55,14 @@ const ESTADO_PAG_CFG = {
   pago:                       { label: 'Pago',          cls: 'bg-emerald-600/20 text-emerald-300 border-emerald-600/30' },
 }
 
+const ESTADOS_SELECT = [
+  { value: 'auto_pagamento',             label: 'Auto Pagamento' },
+  { value: 'auto_pagamento_penalizacao', label: 'Com Penalização' },
+  { value: 'em_pagamento',               label: 'Em Pagamento' },
+  { value: 'em_regularizacao',           label: 'Em Regularização' },
+  { value: 'pago',                       label: 'Pago' },
+]
+
 function BadgeEstadoPag({ estado }) {
   const cfg = ESTADO_PAG_CFG[estado] ?? { label: estado ?? '—', cls: 'bg-surface-2 text-accent-muted border-border' }
   return (
@@ -124,34 +132,23 @@ function CardPagamentos({ djId, djNome, dataInicio, dataFim, refreshKey, onRefre
 
   const currentSlots = tab === 'em_pagamento' ? emPagamento : tab === 'em_regularizacao' ? emRegularizacao : pago
 
-  async function marcarPago(slot) {
+  async function mudarEstado(slot, novoEstado) {
+    if (novoEstado === slot.estado_pagamento) return
     setActioning(true)
     try {
-      const { data: pedido } = await supabase.from('pedidos_pagamento').insert({
-        dj_id: djId,
-        valor_total: Number(slot.valor ?? 0),
-        estado: 'pago',
-        data_pagamento: new Date().toISOString(),
-      }).select().single()
-      await supabase.from('agenda')
-        .update({ estado_pagamento: 'pago', pedido_pagamento_id: pedido?.id ?? null })
-        .eq('id', slot.id)
-      onRefresh()
-    } finally { setActioning(false) }
-  }
-
-  async function regularizar(slot) {
-    setActioning(true)
-    try {
-      await supabase.from('agenda').update({ estado_pagamento: 'auto_pagamento_penalizacao' }).eq('id', slot.id)
-      onRefresh()
-    } finally { setActioning(false) }
-  }
-
-  async function aprovarAdmin(slot) {
-    setActioning(true)
-    try {
-      await supabase.from('agenda').update({ estado_pagamento: 'em_pagamento' }).eq('id', slot.id)
+      if (novoEstado === 'pago') {
+        const { data: pedido } = await supabase.from('pedidos_pagamento').insert({
+          dj_id: djId,
+          valor_total: Number(slot.valor ?? 0),
+          estado: 'pago',
+          data_pagamento: new Date().toISOString(),
+        }).select().single()
+        await supabase.from('agenda')
+          .update({ estado_pagamento: 'pago', pedido_pagamento_id: pedido?.id ?? null })
+          .eq('id', slot.id)
+      } else {
+        await supabase.from('agenda').update({ estado_pagamento: novoEstado }).eq('id', slot.id)
+      }
       onRefresh()
     } finally { setActioning(false) }
   }
@@ -195,7 +192,6 @@ function CardPagamentos({ djId, djNome, dataInicio, dataFim, refreshKey, onRefre
                 <th className="text-left px-3 py-2 font-medium text-accent-muted">Horário</th>
                 <th className="text-left px-3 py-2 font-medium text-accent-muted">Estado</th>
                 <th className="text-right px-4 py-2 font-medium text-accent-muted">Valor</th>
-                {tab !== 'pago' && <th className="px-4 py-2" />}
               </tr>
             </thead>
             <tbody>
@@ -211,35 +207,20 @@ function CardPagamentos({ djId, djNome, dataInicio, dataFim, refreshKey, onRefre
                     {s.hora_inicio?.slice(0, 5)}–{s.hora_fim?.slice(0, 5)}
                   </td>
                   <td className="px-3 py-2.5">
-                    <BadgeEstadoPag estado={s.estado_pagamento} />
+                    <select
+                      value={s.estado_pagamento}
+                      onChange={e => mudarEstado(s, e.target.value)}
+                      disabled={actioning}
+                      className="appearance-none rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] font-medium text-accent focus:outline-none focus:border-white/20 disabled:opacity-50 cursor-pointer"
+                    >
+                      {ESTADOS_SELECT.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-accent">
                     {s.valor != null ? formatarEuro(Number(s.valor)) : '—'}
                   </td>
-                  {tab !== 'pago' && (
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-1.5 justify-end">
-                        {tab === 'em_pagamento' && (
-                          <button onClick={() => marcarPago(s)} disabled={actioning}
-                            className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50 whitespace-nowrap">
-                            Marcar Pago
-                          </button>
-                        )}
-                        {tab === 'em_regularizacao' && (
-                          <>
-                            <button onClick={() => regularizar(s)} disabled={actioning}
-                              className="rounded-lg border border-orange-500/40 bg-orange-500/10 px-2 py-1 text-[10px] font-bold text-orange-400 hover:bg-orange-500/20 transition-colors disabled:opacity-50 whitespace-nowrap">
-                              Regularizar
-                            </button>
-                            <button onClick={() => aprovarAdmin(s)} disabled={actioning}
-                              className="rounded-lg border border-blue-500/40 bg-blue-500/10 px-2 py-1 text-[10px] font-bold text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50 whitespace-nowrap">
-                              Aprovar
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
