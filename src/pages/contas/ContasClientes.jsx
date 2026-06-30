@@ -916,7 +916,7 @@ function PrintToggle({ k, isPrinted, togglePrint }) {
   )
 }
 
-function SpaceCard({ espaco, slots, eventos, cardState, onCardChange, onSave, saving, catTotals, subtiposConfig, turnos, mes, layoutView }) {
+function SpaceCard({ espaco, slots, slotsExcluidos = [], eventos, cardState, onCardChange, onSave, saving, catTotals, subtiposConfig, turnos, mes, layoutView }) {
   // DJ hierarchy: tipo_slot → turno → DJ
   const djHier = useMemo(() => {
     return CAT_DEFS.map(cat => {
@@ -956,6 +956,23 @@ function SpaceCard({ espaco, slots, eventos, cardState, onCardChange, onSave, sa
       return { key: cat.key, label: TIPO_LABELS[cat.key] ?? cat.label, n: catN, billing: catBilling, turnos: turnosList }
     }).filter(g => g.n > 0)
   }, [slots, turnos, subtiposConfig, catTotals])
+
+  const deducoesHier = useMemo(() => {
+    const tipoMap = {}
+    slotsExcluidos.forEach(slot => {
+      const tipoKey = mapTipoSlot(slot.tipo_slot)
+      if (!tipoKey) return
+      const rate = slotRate(slot, subtiposConfig, catTotals)
+      if (!rate) return
+      const dayNum = slot.data ? String(new Date(slot.data + 'T12:00:00').getDate()).padStart(2, '0') : null
+      if (!tipoMap[tipoKey]) tipoMap[tipoKey] = { billing: 0, days: new Set() }
+      tipoMap[tipoKey].billing += rate
+      if (dayNum) tipoMap[tipoKey].days.add(dayNum)
+    })
+    return Object.fromEntries(
+      Object.entries(tipoMap).map(([k, v]) => [k, { billing: v.billing, days: [...v.days].sort((a, b) => Number(a) - Number(b)) }])
+    )
+  }, [slotsExcluidos, subtiposConfig, catTotals])
 
   // Build APOIO hierarchy: tipo → nome (merged)
   const apoioHier = useMemo(() => {
@@ -1254,6 +1271,16 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
                     </div>
                   )
                 })}
+                {deducoesHier[tipo.key]?.billing > 0 && (
+                  <div className="flex items-center gap-2 px-6 py-1.5 border-t border-white/[0.06]">
+                    <span className="text-[11px] italic flex-1 text-red-400/50">
+                      ↓ Faltas/Cancelamentos · dias {deducoesHier[tipo.key].days.join(', ')}
+                    </span>
+                    <span className="text-[11px] tabular-nums text-red-400/50">
+                      −{formatarEuro(deducoesHier[tipo.key].billing)}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
             {djHier.length === 0 && <p className="px-6 py-3 text-xs text-white/15 italic">Sem atuações DJ</p>}
@@ -1632,9 +1659,10 @@ export function ContasClientes() {
   const { anoMes } = useMesStore()
   const { espacos, loading: loadingEspacos } = useEspacos()
   const { pushUndo } = useUndo()
-  const [slots, setSlots]       = useState([])
-  const [eventos, setEventos]   = useState([])
-  const [agendTec, setAgendTec] = useState([])
+  const [slots, setSlots]             = useState([])
+  const [slotsExcluidos, setSlotsExcluidos] = useState([])
+  const [eventos, setEventos]         = useState([])
+  const [agendTec, setAgendTec]       = useState([])
   const [loading, setLoading]   = useState(true)
   const [cards, setCards]       = useState({})
   const [catTotals, setCatTotals]       = useState({})
@@ -1659,7 +1687,7 @@ export function ContasClientes() {
 
   const carregar = useCallback(async () => {
     setLoading(true)
-    const [sRes, eRes, tRes, cRes, cfgRes, turnosRes] = await Promise.all([
+    const [sRes, eRes, tRes, cRes, cfgRes, turnosRes, fRes] = await Promise.all([
       supabase.from('agenda')
         .select('id, dj_id, espaco_id, turno_id, valor, margem, transporte, extras, estado, estado_pagamento, tipo_slot, dj_nome, hora_inicio, hora_fim, data, djs(nome, nome_artistico)')
         .gte('data', dataInicio).lte('data', dataFim)
@@ -1675,11 +1703,16 @@ export function ContasClientes() {
         .select('*').eq('mes', mes),
       supabase.from('configuracoes').select('chave, valor'),
       supabase.from('turnos_espaco').select('id, espaco_id, nome, ordem, hora_inicio, hora_fim, dias_semana').order('ordem'),
+      supabase.from('agenda')
+        .select('id, dj_id, espaco_id, turno_id, valor, margem, transporte, extras, estado, tipo_slot, dj_nome, hora_inicio, hora_fim, data, djs(nome, nome_artistico)')
+        .gte('data', dataInicio).lte('data', dataFim)
+        .in('estado', ['faltou', 'cancelado']),
     ])
     if (!sRes.error)      setSlots(sRes.data ?? [])
     if (!eRes.error)      setEventos(eRes.data ?? [])
     if (!tRes.error)      setAgendTec(tRes.data ?? [])
     if (!turnosRes.error) setTurnos(turnosRes.data ?? [])
+    if (!fRes.error)      setSlotsExcluidos(fRes.data ?? [])
     if (!cfgRes.error) {
       const cfg = Object.fromEntries((cfgRes.data ?? []).map(r => [r.chave, r.valor]))
       const cats = safeParse(cfg.contas_categorias, [])
@@ -1924,6 +1957,7 @@ export function ContasClientes() {
             <SpaceCard
               espaco={espacoDetalhe}
               slots={slots.filter(s => s.espaco_id === espacoAtivo)}
+              slotsExcluidos={slotsExcluidos.filter(s => s.espaco_id === espacoAtivo)}
               eventos={eventosEspaco}
               cardState={cards[espacoAtivo] ?? initCard([])}
               onCardChange={handleCardChange}
