@@ -71,9 +71,14 @@ const vazio = {
 }
 
 const ESTADO_PAG_OPCOES = [
-  { value: 'pendente', label: 'Pendente' },
-  { value: 'parcial',  label: 'Parcial' },
-  { value: 'pago',     label: 'Pago' },
+  { value: 'pendente',                  label: 'Pendente' },
+  { value: 'a_pagamento',               label: 'A Pagar' },
+  { value: 'em_pagamento',              label: 'Em Pagamento' },
+  { value: 'auto_pagamento',            label: 'Auto Pagamento' },
+  { value: 'auto_pagamento_penalizacao',label: 'Auto Pag. c/ Penalização' },
+  { value: 'em_regularizacao',          label: 'Em Regularização' },
+  { value: 'parcial',                   label: 'Parcial' },
+  { value: 'pago',                      label: 'Pago' },
 ]
 const FORMA_PAG_OPCOES = [
   { value: 'transferencia', label: 'Transferência' },
@@ -847,9 +852,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                   {ESTADO_OPCOES.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
                 </Select>
                 <Select label="Pagamento" value={form.estado_pagamento ?? 'pendente'} onChange={set('estado_pagamento')}>
-                  <option value="pendente">—</option>
-                  <option value="a_pagamento">A Pagar</option>
-                  <option value="pago">Pago</option>
+                  {ESTADO_PAG_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </Select>
               </div>
 
@@ -976,9 +979,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                   {ESTADO_OPCOES.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
                 </Select>
                 <Select label="Pagamento" value={form.estado_pagamento ?? 'pendente'} onChange={set('estado_pagamento')}>
-                  <option value="pendente">—</option>
-                  <option value="a_pagamento">A Pagar</option>
-                  <option value="pago">Pago</option>
+                  {ESTADO_PAG_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </Select>
               </div>
 
