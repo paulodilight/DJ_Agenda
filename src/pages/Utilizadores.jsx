@@ -190,10 +190,19 @@ function FormNovoUtilizador({ onCriar, onCancelar }) {
       setErro('Nome, email e password são obrigatórios.')
       return
     }
+    if (form.password.length < 6) {
+      setErro('A password deve ter pelo menos 6 caracteres.')
+      return
+    }
     setCriando(true)
     setErro('')
-    const result = await onCriar(form)
-    if (result?.error) { setErro(result.error); setCriando(false) }
+    try {
+      const result = await onCriar(form)
+      if (result?.error) { setErro(result.error); setCriando(false) }
+    } catch (err) {
+      setErro('Erro ao criar utilizador. Tenta novamente.')
+      setCriando(false)
+    }
   }
 
   return (
@@ -334,28 +343,32 @@ export function Utilizadores() {
   }
 
   const criarUtilizador = async (form) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gerir-utilizador`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({
-        action: 'criar',
-        email: form.email,
-        password: form.password,
-        nome: form.nome,
-        paginas: form.paginas,
-        is_admin: form.is_admin,
-      }),
-    })
-    const json = await res.json()
-    if (json.error) return { error: json.error }
-    setMostrarForm(false)
-    await carregar()
-    return {}
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gerir-utilizador`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          action: 'criar',
+          email: form.email,
+          password: form.password,
+          nome: form.nome,
+          paginas: form.paginas,
+          is_admin: form.is_admin,
+        }),
+      })
+      const json = await res.json()
+      if (json.error) return { error: json.error }
+      setMostrarForm(false)
+      await carregar()
+      return {}
+    } catch (err) {
+      return { error: String(err) }
+    }
   }
 
   const apagarUtilizador = async (userId) => {
