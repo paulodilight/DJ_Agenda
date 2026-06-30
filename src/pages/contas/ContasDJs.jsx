@@ -92,7 +92,7 @@ function BRow({ label, value, bold, accent }) {
 
 // ─── Card Pagamentos por DJ ───────────────────────────────────────────────────
 
-function CardPagamentos({ djId, djNome, refreshKey, onRefresh }) {
+function CardPagamentos({ djId, djNome, dataInicio, dataFim, refreshKey, onRefresh }) {
   const [slots, setSlots] = useState([])
   const [tab, setTab] = useState('em_pagamento')
   const [actioning, setActioning] = useState(false)
@@ -105,10 +105,12 @@ function CardPagamentos({ djId, djNome, refreshKey, onRefresh }) {
       .select('id, data, hora_inicio, hora_fim, valor, estado_pagamento, pedido_pagamento_id, espacos!agenda_espaco_id_fkey(nome)')
       .eq('dj_id', djId)
       .in('estado_pagamento', ['auto_pagamento', 'auto_pagamento_penalizacao', 'em_pagamento', 'em_regularizacao', 'pago'])
+      .gte('data', dataInicio)
+      .lte('data', dataFim)
       .order('data', { ascending: false })
       .then(({ data }) => { if (!cancelled) setSlots(data ?? []) })
     return () => { cancelled = true }
-  }, [djId, refreshKey])
+  }, [djId, dataInicio, dataFim, refreshKey])
 
   const emPagamento     = slots.filter(s => ['auto_pagamento', 'auto_pagamento_penalizacao', 'em_pagamento'].includes(s.estado_pagamento))
   const emRegularizacao = slots.filter(s => s.estado_pagamento === 'em_regularizacao')
@@ -671,6 +673,8 @@ export function ContasDJs() {
           <CardPagamentos
             djId={djSel}
             djNome={djData.nome}
+            dataInicio={dataInicio}
+            dataFim={dataFim}
             refreshKey={refreshPag}
             onRefresh={() => setRefreshPag(k => k + 1)}
           />
