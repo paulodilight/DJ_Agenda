@@ -72,6 +72,7 @@ const vazio = {
 }
 
 const ESTADO_PAG_OPCOES = [
+  { value: 'bom_gig',                   label: 'Bom GIG!' },
   { value: 'pendente',                  label: 'Pendente' },
   { value: 'a_pagamento',               label: 'A Pagar' },
   { value: 'em_pagamento',              label: 'Em Pagamento' },
