@@ -26,14 +26,15 @@ export const useAuthStore = create((set) => ({
     set({ session, user: session?.user ?? null, loading: false })
     await _carregarPermissoes(session?.user?.id, set)
 
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         set({ session: null, user: null, recoveryMode: true, permissoes: null, utilizadorNome: null })
         window.location.hash = '/reset-password'
         return
       }
       set({ session, user: session?.user ?? null, recoveryMode: false })
-      await _carregarPermissoes(session?.user?.id, set)
+      // Sem await — não bloquear a fila interna do cliente Supabase
+      _carregarPermissoes(session?.user?.id ?? null, set)
     })
   },
 
