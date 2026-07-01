@@ -30,6 +30,7 @@ const ESTADO_OPCOES = [
   { value: 'pré-confirmado',  label: 'Pré-confirmado' },
   { value: 'add_agenda',      label: 'Add Agenda' },
   { value: 'confirmado',      label: 'Confirmado' },
+  { value: 'bom_gig',        label: 'Bom GIG!' },
   { value: 'alterar',         label: 'Alterar' },
   { value: 'trocado',         label: 'Trocado' },
   { value: 'a_pedido',        label: 'A pedido' },
