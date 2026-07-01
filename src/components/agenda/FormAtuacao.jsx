@@ -12,7 +12,6 @@ import { clsx } from 'clsx'
 const ESTADO_OPCOES = [
   { value: 'proposta', label: 'Proposta' },
   { value: 'confirmado', label: 'Confirmado' },
-  { value: 'bom_gig', label: 'Bom GIG!' },
 ]
 
 const diaSemana = (dataStr) => {

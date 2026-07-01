@@ -24,7 +24,6 @@ const PERIODOS = [
 
 const ESTADOS_AGENDA = [
   { value: 'confirmado', label: 'Confirmado' },
-  { value: 'bom_gig',   label: 'Bom GIG!' },
   { value: 'proposta',   label: 'Proposta' },
   { value: 'cancelado',  label: 'Cancelado' },
 ]
