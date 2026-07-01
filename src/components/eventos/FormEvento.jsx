@@ -291,6 +291,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         espaco_id:       form.espaco_id       || null,
         artista_id:      form.artista_id      || null,
         tecnico_id:      form.tecnico_id      || null,
+        tecnico2_id:     form.tecnico2_id     || null,
         hora_inicio:     form.hora_inicio     || null,
         hora_fim:        form.hora_fim        || null,
         hora_instalacao: form.hora_instalacao || null,
