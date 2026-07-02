@@ -273,7 +273,7 @@ export function Eventos() {
                         <Campo label="Horário" valor={horario} icone={Clock} />
                         <Campo label="Local"   valor={local}   icone={MapPin} />
                         <Campo label="Tipo"    valor={ev.tipo} />
-                        <Campo label="Responsável" valor={ev.responsavel} />
+                        <Campo label="Responsável" valor={ev.tecnico?.nome ?? ev.responsavel} />
                         <Campo label="Contacto"    valor={ev.contacto_pelo_evento} />
                         {ev.dia_instalacao && (
                           <Campo
@@ -284,7 +284,7 @@ export function Eventos() {
                         )}
                         {ev.valor_artistico     && <Campo label="Valor artístico"   valor={`${ev.valor_artistico} €`} />}
                         {ev.valor_apoio_tecnico && <Campo label="Apoio técnico"      valor={`${ev.valor_apoio_tecnico} €`} />}
-                        {ev.tecnico_nome        && <Campo label="Técnico"            valor={ev.tecnico_nome} />}
+                        {ev.tecnico2?.nome      && <Campo label="2º Técnico"         valor={ev.tecnico2.nome} />}
                       </div>
 
                       {/* Notas */}
