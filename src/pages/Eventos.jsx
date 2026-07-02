@@ -272,6 +272,7 @@ export function Eventos() {
                       <div className="pt-3 flex flex-wrap gap-x-6 gap-y-2">
                         <Campo label="Horário" valor={horario} icone={Clock} />
                         <Campo label="Local"   valor={local}   icone={MapPin} />
+                        {ev.morada && ev.espaco_nome && <Campo label="Morada" valor={ev.morada} icone={MapPin} />}
                         <Campo label="Tipo"    valor={ev.tipo} />
                         <Campo label="Responsável" valor={ev.tecnico?.nome ?? ev.responsavel} />
                         <Campo label="Contacto"    valor={ev.contacto_pelo_evento} />
