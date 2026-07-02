@@ -45,8 +45,10 @@ export const supaEventosApi = {
     const COLS = [
       'evento', 'data_evento', 'hora_inicio', 'hora_fim', 'hora_instalacao', 'dia_instalacao',
       'status', 'espaco_id', 'tecnico_id', 'tecnico2_id', 'tipo', 'notas_operacionais', 'Equipamentos',
-      'contacto_pelo_evento', 'morada', 'artista_id', 'xclusive', 'rider_url',
+      'contacto_pelo_evento', 'morada', 'responsavel', 'artista_id', 'xclusive', 'rider_url',
       'valor', 'valor_artistico', 'valor_apoio_tecnico', 'notas_faturacao',
+      'margem', 'transporte', 'extras_contas',
+      'estado_pagamento', 'forma_pagamento', 'notas_contas',
     ]
     return Object.fromEntries(COLS.filter(k => k in dados).map(k => [k, dados[k]]))
   },
