@@ -438,11 +438,12 @@ export function DJPerfil() {
     if (!raw) return
     try {
       const s = JSON.parse(raw)
-      if (s.reciboVerde != null) setReciboVerdeC(s.reciboVerde)
-      if (s.comIva != null)      setComIvaC(s.comIva)
-      if (s.comRetencao != null) setComRetencao(s.comRetencao)
-      if (s.retencaoPct != null) setRetencaoPct(s.retencaoPct)
-      if (s.descontoOpC != null) setDescontoOpC(s.descontoOpC)
+      if (s.reciboVerde    != null) setReciboVerdeC(s.reciboVerde)
+      if (s.comIva         != null) setComIvaC(s.comIva)
+      if (s.comRetencao    != null) setComRetencao(s.comRetencao)
+      if (s.retencaoPct    != null) setRetencaoPct(s.retencaoPct)
+      if (s.descontoOp     != null) setDescontoOpC(s.descontoOp)
+      if (s.premioOverride != null) setPremioOverrideC(s.premioOverride)
     } catch {}
   }, [id])
 
@@ -825,7 +826,7 @@ export function DJPerfil() {
                     <>
                       <button
                         onClick={() => {
-                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ reciboVerde: reciboVerdeC, comIva: comIvaC, comRetencao, retencaoPct, descontoOpC }))
+                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ reciboVerde: reciboVerdeC, comIva: comIvaC, comRetencao, retencaoPct, descontoOp: descontoOpC, premioOverride: premioOverrideC }))
                           setContasSucesso(true)
                           setTimeout(() => setContasSucesso(false), 2500)
                         }}
@@ -2124,7 +2125,7 @@ LMD · XclusiveDJ`)
                       )}
                       <button
                         onClick={() => {
-                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ reciboVerde: reciboVerdeC, comIva: comIvaC, comRetencao, retencaoPct, descontoOpC }))
+                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ reciboVerde: reciboVerdeC, comIva: comIvaC, comRetencao, retencaoPct, descontoOp: descontoOpC, premioOverride: premioOverrideC }))
                           setContasSucesso(true)
                           setTimeout(() => setContasSucesso(false), 2500)
                         }}
