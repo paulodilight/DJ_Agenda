@@ -29,6 +29,12 @@ export function ColaboradorOcorrencias() {
   const [aberta,        setAberta]       = useState(null)
   const [modalNova,     setModalNova]    = useState(false)
   const [versao,        setVersao]       = useState(0)
+  const [espacos,       setEspacos]      = useState([])
+
+  useEffect(() => {
+    supabase.from('espacos').select('id, nome').eq('activo', true).order('nome')
+      .then(({ data }) => setEspacos(data ?? []))
+  }, [])
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -155,6 +161,7 @@ export function ColaboradorOcorrencias() {
         <ModalNovaOcorrencia
           nomeUtilizador={colaborador?.nome ?? 'Técnico'}
           tipoUtilizador="tecnico"
+          espacos={espacos}
           onFechar={() => setModalNova(false)}
           onCriada={() => setVersao(v => v + 1)}
         />
