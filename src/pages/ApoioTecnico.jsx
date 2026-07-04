@@ -1129,6 +1129,13 @@ export function ApoioTecnico() {
   useEffect(() => { carregar() }, [carregar])
   useEffect(() => { setFiltroEspaco(''); setFiltroTecnico(''); setPesquisa('') }, [anoMes])
 
+  useEffect(() => {
+    const ch = supabase.channel('apoio-tecnico-eventos')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'supa_eventos' }, () => carregar())
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [carregar])
+
 
   const carregarComScroll = useCallback(() => {
     if (scrollRef.current) {
