@@ -477,7 +477,7 @@ export function ColaboradorAgenda() {
       supabase.from('vw_colaboradores').select('id, nome, foto_url, tipo').order('nome'),
       supabase.from('espacos').select('id, nome').eq('activo', true).order('nome'),
       supabase.from('supa_eventos')
-        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, tecnico_id, notas_operacionais, Equipamentos, notas_colaborador, contacto_pelo_evento, morada, tipo')
+        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, tecnico_id, notas_operacionais, Equipamentos, notas_colaborador, contacto_pelo_evento, morada, tipo, rider_url')
         .gte('data_evento', dataInicio).lte('data_evento', dataFim).neq('status', 'cancelado'),
       supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicio).lte('data', dataFim),
     ]).then(async ([tRes, eRes, evRes, agRes]) => {

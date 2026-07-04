@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText } from 'lucide-react'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
@@ -432,6 +432,19 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   {evento.Equipamentos || 'Sem equipamentos definidos.'}
                 </div>
               </div>
+              {evento.rider_url && (
+                <div>
+                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
+                    <FileText size={12} /> Rider Técnico
+                  </p>
+                  <a href={evento.rider_url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-surface-2 text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
+                    style={{ fontSize: 13 }}>
+                    <FileText size={14} />
+                    Ver PDF
+                  </a>
+                </div>
+              )}
               {isAtribuido && (
                 <div>
                   <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>As minhas notas</p>
