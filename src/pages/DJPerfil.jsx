@@ -376,7 +376,7 @@ export function DJPerfil() {
     supabase
       .from('agenda')
       .select(`
-        id, dj_id, turno_id, data, hora_inicio, hora_fim, valor, estado,
+        id, dj_id, turno_id, data, hora_inicio, hora_fim, valor, estado, assinatura_aberta,
         espacos(id, nome, morada),
         presencas_djs(agenda_id, signed_at, signed_by),
         turnos_espaco(hora_fim)
@@ -392,6 +392,11 @@ export function DJPerfil() {
       .finally(() => { if (!cancelled) setLoadingContas(false) })
     return () => { cancelled = true }
   }, [aba, id, dataInicioCon, dataFimCon])
+
+  const toggleAssinaturaAberta = useCallback(async (slotId, valor) => {
+    await supabase.from('agenda').update({ assinatura_aberta: valor }).eq('id', slotId)
+    setSlotsContas(prev => prev.map(s => s.id === slotId ? { ...s, assinatura_aberta: valor } : s))
+  }, [])
 
   const slotsRichCon = useMemo(() => {
     return slotsContas
@@ -2186,7 +2191,23 @@ LMD · XclusiveDJ`)
                                 {!isPag ? <span className="text-border/40">—</span>
                                   : rich?.assStatus === 'a_tempo'  ? <span className="text-status-confirmado font-bold" title="Assinado a tempo">✓</span>
                                   : rich?.assStatus === 'atrasada' ? <span className="text-amber-500" title="Assinatura atrasada">!</span>
-                                  : <span className="text-border/50" title="Sem assinatura">✗</span>}
+                                  : (
+                                    <div className="flex items-center justify-center gap-1">
+                                      <span className="text-border/50" title="Sem assinatura">✗</span>
+                                      <button
+                                        type="button"
+                                        title={s.assinatura_aberta ? 'Fechar janela de assinatura' : 'Abrir janela de assinatura'}
+                                        onClick={() => toggleAssinaturaAberta(s.id, !s.assinatura_aberta)}
+                                        className={clsx(
+                                          'w-5 h-5 rounded flex items-center justify-center transition-colors',
+                                          s.assinatura_aberta
+                                            ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                                            : 'bg-surface-3 text-accent-subtle hover:text-amber-400 hover:bg-amber-500/10'
+                                        )}>
+                                        {s.assinatura_aberta ? <Unlock size={10} /> : <Lock size={10} />}
+                                      </button>
+                                    </div>
+                                  )}
                               </td>
                               <td className="px-2 py-2.5 text-center tabular-nums">
                                 {rich?.horasExtra > 0
