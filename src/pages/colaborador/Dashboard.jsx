@@ -148,7 +148,7 @@ export function ColaboradorDashboard() {
   const proximaTarefa = tarefas.find(t => !['concluída', 'concluida', 'cancelada'].includes(t.estado)) ?? null
 
   const proximaPreparacao = eventos
-    .filter(e => e.data_preparacao && e.data_preparacao >= hoje)
+    .filter(e => e.meu && e.data_preparacao && e.data_preparacao >= hoje)
     .sort((a, b) => a.data_preparacao.localeCompare(b.data_preparacao))[0] ?? null
 
   const localProximo   = proximoEvento?.espacos?.nome || proximoEvento?.cliente || null

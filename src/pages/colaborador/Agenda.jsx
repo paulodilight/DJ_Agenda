@@ -603,12 +603,12 @@ export function ColaboradorAgenda() {
 
   const preparacoesPorDia = useMemo(() => {
     const m = {}
-    eventos.filter(e => e.data_preparacao).forEach(ev => {
+    eventos.filter(e => e.data_preparacao && meusIds.has(e.id)).forEach(ev => {
       if (!m[ev.data_preparacao]) m[ev.data_preparacao] = []
       m[ev.data_preparacao].push(ev)
     })
     return m
-  }, [eventos])
+  }, [eventos, meusIds])
 
   const { proxima: proximaAssin, registar: registarAssin } = useAssinaturaDia(colaborador?.id ?? null)
 
