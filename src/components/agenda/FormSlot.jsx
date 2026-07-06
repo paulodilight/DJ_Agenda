@@ -778,14 +778,6 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
             </div>
           )}
 
-          {/* Nota Especial — visível em todas as abas */}
-          {slot && form.notas?.trim() && (
-            <div className="rounded-lg bg-amber-500/[0.08] border border-amber-500/20 px-3 py-2.5">
-              <p className="text-[9px] font-bold text-amber-400/60 uppercase tracking-widest mb-1">Nota Especial</p>
-              <p className="text-sm text-amber-200/70 leading-relaxed whitespace-pre-wrap">{form.notas}</p>
-            </div>
-          )}
-
           {/* ── Abas — só quando existe slot ── */}
           {slot && (
             <div className="flex gap-0 border-b border-border -mx-6 px-6">
