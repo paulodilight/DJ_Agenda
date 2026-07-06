@@ -139,7 +139,7 @@ export const colaboradorApi = {
     if (!primeiro) return []
     const { data, error } = await supaEventos
       .from('supa_tarefas')
-      .select('id, tarefa, responsavel, estado, confirmacao, data_conclusao, hora, tipo, notas_operacionais, criado_por, foto_url')
+      .select('id, tarefa, responsavel, estado, confirmacao, data_conclusao, hora, tipo, notas_operacionais, criado_por, foto_url, concluida_em')
       .ilike('responsavel', `%${primeiro}%`)
       .order('data_conclusao', { ascending: true })
     if (error) throw error
@@ -150,7 +150,11 @@ export const colaboradorApi = {
     const concluida = estado === 'concluída'
     const { error } = await supaEventos
       .from('supa_tarefas')
-      .update({ estado, confirmacao: concluida ? 'concluida' : 'nao_concluida' })
+      .update({
+        estado,
+        confirmacao: concluida ? 'concluida' : 'nao_concluida',
+        concluida_em: concluida ? new Date().toISOString() : null,
+      })
       .eq('id', id)
     if (error) throw error
   },
