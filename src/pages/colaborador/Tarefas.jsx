@@ -117,12 +117,16 @@ export function ColaboradorTarefas() {
                 <p className={clsx('text-sm font-medium text-accent', bloqueada && 'line-through')}>{t.tarefa}</p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <Badge variante={ESTADO_VAR[t.estado] ?? 'default'}>{t.estado}</Badge>
-                  {t.data_conclusao && (
+                  {t.tipo === 'Recorrente' && t.recorrencia ? (
+                    <span className="text-[11px] text-accent-subtle">
+                      {t.recorrencia === 'semanal' ? 'Semanal' : 'Mensal'}
+                    </span>
+                  ) : t.data_conclusao ? (
                     <span className="flex items-center gap-1 text-[11px] text-accent-subtle">
                       <Clock size={11} />
                       {dataLonga(t.data_conclusao)}{t.hora ? ` · ${hhmm(t.hora)}` : ''}
                     </span>
-                  )}
+                  ) : null}
                   {t.criado_por && <span className="text-[11px] text-accent-subtle">por {t.criado_por}</span>}
                 </div>
                 {t.notas_operacionais && (
