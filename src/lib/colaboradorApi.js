@@ -43,7 +43,7 @@ export const colaboradorApi = {
       .eq('tecnico_id', tecnicoId)
     const equipaIds = new Set((et ?? []).map((r) => r.evento_id))
 
-    const COLS = 'id,evento,tipo,status,tecnico_id,contacto_pelo_evento,morada,dia_instalacao,hora_instalacao,data_evento,hora_inicio,hora_fim,notas_operacionais,Equipamentos,notas_colaborador,espaco_id,responsavel,espacos(nome,logo_url)'
+    const COLS = 'id,evento,tipo,status,tecnico_id,todos_tecnicos,contacto_pelo_evento,morada,dia_instalacao,hora_instalacao,data_evento,hora_inicio,hora_fim,notas_operacionais,Equipamentos,notas_colaborador,espaco_id,responsavel,data_preparacao,notas_preparacao,espacos(nome,logo_url)'
     const { data, error } = await supabase
       .from('supa_eventos')
       .select(COLS)
@@ -64,7 +64,7 @@ export const colaboradorApi = {
     }
 
     return (data ?? []).map((e) => {
-      const isResp   = e.tecnico_id === tecnicoId
+      const isResp   = e.tecnico_id === tecnicoId || e.todos_tecnicos === true
       const isEquipa = equipaIds.has(e.id)
       const meu      = isResp || isEquipa
       const fonte    = isResp && isEquipa ? 'ambos' : isResp ? 'responsavel' : isEquipa ? 'equipa' : null
@@ -139,8 +139,8 @@ export const colaboradorApi = {
     if (!primeiro) return []
     const { data, error } = await supaEventos
       .from('supa_tarefas')
-      .select('id, tarefa, responsavel, estado, confirmacao, data_conclusao, hora, tipo, notas_operacionais, criado_por')
-      .ilike('responsavel', primeiro)
+      .select('id, tarefa, responsavel, estado, confirmacao, data_conclusao, hora, tipo, notas_operacionais, criado_por, foto_url')
+      .ilike('responsavel', `%${primeiro}%`)
       .order('data_conclusao', { ascending: true })
     if (error) throw error
     return data ?? []
@@ -151,6 +151,14 @@ export const colaboradorApi = {
     const { error } = await supaEventos
       .from('supa_tarefas')
       .update({ estado, confirmacao: concluida ? 'concluida' : 'nao_concluida' })
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  async actualizarFotoTarefa(id, fotoUrl) {
+    const { error } = await supaEventos
+      .from('supa_tarefas')
+      .update({ foto_url: fotoUrl })
       .eq('id', id)
     if (error) throw error
   },

@@ -48,9 +48,12 @@ const VAZIO = {
   estado_pagamento: '',
   forma_pagamento: '',
   notas_contas: '',
-  tecnico_id:  '',
-  tecnico2_id: '',
-  rider_url:   '',
+  tecnico_id:        '',
+  tecnico2_id:       '',
+  todos_tecnicos:    false,
+  rider_url:         '',
+  data_preparacao:   '',
+  notas_preparacao:  '',
 }
 
 const ESTADO_PAG_OPCOES = [
@@ -222,12 +225,14 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         notas_faturacao:  evento.notas_faturacao  ?? '',
         xclusive:    evento.xclusive    ?? false,
         artista_id:  evento.artista_id  ?? '',
-        tecnico_id:      evento.tecnico_id  ?? '',
+        tecnico_id:      evento.todos_tecnicos ? 'todos' : (evento.tecnico_id ?? ''),
         tecnico2_id:     evento.tecnico2_id ?? '',
         rider_url:       evento.rider_url   ?? '',
         hora_inicio:     evento.hora_inicio?.slice(0, 5)     ?? '',
         hora_fim:        evento.hora_fim?.slice(0, 5)        ?? '',
         hora_instalacao: evento.hora_instalacao?.slice(0, 5) ?? '',
+        data_preparacao:  evento.data_preparacao  ?? '',
+        notas_preparacao: evento.notas_preparacao ?? '',
       })
       // Carregar itens de billing existentes para este evento
       supabase.from('contas_clientes').select('*').eq('evento_id', evento.id)
@@ -290,12 +295,15 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         notas_faturacao:  form.notas_faturacao?.trim() || null,
         espaco_id:       form.espaco_id       || null,
         artista_id:      form.artista_id      || null,
-        tecnico_id:      form.tecnico_id      || null,
+        tecnico_id:      form.tecnico_id === 'todos' ? null : (form.tecnico_id || null),
         tecnico2_id:     form.tecnico2_id     || null,
+        todos_tecnicos:  form.tecnico_id === 'todos',
         hora_inicio:     form.hora_inicio     || null,
         hora_fim:        form.hora_fim        || null,
         hora_instalacao: form.hora_instalacao || null,
         dia_instalacao:  form.dia_instalacao  || null,
+        data_preparacao:  form.data_preparacao  || null,
+        notas_preparacao: form.notas_preparacao?.trim() || null,
       }
       let savedId = evento?.id
       if (evento?.id) {
@@ -597,6 +605,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     onChange={(e) => set('tecnico_id', e.target.value)}
                   >
                     <option value="">— Não atribuído —</option>
+                    <option value="todos">Todos os técnicos</option>
                     {tecnicos.map(t => (
                       <option key={t.id} value={t.id}>{t.nome}</option>
                     ))}
@@ -685,6 +694,30 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     onChange={(e) => set('hora_instalacao', e.target.value)}
                   />
                 </Field>
+              </div>
+
+              {/* Preparação */}
+              <div className="border-t border-border/40 pt-4 flex flex-col gap-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Preparação</p>
+                <Field label="Data de preparação">
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={form.data_preparacao}
+                    onChange={(e) => set('data_preparacao', e.target.value)}
+                  />
+                </Field>
+                {form.data_preparacao && (
+                  <Field label="Nota de preparação">
+                    <textarea
+                      className={textareaCls}
+                      rows={3}
+                      value={form.notas_preparacao}
+                      onChange={(e) => set('notas_preparacao', e.target.value)}
+                      placeholder="O que é para preparar…"
+                    />
+                  </Field>
+                )}
               </div>
             </>
           )}

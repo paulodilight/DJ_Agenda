@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ClipboardList, Camera, ChevronRight, CalendarClock, Wrench, LayoutList, PenLine, AlertTriangle } from 'lucide-react'
 import { useColaboradorStore } from '@/store'
 import { colaboradorApi } from '@/lib/colaboradorApi'
+import { supabase } from '@/lib/supabase'
 import { Avatar } from '@/components/colaborador/Avatar'
 import { EventoModal } from '@/components/colaborador/EventoModal'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
@@ -80,6 +81,8 @@ export function ColaboradorDashboard() {
   const [loading, setLoading]           = useState(true)
   const [eventos, setEventos]           = useState([])
   const [mapaTecnicos, setMapaTecnicos] = useState({})
+  const [tarefas, setTarefas]           = useState([])
+  const [ocorrencia, setOcorrencia]     = useState(null)
   const [aEnviarFoto, setAEnviarFoto]   = useState(false)
   const [eventoAberto, setEventoAberto] = useState(null)
   const fileRef = useRef(null)
@@ -91,11 +94,19 @@ export function ColaboradorDashboard() {
     Promise.all([
       colaboradorApi.eventosDoTecnico(colaborador.id),
       colaboradorApi.listarColaboradores(),
+      colaboradorApi.tarefasDoColaborador(colaborador.nome),
+      supabase.from('ocorrencias').select('id, titulo, status, created_at, espacos(nome)')
+        .in('status', ['aberta', 'em_processo'])
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
     ])
-      .then(([evs, colabs]) => {
+      .then(([evs, colabs, tarefasData, { data: oc }]) => {
         if (!activo) return
         setEventos(evs)
         setMapaTecnicos(Object.fromEntries(colabs.map(c => [c.id, c.nome])))
+        setTarefas(tarefasData)
+        setOcorrencia(oc ?? null)
       })
       .catch(console.error)
       .finally(() => activo && setLoading(false))
@@ -133,6 +144,12 @@ export function ColaboradorDashboard() {
     })
     .sort((a, b) => chaveOrdem(a).localeCompare(chaveOrdem(b)))
   const proximoEvento = proximos[0] ?? null
+
+  const proximaTarefa = tarefas.find(t => !['concluída', 'concluida', 'cancelada'].includes(t.estado)) ?? null
+
+  const proximaPreparacao = eventos
+    .filter(e => e.meu && e.data_preparacao && e.data_preparacao >= hoje)
+    .sort((a, b) => a.data_preparacao.localeCompare(b.data_preparacao))[0] ?? null
 
   const localProximo   = proximoEvento?.espacos?.nome || proximoEvento?.cliente || null
   const instalProximo  = proximoEvento?.hora_instalacao
@@ -197,22 +214,50 @@ export function ColaboradorDashboard() {
           </div>
         )}
 
+        {/* Preparação */}
+        {proximaPreparacao && (
+          <div className="mt-3 rounded-2xl border border-blue-500/20 bg-blue-500/[0.05] p-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70 mb-2">
+              Preparação
+            </p>
+            <p className="text-base font-bold text-accent leading-snug">{dataLonga(proximaPreparacao.data_preparacao)}</p>
+            {proximaPreparacao.notas_preparacao && (
+              <p className="text-sm text-accent-muted mt-1 leading-relaxed">{proximaPreparacao.notas_preparacao}</p>
+            )}
+            <p className="text-[11px] text-accent-subtle/60 mt-2">→ {proximaPreparacao.evento}</p>
+          </div>
+        )}
+
         {/* Próxima tarefa */}
         <div className="mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2 flex items-center gap-1.5">
             <ClipboardList size={11} />
             Próxima tarefa
           </p>
-          <p className="text-sm text-accent-subtle">Sem tarefas pendentes.</p>
+          {proximaTarefa
+            ? <>
+                <p className="text-sm font-semibold text-accent leading-snug">{proximaTarefa.tarefa}</p>
+                {proximaTarefa.data_conclusao && (
+                  <p className="text-[11px] text-accent-muted mt-1">{dataLonga(proximaTarefa.data_conclusao)}{proximaTarefa.hora ? ` · ${hhmm(proximaTarefa.hora)}` : ''}</p>
+                )}
+              </>
+            : <p className="text-sm text-accent-subtle">Sem tarefas pendentes.</p>
+          }
         </div>
 
-        {/* Próxima ocorrência */}
+        {/* Ocorrência mais antiga em aberto */}
         <div className="mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2 flex items-center gap-1.5">
             <AlertTriangle size={11} />
-            Próxima ocorrência
+            Ocorrência em aberto
           </p>
-          <p className="text-sm text-accent-subtle">Sem ocorrências registadas.</p>
+          {ocorrencia
+            ? <>
+                <p className="text-sm font-semibold text-accent leading-snug">{ocorrencia.titulo}</p>
+                {ocorrencia.espacos?.nome && <p className="text-[11px] text-accent-muted mt-0.5">{ocorrencia.espacos.nome}</p>}
+              </>
+            : <p className="text-sm text-accent-subtle">Sem ocorrências em aberto.</p>
+          }
         </div>
       </div>
 
