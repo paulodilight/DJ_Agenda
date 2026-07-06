@@ -65,6 +65,28 @@ function PillEvento({ ev, espaco, meu, tecNome, tecCor, colaboradorNome, compact
   )
 }
 
+// ── Pill Preparação ──────────────────────────────────────────────────────────
+function PillPreparacao({ ev, compact = false }) {
+  return (
+    <div className={clsx(
+      'w-full rounded-lg border',
+      'bg-purple-500/[0.07] border-purple-500/20',
+      compact ? 'px-2 py-1.5' : 'px-3 py-2',
+    )}>
+      <div className="flex items-center gap-1.5">
+        <Wrench size={compact ? 9 : 11} className="text-purple-400 shrink-0" />
+        <span className={clsx('font-bold text-purple-300 truncate', compact ? 'text-[12px]' : 'text-[13px]')}>
+          Preparação
+        </span>
+      </div>
+      <p className={clsx('truncate mt-0.5 text-purple-400/70', compact ? 'text-[10px]' : 'text-[11px]')}>{ev.evento}</p>
+      {!compact && ev.notas_preparacao && (
+        <p className="text-[11px] text-purple-400/50 mt-0.5 leading-relaxed whitespace-pre-line line-clamp-3">{ev.notas_preparacao}</p>
+      )}
+    </div>
+  )
+}
+
 // ── Pill LMD ─────────────────────────────────────────────────────────────────
 function PillLmd({ onClick, comBotao = false }) {
   return (
@@ -126,7 +148,7 @@ function ModalLmd({ dataStr, proxima, registar, onFechar }) {
 }
 
 // ── Vista Mês ─────────────────────────────────────────────────────────────────
-function VistaMes({ anoMes, dias, eventosPorDia, lmdPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onDiaClick }) {
+function VistaMes({ anoMes, dias, eventosPorDia, lmdPorDia, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onDiaClick }) {
   const semanas = useMemo(() => {
     const rows = []
     let i = 0
@@ -168,6 +190,11 @@ function VistaMes({ anoMes, dias, eventosPorDia, lmdPorDia, meusIds, espacosIdx,
                 {temMeuLmd && (
                   <div className="mb-0.5 rounded px-1 py-0.5 bg-indigo-500/[0.08] border border-indigo-500/20">
                     <span className="text-[12px] font-bold text-indigo-400">LMD</span>
+                  </div>
+                )}
+                {(preparacoesPorDia[dataStr] ?? []).length > 0 && (
+                  <div className="mb-0.5 rounded px-1 py-0.5 bg-purple-500/[0.08] border border-purple-500/20">
+                    <span className="text-[12px] font-bold text-purple-400">Prep</span>
                   </div>
                 )}
                 <div className="flex flex-col gap-0.5">
@@ -274,7 +301,7 @@ function PillFolgaCard({ folgaIds, tecnicos, tecCorMap, compact = false }) {
   )
 }
 
-function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, folgasIdx, lmdAgendIdx, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick }) {
+function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, folgasIdx, lmdAgendIdx, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick }) {
 
   if (!paisagem) {
     // Portrait: strip de 7 dias + detalhe
@@ -322,7 +349,10 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
         {/* Detalhe — min-h-0 garante scroll quando muitos cards */}
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-2">
           {temMeuLmd && <PillLmd onClick={() => onLmdClick(diaSeleccionado)} comBotao={false} />}
-          {evsDia.length === 0 && !temMeuLmd
+          {(preparacoesPorDia[diaSeleccionado] ?? []).map(ev => (
+            <PillPreparacao key={`prep-${ev.id}`} ev={ev} />
+          ))}
+          {evsDia.length === 0 && !temMeuLmd && (preparacoesPorDia[diaSeleccionado] ?? []).length === 0
             ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos.</p>
             : evsDia.map(ev => {
                 const meu    = meusIds.has(ev.id)
@@ -377,6 +407,9 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
             </div>
             <div className="flex-1 flex flex-col gap-1 p-1 overflow-y-auto">
               {temMeuLmd && <PillLmd onClick={() => onLmdClick(dataStr)} />}
+              {(preparacoesPorDia[dataStr] ?? []).map(ev => (
+                <PillPreparacao key={`prep-${ev.id}`} ev={ev} compact />
+              ))}
               {evs.map(ev => {
                 const meu    = meusIds.has(ev.id)
                 const espaco = espacosIdx[ev.espaco_id]?.nome ?? ''
@@ -400,15 +433,19 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
 }
 
 // ── Vista Dia ─────────────────────────────────────────────────────────────────
-function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick }) {
+function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick }) {
   const evsDia    = eventosPorDia[diaSeleccionado] ?? []
+  const prepsDia  = preparacoesPorDia[diaSeleccionado] ?? []
   const temMeuLmd = (lmdPorDia[diaSeleccionado] ?? []).includes(colaborador?.id)
   const nomeDia   = cap(format(parseISO(diaSeleccionado), 'EEEE, d MMMM', { locale: pt }))
   return (
     <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
       <p className="text-[12px] font-bold uppercase tracking-widest text-accent-subtle capitalize mb-1">{nomeDia}</p>
       {temMeuLmd && <PillLmd onClick={() => onLmdClick(diaSeleccionado)} comBotao />}
-      {evsDia.length === 0 && !temMeuLmd
+      {prepsDia.map(ev => (
+        <PillPreparacao key={`prep-${ev.id}`} ev={ev} />
+      ))}
+      {evsDia.length === 0 && !temMeuLmd && prepsDia.length === 0
         ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos neste dia.</p>
         : evsDia.map(ev => {
             const meu    = meusIds.has(ev.id)
@@ -477,7 +514,7 @@ export function ColaboradorAgenda() {
       supabase.from('vw_colaboradores').select('id, nome, foto_url, tipo').order('nome'),
       supabase.from('espacos').select('id, nome').eq('activo', true).order('nome'),
       supabase.from('supa_eventos')
-        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, tecnico_id, notas_operacionais, Equipamentos, notas_colaborador, contacto_pelo_evento, morada, tipo, rider_url')
+        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, tecnico_id, todos_tecnicos, notas_operacionais, Equipamentos, notas_colaborador, contacto_pelo_evento, morada, tipo, rider_url, data_preparacao, notas_preparacao')
         .gte('data_evento', dataInicio).lte('data_evento', dataFim).neq('status', 'cancelado'),
       supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicio).lte('data', dataFim),
     ]).then(async ([tRes, eRes, evRes, agRes]) => {
@@ -493,7 +530,7 @@ export function ColaboradorAgenda() {
         setEvTecs(etData ?? [])
         setEventos(evs)
         const viaJuncao = new Set((etData ?? []).filter(r => r.tecnico_id === colaborador.id).map(r => r.evento_id))
-        const viaResp   = new Set(evs.filter(e => e.tecnico_id === colaborador.id).map(e => e.id))
+        const viaResp   = new Set(evs.filter(e => e.tecnico_id === colaborador.id || e.todos_tecnicos === true).map(e => e.id))
         setMeusIds(new Set([...viaJuncao, ...viaResp]))
       } else {
         setEvTecs([]); setEventos([]); setMeusIds(new Set())
@@ -563,6 +600,15 @@ export function ColaboradorAgenda() {
     })
     return m
   }, [eventosFiltrados])
+
+  const preparacoesPorDia = useMemo(() => {
+    const m = {}
+    eventos.filter(e => e.data_preparacao).forEach(ev => {
+      if (!m[ev.data_preparacao]) m[ev.data_preparacao] = []
+      m[ev.data_preparacao].push(ev)
+    })
+    return m
+  }, [eventos])
 
   const { proxima: proximaAssin, registar: registarAssin } = useAssinaturaDia(colaborador?.id ?? null)
 
@@ -667,7 +713,7 @@ export function ColaboradorAgenda() {
       {/* Conteúdo */}
       {vista === 'mes' && (
         <VistaMes anoMes={anoMes} dias={dias}
-          eventosPorDia={eventosPorDia} lmdPorDia={lmdPorDia}
+          eventosPorDia={eventosPorDia} lmdPorDia={lmdPorDia} preparacoesPorDia={preparacoesPorDia}
           meusIds={meusIds} espacosIdx={espacosIdx}
           tecnicos={tecnicos} tecCorMap={tecCorMap} evTecIdx={evTecIdx}
           colaborador={colaborador}
@@ -677,6 +723,7 @@ export function ColaboradorAgenda() {
         <VistaSemana semana7={semana7} paisagem={paisagem}
           diaSeleccionado={diaSeleccionado} setDiaSeleccionado={setDiaSelec}
           eventosPorDia={eventosPorDia} lmdPorDia={lmdPorDia} folgasIdx={folgasIdx} lmdAgendIdx={lmdAgendIdx}
+          preparacoesPorDia={preparacoesPorDia}
           meusIds={meusIds} espacosIdx={espacosIdx}
           tecnicos={tecnicos} tecCorMap={tecCorMap} evTecIdx={evTecIdx}
           colaborador={colaborador}
@@ -684,7 +731,7 @@ export function ColaboradorAgenda() {
       )}
       {vista === 'dia' && (
         <VistaDia diaSeleccionado={diaSeleccionado}
-          eventosPorDia={eventosPorDia} lmdPorDia={lmdPorDia}
+          eventosPorDia={eventosPorDia} lmdPorDia={lmdPorDia} preparacoesPorDia={preparacoesPorDia}
           meusIds={meusIds} espacosIdx={espacosIdx}
           tecnicos={tecnicos} tecCorMap={tecCorMap} evTecIdx={evTecIdx}
           colaborador={colaborador}
