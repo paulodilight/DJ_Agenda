@@ -40,8 +40,9 @@ export function ColaboradorTarefas() {
   const { colaborador } = useColaboradorStore()
   const [loading, setLoading] = useState(true)
   const [tarefas, setTarefas] = useState([])
-  const [aGuardar, setAGuardar] = useState(null)
-  const [aUpload, setAUpload]   = useState(null)
+  const [aGuardar, setAGuardar]       = useState(null)
+  const [aUpload, setAUpload]         = useState(null)
+  const [pendingEstados, setPending]  = useState({}) // { [tarefaId]: estado }
   const camaraRefs  = useRef({})
   const galeriaRefs = useRef({})
 
@@ -68,12 +69,17 @@ export function ColaboradorTarefas() {
             : t,
         ),
       )
+      setPending(prev => { const next = { ...prev }; delete next[tarefa.id]; return next })
     } catch (e) {
       console.error(e)
       alert('Não foi possível atualizar: ' + e.message)
     } finally {
       setAGuardar(null)
     }
+  }
+
+  const seleccionarEstado = (tarefaId, estado) => {
+    setPending(prev => prev[tarefaId] === estado ? { ...prev, [tarefaId]: null } : { ...prev, [tarefaId]: estado })
   }
 
   const onFoto = async (e, tarefaId) => {
@@ -142,22 +148,39 @@ export function ColaboradorTarefas() {
 
             {/* Botões de estado */}
             {!bloqueada && (
-              <div className="flex gap-1.5 px-4 pb-3 flex-wrap">
-                {ESTADOS_OPCOES.map((s) => (
+              <div className="flex flex-col gap-1.5 px-4 pb-3">
+                <div className="flex gap-1.5 flex-wrap">
+                  {ESTADOS_OPCOES.map((s) => {
+                    const isActual = t.estado === s
+                    const isSel    = pendingEstados[t.id] === s
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => seleccionarEstado(t.id, s)}
+                        disabled={aGuardar === t.id}
+                        className={clsx(
+                          'px-2.5 py-1 rounded-full text-[11px] transition-all border capitalize disabled:opacity-40',
+                          isSel && !isActual
+                            ? 'ring-2 ring-offset-1 ring-offset-surface-1 ring-white/30 bg-surface-4 border-white/30 text-accent'
+                            : isActual
+                              ? 'bg-surface-4 border-border text-accent cursor-default'
+                              : 'bg-surface-2 border-border/60 text-accent-subtle hover:text-accent hover:border-white/20',
+                        )}
+                      >
+                        {s}
+                      </button>
+                    )
+                  })}
+                </div>
+                {pendingEstados[t.id] && pendingEstados[t.id] !== t.estado && (
                   <button
-                    key={s}
-                    onClick={() => mudarEstado(t, s)}
-                    disabled={aGuardar === t.id || t.estado === s}
-                    className={clsx(
-                      'px-2.5 py-1 rounded-full text-[11px] transition-colors border',
-                      t.estado === s
-                        ? 'bg-surface-4 border-border text-accent cursor-default'
-                        : 'bg-surface-2 border-border/60 text-accent-subtle hover:text-accent hover:border-white/20 disabled:opacity-40',
-                    )}
+                    onClick={() => mudarEstado(t, pendingEstados[t.id])}
+                    disabled={aGuardar === t.id}
+                    className="w-full py-2 rounded-xl bg-accent/20 border border-accent/40 text-accent font-semibold text-[12px] hover:bg-accent/30 transition-colors disabled:opacity-50"
                   >
-                    {s}
+                    {aGuardar === t.id ? 'A guardar…' : `Confirmar → ${pendingEstados[t.id]}`}
                   </button>
-                ))}
+                )}
               </div>
             )}
 
