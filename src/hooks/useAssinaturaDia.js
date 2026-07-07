@@ -35,7 +35,7 @@ const hojeISO = () => {
 const inicioHoje = () => `${hojeISO()}T00:00:00.000Z`
 const fimHoje   = () => `${hojeISO()}T23:59:59.999Z`
 
-export function useAssinaturaDia(tecnicoId) {
+export function useAssinaturaDia(tecnicoId, eventoIdFixo = null) {
   const [proxima, setProxima] = useState(null)
   const [feitas,  setFeitas]  = useState([])
   const [loading, setLoading] = useState(true)
@@ -108,7 +108,11 @@ export function useAssinaturaDia(tecnicoId) {
       const assinEvento = (assin ?? []).filter(a => a.evento_id === eventoId)
       const tiposEvento = new Set(assinEvento.map(a => a.tipo))
 
-      setFeitas(assinEvento.map(a => ({ tipo: a.tipo, registado_em: a.registado_em })))
+      // feitas: se foi passado eventoIdFixo (ex: EventoModal), filtra a esse evento específico
+      const assinFeitas = eventoIdFixo
+        ? (assin ?? []).filter(a => a.evento_id === eventoIdFixo)
+        : assinEvento
+      setFeitas(assinFeitas.map(a => ({ tipo: a.tipo, registado_em: a.registado_em })))
 
       // 4. Próxima acção
       let proxima = null

@@ -84,7 +84,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const isResponsavel = evento.todos_tecnicos === true || colaborador?.id === evento.tecnico_id
 
   // ── Assinatura de início/fim de evento ──
-  const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading, feitas: feitasAssin } = useAssinaturaDia(colaborador?.id ?? null)
+  const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading, feitas: feitasAssin } = useAssinaturaDia(colaborador?.id ?? null, evento.id)
   const [assinandoEvento, setAssinandoEvento] = useState(false)
   const mostrarInicioEvento = !assinLoading && proximaAssin?.tipo === 'evento_entrada' && proximaAssin?.eventoId === evento.id
   const mostrarFimEvento   = !assinLoading && proximaAssin?.tipo === 'evento_saida'   && proximaAssin?.eventoId === evento.id
