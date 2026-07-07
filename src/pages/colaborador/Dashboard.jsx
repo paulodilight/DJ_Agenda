@@ -91,7 +91,7 @@ function ModalTarefa({ tarefa, onFechar, onGuardar }) {
   const bloqueada = ['concluída', 'concluida'].includes(tarefa.estado)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onFechar}>
       <div className="w-full max-w-sm rounded-2xl border border-border bg-surface-1 shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}>
@@ -428,7 +428,7 @@ export function ColaboradorDashboard() {
 
       {/* Modal ocorrência */}
       {ocorrenciaAberta && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={() => setOcorrenciaAberta(null)}>
           <div className="w-full max-w-sm rounded-2xl border border-border bg-surface-1 shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}>
