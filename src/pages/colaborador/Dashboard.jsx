@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ClipboardList, Camera, ChevronRight, CalendarClock, Wrench, LayoutList, PenLine, AlertTriangle } from 'lucide-react'
+import { ClipboardList, Camera, ChevronRight, CalendarClock, Wrench, LayoutList, PenLine, AlertTriangle, Clock, X } from 'lucide-react'
 import { useColaboradorStore } from '@/store'
 import { colaboradorApi } from '@/lib/colaboradorApi'
 import { supabase } from '@/lib/supabase'
@@ -82,9 +82,11 @@ export function ColaboradorDashboard() {
   const [eventos, setEventos]           = useState([])
   const [mapaTecnicos, setMapaTecnicos] = useState({})
   const [tarefas, setTarefas]           = useState([])
-  const [ocorrencia, setOcorrencia]     = useState(null)
-  const [aEnviarFoto, setAEnviarFoto]   = useState(false)
-  const [eventoAberto, setEventoAberto] = useState(null)
+  const [ocorrencia, setOcorrencia]         = useState(null)
+  const [aEnviarFoto, setAEnviarFoto]       = useState(false)
+  const [eventoAberto, setEventoAberto]     = useState(null)
+  const [tarefaAberta, setTarefaAberta]     = useState(null)
+  const [ocorrenciaAberta, setOcorrenciaAberta] = useState(null)
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -95,7 +97,7 @@ export function ColaboradorDashboard() {
       colaboradorApi.eventosDoTecnico(colaborador.id),
       colaboradorApi.listarColaboradores(),
       colaboradorApi.tarefasDoColaborador(colaborador.nome),
-      supabase.from('ocorrencias').select('id, titulo, status, created_at, espacos(nome)')
+      supabase.from('ocorrencias').select('id, titulo, status, created_at, notas, prioridade, espacos(nome)')
         .in('status', ['aberta', 'em_processo'])
         .order('created_at', { ascending: true })
         .limit(1)
@@ -145,7 +147,10 @@ export function ColaboradorDashboard() {
     .sort((a, b) => chaveOrdem(a).localeCompare(chaveOrdem(b)))
   const proximoEvento = proximos[0] ?? null
 
-  const proximaTarefa = tarefas.find(t => !['concluída', 'concluida', 'cancelada'].includes(t.estado)) ?? null
+  const proximaTarefa = tarefas.find(t =>
+    !['concluída', 'concluida', 'cancelada'].includes(t.estado) &&
+    (!t.data_conclusao || t.data_conclusao >= hoje)
+  ) ?? null
 
   const proximaPreparacao = eventos
     .filter(e => e.meu && e.data_preparacao && e.data_preparacao >= hoje)
@@ -229,7 +234,10 @@ export function ColaboradorDashboard() {
         )}
 
         {/* Próxima tarefa */}
-        <div className="mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4">
+        <div
+          className={proximaTarefa ? 'mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4 cursor-pointer hover:border-white/20 active:scale-[0.99] transition-all' : 'mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4'}
+          onClick={proximaTarefa ? () => setTarefaAberta(proximaTarefa) : undefined}
+        >
           <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2 flex items-center gap-1.5">
             <ClipboardList size={11} />
             Próxima tarefa
@@ -246,7 +254,10 @@ export function ColaboradorDashboard() {
         </div>
 
         {/* Ocorrência mais antiga em aberto */}
-        <div className="mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4">
+        <div
+          className={ocorrencia ? 'mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4 cursor-pointer hover:border-white/20 active:scale-[0.99] transition-all' : 'mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4'}
+          onClick={ocorrencia ? () => setOcorrenciaAberta(ocorrencia) : undefined}
+        >
           <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2 flex items-center gap-1.5">
             <AlertTriangle size={11} />
             Ocorrência em aberto
@@ -286,6 +297,109 @@ export function ColaboradorDashboard() {
           mapaTecnicos={mapaTecnicos}
           onFechar={() => setEventoAberto(null)}
         />
+      )}
+
+      {/* Modal tarefa */}
+      {tarefaAberta && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setTarefaAberta(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface-1 shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+              <ClipboardList size={14} className="text-accent-muted shrink-0" />
+              <span className="text-sm font-bold text-accent flex-1 truncate">{tarefaAberta.tarefa}</span>
+              <button onClick={() => setTarefaAberta(null)} className="text-accent-subtle hover:text-accent transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle">Estado</span>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border border-border bg-surface-2 text-accent-muted capitalize">{tarefaAberta.estado}</span>
+              </div>
+              {tarefaAberta.data_conclusao && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Data limite</p>
+                  <p className="text-sm text-accent-muted flex items-center gap-1.5">
+                    <Clock size={12} className="shrink-0" />
+                    {dataLonga(tarefaAberta.data_conclusao)}{tarefaAberta.hora ? ` · ${hhmm(tarefaAberta.hora)}` : ''}
+                  </p>
+                </div>
+              )}
+              {tarefaAberta.tipo && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Tipo</p>
+                  <p className="text-sm text-accent-muted">{tarefaAberta.tipo}{tarefaAberta.recorrencia ? ` · ${tarefaAberta.recorrencia}` : ''}</p>
+                </div>
+              )}
+              {tarefaAberta.criado_por && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Criado por</p>
+                  <p className="text-sm text-accent-muted">{tarefaAberta.criado_por}</p>
+                </div>
+              )}
+              {tarefaAberta.notas_operacionais && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-1">Notas</p>
+                  <p className="text-sm text-accent-muted leading-relaxed whitespace-pre-line">{tarefaAberta.notas_operacionais}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal ocorrência */}
+      {ocorrenciaAberta && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setOcorrenciaAberta(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface-1 shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-amber-500/20 bg-amber-500/[0.05] flex items-center gap-2">
+              <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+              <span className="text-sm font-bold text-accent flex-1 truncate">{ocorrenciaAberta.titulo}</span>
+              <button onClick={() => setOcorrenciaAberta(null)} className="text-accent-subtle hover:text-accent transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle">Estado</span>
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border capitalize ${
+                  ocorrenciaAberta.status === 'aberta' ? 'bg-red-400/10 border-red-400/30 text-red-400' :
+                  ocorrenciaAberta.status === 'em_processo' ? 'bg-amber-400/10 border-amber-400/30 text-amber-400' :
+                  'bg-green-400/10 border-green-400/30 text-green-400'
+                }`}>{ocorrenciaAberta.status?.replace('_', ' ')}</span>
+              </div>
+              {ocorrenciaAberta.espacos?.nome && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Local</p>
+                  <p className="text-sm text-accent-muted">{ocorrenciaAberta.espacos.nome}</p>
+                </div>
+              )}
+              {ocorrenciaAberta.prioridade && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Prioridade</p>
+                  <p className="text-sm text-accent-muted capitalize">{ocorrenciaAberta.prioridade}</p>
+                </div>
+              )}
+              {ocorrenciaAberta.created_at && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Reportada em</p>
+                  <p className="text-sm text-accent-muted">
+                    {new Date(ocorrenciaAberta.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+              )}
+              {ocorrenciaAberta.notas && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-1">Notas</p>
+                  <p className="text-sm text-accent-muted leading-relaxed whitespace-pre-line">{ocorrenciaAberta.notas}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

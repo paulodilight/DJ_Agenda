@@ -76,11 +76,12 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
   // Só pode ver/editar as suas próprias notas se estiver atribuído ao evento
   const isAtribuido = colaborador && (
+    evento.todos_tecnicos === true ||
     (evento._tecnicosIds ?? []).includes(colaborador.id) ||
     evento.tecnico_id === colaborador.id
   )
   // Só o responsável principal pode assinar presença
-  const isResponsavel = colaborador?.id === evento.tecnico_id
+  const isResponsavel = evento.todos_tecnicos === true || colaborador?.id === evento.tecnico_id
 
   // ── Assinatura de início/fim de evento ──
   const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading, feitas: feitasAssin } = useAssinaturaDia(colaborador?.id ?? null)
@@ -138,7 +139,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
   const logo    = evento.espacos?.logo_url
   const cliente = evento.espacos?.nome || evento.cliente || null
-  const tecNomeResp = mapaTecnicos[evento.tecnico_id] || evento.responsavel || null
+  const tecNomeResp = evento.todos_tecnicos ? 'Todos os técnicos' : (mapaTecnicos[evento.tecnico_id] || evento.responsavel || null)
 
   const outrosTecs = (evento._tecnicosIds ?? [])
     .filter(id => id !== evento.tecnico_id)

@@ -687,13 +687,16 @@ function ModalDia({ dataStr, tecnicos, tecCorMap, lmdPorDia, linhasBrutas, folga
                       </div>
                       {linha.ev && <p className="text-[11px] text-accent-muted truncate">{linha.ev.evento}</p>}
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {(linha.tecIds ?? []).map(tid => {
+                        {linha.ev?.todos_tecnicos && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-blue-400/15 text-blue-400 border-blue-400/30">Todos</span>
+                        )}
+                        {!linha.ev?.todos_tecnicos && (linha.tecIds ?? []).map(tid => {
                           const tec = tecnicos.find(t => t.id === tid)
                           const cor = tecCorMap[tid]
                           if (!tec) return null
                           return <span key={tid} className={clsx('inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border', cor?.chip ?? 'bg-surface-3 text-accent-muted border-border')}>{tec.nome}</span>
                         })}
-                        {(linha.tecIds ?? []).length === 0 && <span className="text-[11px] italic text-red-400/70">sem técnico</span>}
+                        {!linha.ev?.todos_tecnicos && (linha.tecIds ?? []).length === 0 && <span className="text-[11px] italic text-red-400/70">sem técnico</span>}
                       </div>
                       {(linha.ev?.hora_instalacao || linha.ev?.hora_inicio) && (
                         <div className="flex items-center gap-2 text-[10px] text-accent-subtle">
@@ -1043,7 +1046,7 @@ function VistaChecklists() {
 }
 
 export function ApoioTecnico() {
-  const { anoMes } = useMesStore()
+  const { anoMes, setAnoMes } = useMesStore()
   const [loading, setLoading]           = useState(true)
   const [tecnicos, setTecnicos]         = useState([])
   const [agendamentos, setAgendamentos] = useState([])
@@ -1060,11 +1063,16 @@ export function ApoioTecnico() {
   const [vista, setVista]                 = useState('lista') // lista | semana | mes | colunas | stats | ocorrencias
   const [semanaRef, setSemanaRef]         = useState(hojeStr)
   const [modalDia, setModalDia]           = useState(null)
+  const [modalPrep, setModalPrep]         = useState(null) // evento com data_preparacao
   const [modalChecklist, setModalChecklist] = useState(null) // { eventoId, eventoNome, tecIds }
 
+  // ── Reset ao mês actual ao entrar na página ──────────────────────────────────
+  useEffect(() => { setAnoMes(format(new Date(), 'yyyy-MM')) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Scroll refs ─────────────────────────────────────────────────────────────
-  const scrollRef   = useRef(null)
-  const savedScroll = useRef({ top: 0, left: 0 })
+  const scrollRef      = useRef(null)
+  const savedScroll    = useRef({ top: 0, left: 0 })
+  const initialLoad    = useRef(true)
 
   // ── Drag state (técnico) ────────────────────────────────────────────────────
   const [dragSource, setDragSource] = useState(null)  // { dropKey, tecnicoId, eventoId, agId }
@@ -1098,7 +1106,7 @@ export function ApoioTecnico() {
       supabase.from('espacos').select('id, nome').eq('activo', true).order('nome'),
       supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicioExt).lte('data', dataFimExt),
       supabase.from('supa_eventos')
-        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, tecnico_id, tecnico2_id, valor_apoio_tecnico, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, rider_url')
+        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, tecnico_id, tecnico2_id, todos_tecnicos, valor_apoio_tecnico, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, rider_url, data_preparacao')
         .gte('data_evento', dataInicioExt).lte('data_evento', dataFimExt).neq('status', 'cancelado'),
       supabase.from('agenda')
         .select('id, espaco_id, data, dj_nome, dj_id, tipo_slot, estado, djs(nome, nome_artistico)')
@@ -1145,14 +1153,18 @@ export function ApoioTecnico() {
   }, [carregar])
 
   useEffect(() => {
-    if (!loading && (savedScroll.current.top > 0 || savedScroll.current.left > 0)) {
-      requestAnimationFrame(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop  = savedScroll.current.top
-          scrollRef.current.scrollLeft = savedScroll.current.left
-        }
-      })
-    }
+    if (loading) return
+    requestAnimationFrame(() => {
+      if (!scrollRef.current) return
+      if (savedScroll.current.top > 0 || savedScroll.current.left > 0) {
+        scrollRef.current.scrollTop  = savedScroll.current.top
+        scrollRef.current.scrollLeft = savedScroll.current.left
+      } else if (initialLoad.current) {
+        initialLoad.current = false
+        const el = scrollRef.current.querySelector(`[data-data="${hojeStr}"]`)
+        if (el) el.scrollIntoView({ block: 'start' })
+      }
+    })
   }, [loading])
 
   // ── Handlers folga drag ──────────────────────────────────────────────────────
@@ -1349,7 +1361,7 @@ export function ApoioTecnico() {
       if (filtroEspaco) linhas = linhas.filter(l => l.espaco_id === filtroEspaco)
 
       if (tecFiltroId) {
-        linhas = linhas.filter(l => (l.tecIds ?? []).includes(tecFiltroId))
+        linhas = linhas.filter(l => l.ev?.todos_tecnicos || (l.tecIds ?? []).includes(tecFiltroId))
       }
 
       if (q) linhas = linhas.filter(l => {
@@ -1396,6 +1408,15 @@ export function ApoioTecnico() {
   const maxGrupos = useMemo(() =>
     Math.max(1, ...linhasPorDia.map(g => g.linhas.length))
   , [linhasPorDia])
+
+  const preparacoesPorDia = useMemo(() => {
+    const m = {}
+    eventos.filter(e => e.data_preparacao).forEach(ev => {
+      if (!m[ev.data_preparacao]) m[ev.data_preparacao] = []
+      m[ev.data_preparacao].push(ev)
+    })
+    return m
+  }, [eventos])
 
   // ── Handlers de drag & drop ──────────────────────────────────────────────────
   const handleDragStart = useCallback((e, linha, tecnicoId) => {
@@ -1804,14 +1825,24 @@ export function ApoioTecnico() {
                 const isHoje     = dataStr === hojeStr
 
                 const row = (
-                  <tr key={dataStr} className={clsx(
+                  <tr key={dataStr} data-data={dataStr} className={clsx(
                     'border-b border-border/20 hover:bg-surface-2/20 transition-colors align-middle',
                     isHoje ? 'bg-zinc-100 [&_td]:!text-gray-700' : zebraCls
                   )}>
                     <td colSpan={2} onClick={() => setModalFolga({ data: dataStr })} title="Gerir folgas"
                       className={clsx('px-3 py-2 font-medium whitespace-nowrap border-r border-border/40 cursor-pointer hover:bg-orange-400/5 transition-colors',
                         isHoje ? 'text-gray-800 font-bold' : 'text-accent-muted')}>
-                      {diaSemanaData(dataStr)}
+                      <div className="flex flex-col">
+                        {diaSemanaData(dataStr)}
+                        {(preparacoesPorDia[dataStr] ?? []).map(ev => (
+                          <button key={`prep-col-${ev.id}`}
+                            onClick={e => { e.stopPropagation(); setModalPrep(ev) }}
+                            className="flex items-center gap-0.5 mt-0.5 hover:opacity-80 transition-opacity">
+                            <Wrench size={8} className="text-purple-400/70 shrink-0" />
+                            <span className="text-[8px] text-purple-400/70 font-semibold">Preparação</span>
+                          </button>
+                        ))}
+                      </div>
                     </td>
                     {Array.from({ length: maxGrupos }, (_, i) => {
                       const linha = linhas[i] ?? null
@@ -1996,6 +2027,22 @@ export function ApoioTecnico() {
                             ))}
                           </button>
                         )}
+                        {(preparacoesPorDia[dataStr] ?? []).length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Wrench size={9} className="text-purple-400/60 shrink-0" />
+                            <span className="text-[9px] font-bold text-purple-400/60 uppercase tracking-widest">Preparação</span>
+                            {(preparacoesPorDia[dataStr] ?? []).map(ev => {
+                              const tec = tecnicos.find(t => t.id === ev.tecnico_id)
+                              const cor = tec ? tecCorMap[tec.id] : null
+                              return tec ? (
+                                <button key={ev.id} onClick={e => { e.stopPropagation(); setModalPrep(ev) }}
+                                  className={clsx('inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border hover:opacity-80 transition-opacity', cor?.chip ?? 'bg-purple-400/15 text-purple-400 border-purple-400/30')}>
+                                  {tec.nome.split(' ')[0]}
+                                </button>
+                              ) : null
+                            })}
+                          </span>
+                        )}
                         <button onClick={() => setModalEditEvento({ data_evento: dataStr })}
                           className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded border border-border/50 text-[10px] text-accent-subtle/50 hover:text-accent-subtle hover:border-border transition-colors">
                           <Plus size={10} /> evento
@@ -2170,6 +2217,27 @@ export function ApoioTecnico() {
                         className="w-full text-center text-[11px] text-accent-subtle/40 hover:text-accent-subtle py-0.5 transition-colors">
                         + evento
                       </button>
+
+                      {(preparacoesPorDia[dataStr] ?? []).map(ev => {
+                        const tec = tecnicos.find(t => t.id === ev.tecnico_id)
+                        const cor = tec ? tecCorMap[tec.id] : null
+                        return (
+                          <div key={`prep-${ev.id}`}
+                            onClick={() => setModalPrep(ev)}
+                            className="px-1.5 py-1 rounded-lg border bg-purple-500/[0.07] border-purple-500/20 cursor-pointer hover:bg-purple-500/10 transition-colors">
+                            <div className="flex items-center gap-1">
+                              <Wrench size={9} className="text-purple-400 shrink-0" />
+                              <span className="text-[11px] font-bold text-purple-300 truncate">Preparação</span>
+                            </div>
+                            <p className="text-[10px] text-purple-400/70 truncate">{ev.evento}</p>
+                            {tec && (
+                              <span className={clsx('text-[10px] font-semibold', cor?.chip ? cor.chip : 'text-purple-400/50')}>
+                                {tec.nome.split(' ')[0]}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
 
                     {/* LMD — zona fixa, aceita drop → cria evento 10h-19h */}
@@ -2327,6 +2395,12 @@ export function ApoioTecnico() {
                             </div>
                           ))}
                           {linhasDia.length > 3 && <p className="text-[8px] text-accent-subtle/50">+{linhasDia.length - 3} mais</p>}
+                          {(preparacoesPorDia[dataStr] ?? []).length > 0 && (
+                            <div className="px-1 py-0.5 rounded bg-purple-500/[0.08] border border-purple-500/20 flex items-center gap-0.5">
+                              <Wrench size={8} className="text-purple-400 shrink-0" />
+                              <span className="text-[8px] font-bold text-purple-400">Preparação</span>
+                            </div>
+                          )}
                           {folgaIds.length > 0 && (
                             <div className="flex gap-0.5 flex-wrap mt-auto">
                               {folgaIds.slice(0, 2).map(tid => {
@@ -2415,6 +2489,54 @@ export function ApoioTecnico() {
         onFechar={() => setModalEditEvento(null)}
         onGuardado={() => { setModalEditEvento(null); carregarComScroll() }}
       />
+
+      {/* Modal Preparação (read-only) */}
+      {modalPrep && (() => {
+        const tec = tecnicos.find(t => t.id === modalPrep.tecnico_id)
+        const cor = tec ? tecCorMap[tec.id] : null
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setModalPrep(null)}>
+            <div className="w-full max-w-sm rounded-2xl border border-purple-500/30 bg-surface-1 shadow-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}>
+              {/* Cabeçalho */}
+              <div className="px-5 py-4 border-b border-purple-500/20 bg-purple-500/[0.06] flex items-center gap-2">
+                <Wrench size={14} className="text-purple-400 shrink-0" />
+                <span className="text-sm font-bold text-purple-300">Preparação</span>
+                <button onClick={() => setModalPrep(null)}
+                  className="ml-auto text-accent-subtle hover:text-accent transition-colors text-lg leading-none">×</button>
+              </div>
+              {/* Corpo */}
+              <div className="px-5 py-4 flex flex-col gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Evento</p>
+                  <p className="text-sm font-semibold text-accent">{modalPrep.evento}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Data de preparação</p>
+                  <p className="text-sm text-accent-muted">{modalPrep.data_preparacao}</p>
+                </div>
+                {tec && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-1">Técnico</p>
+                    <span className={clsx('inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border', cor?.chip ?? 'bg-purple-400/15 text-purple-400 border-purple-400/30')}>
+                      {tec.nome}
+                    </span>
+                  </div>
+                )}
+                {modalPrep.notas_preparacao ? (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-1">Notas</p>
+                    <p className="text-sm text-accent-muted leading-relaxed whitespace-pre-line">{modalPrep.notas_preparacao}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-accent-subtle/50 italic">Sem notas de preparação.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Modal Dia (vista mês) */}
       {modalDia && (
