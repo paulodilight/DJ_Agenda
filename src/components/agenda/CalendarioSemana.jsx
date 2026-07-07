@@ -50,6 +50,19 @@ function indiceTurnoPorHora(horaSlot, turnos) {
   return bestIdx
 }
 
+// ── Chip de preparação ───────────────────────────────────────────────────────
+function PrepChip({ evento, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left px-2 py-1 rounded border text-[10px] leading-tight transition-colors hover:brightness-110 border-purple-500/40 bg-purple-500/10 text-purple-300"
+    >
+      <div className="font-semibold truncate">{evento.evento}</div>
+      <div className="text-[9px] opacity-70 mt-0.5">Preparação</div>
+    </button>
+  )
+}
+
 // ── Chip de evento da supa_eventos ───────────────────────────────────────────
 function EventoChip({ evento, onClick }) {
   const corStatus = {
@@ -184,6 +197,18 @@ export function CalendarioSemana({
     supaEventos.forEach(ev => {
       if (!ev.espaco_id_dj) return
       const k = `${ev.data_evento}|${ev.espaco_id_dj}`
+      if (!idx[k]) idx[k] = []
+      idx[k].push(ev)
+    })
+    return idx
+  }, [supaEventos])
+
+  // Índice de preparações por "data_preparacao|espaco_id_dj"
+  const prepIdx = useMemo(() => {
+    const idx = {}
+    supaEventos.forEach(ev => {
+      if (!ev.data_preparacao || !ev.espaco_id_dj) return
+      const k = `${ev.data_preparacao}|${ev.espaco_id_dj}`
       if (!idx[k]) idx[k] = []
       idx[k].push(ev)
     })
@@ -358,6 +383,37 @@ export function CalendarioSemana({
                       <div className="flex flex-col gap-1">
                         {evs.map(ev => (
                           <EventoChip
+                            key={ev.id}
+                            evento={ev}
+                            onClick={() => onClickEvento?.(ev)}
+                          />
+                        ))}
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>,
+
+              /* ── Linha de Preparações ── */
+              <tr key={`prep-row-${espaco.id}`} className="bg-purple-950/10">
+                <td className="px-3 py-1 text-accent-muted border-r border-b border-border sticky left-0 bg-inherit z-10 whitespace-nowrap">
+                  <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">Preparação</span>
+                </td>
+                {dias.map(dia => {
+                  const dataStr = isoData(dia)
+                  const preps = prepIdx[`${dataStr}|${espaco.id}`] ?? []
+                  return (
+                    <td
+                      key={dataStr}
+                      className={clsx(
+                        'px-1.5 py-1.5 border-r border-b border-border',
+                        preps.length > 0 ? 'align-top' : 'align-middle',
+                        fds(dia) ? 'bg-blue-400/[0.06]' : ''
+                      )}
+                    >
+                      <div className="flex flex-col gap-1">
+                        {preps.map(ev => (
+                          <PrepChip
                             key={ev.id}
                             evento={ev}
                             onClick={() => onClickEvento?.(ev)}

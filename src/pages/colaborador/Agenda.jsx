@@ -66,13 +66,14 @@ function PillEvento({ ev, espaco, meu, tecNome, tecCor, colaboradorNome, compact
 }
 
 // ── Pill Preparação ──────────────────────────────────────────────────────────
-function PillPreparacao({ ev, compact = false }) {
+function PillPreparacao({ ev, compact = false, onClick }) {
   return (
-    <div className={clsx(
-      'w-full rounded-lg border',
-      'bg-purple-500/[0.07] border-purple-500/20',
-      compact ? 'px-2 py-1.5' : 'px-3 py-2',
-    )}>
+    <button onClick={onClick}
+      className={clsx(
+        'w-full text-left rounded-lg border transition-all active:scale-[0.98]',
+        'bg-purple-500/[0.07] border-purple-500/20 hover:border-purple-500/35',
+        compact ? 'px-2 py-1.5' : 'px-3 py-2',
+      )}>
       <div className="flex items-center gap-1.5">
         <Wrench size={compact ? 9 : 11} className="text-purple-400 shrink-0" />
         <span className={clsx('font-bold text-purple-300 truncate', compact ? 'text-[12px]' : 'text-[13px]')}>
@@ -83,7 +84,7 @@ function PillPreparacao({ ev, compact = false }) {
       {!compact && ev.notas_preparacao && (
         <p className="text-[11px] text-purple-400/50 mt-0.5 leading-relaxed whitespace-pre-line line-clamp-3">{ev.notas_preparacao}</p>
       )}
-    </div>
+    </button>
   )
 }
 
@@ -301,7 +302,7 @@ function PillFolgaCard({ folgaIds, tecnicos, tecCorMap, compact = false }) {
   )
 }
 
-function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, folgasIdx, lmdAgendIdx, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick }) {
+function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, folgasIdx, lmdAgendIdx, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick, onPrepClick }) {
 
   if (!paisagem) {
     // Portrait: strip de 7 dias + detalhe
@@ -350,7 +351,7 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-2">
           {temMeuLmd && <PillLmd onClick={() => onLmdClick(diaSeleccionado)} comBotao={false} />}
           {(preparacoesPorDia[diaSeleccionado] ?? []).map(ev => (
-            <PillPreparacao key={`prep-${ev.id}`} ev={ev} />
+            <PillPreparacao key={`prep-${ev.id}`} ev={ev} onClick={() => onPrepClick?.(ev)} />
           ))}
           {evsDia.length === 0 && !temMeuLmd && (preparacoesPorDia[diaSeleccionado] ?? []).length === 0
             ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos.</p>
@@ -408,7 +409,7 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
             <div className="flex-1 flex flex-col gap-1 p-1 overflow-y-auto">
               {temMeuLmd && <PillLmd onClick={() => onLmdClick(dataStr)} />}
               {(preparacoesPorDia[dataStr] ?? []).map(ev => (
-                <PillPreparacao key={`prep-${ev.id}`} ev={ev} compact />
+                <PillPreparacao key={`prep-${ev.id}`} ev={ev} compact onClick={() => onPrepClick?.(ev)} />
               ))}
               {evs.map(ev => {
                 const meu    = meusIds.has(ev.id)
@@ -433,7 +434,7 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
 }
 
 // ── Vista Dia ─────────────────────────────────────────────────────────────────
-function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick }) {
+function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick, onPrepClick }) {
   const evsDia    = eventosPorDia[diaSeleccionado] ?? []
   const prepsDia  = preparacoesPorDia[diaSeleccionado] ?? []
   const temMeuLmd = (lmdPorDia[diaSeleccionado] ?? []).includes(colaborador?.id)
@@ -443,7 +444,7 @@ function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, preparacoesPorDia
       <p className="text-[12px] font-bold uppercase tracking-widest text-accent-subtle capitalize mb-1">{nomeDia}</p>
       {temMeuLmd && <PillLmd onClick={() => onLmdClick(diaSeleccionado)} comBotao />}
       {prepsDia.map(ev => (
-        <PillPreparacao key={`prep-${ev.id}`} ev={ev} />
+        <PillPreparacao key={`prep-${ev.id}`} ev={ev} onClick={() => onPrepClick?.(ev)} />
       ))}
       {evsDia.length === 0 && !temMeuLmd && prepsDia.length === 0
         ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos neste dia.</p>
@@ -474,6 +475,7 @@ export function ColaboradorAgenda() {
   const [filtroMeu, setFiltroMeu]     = useState(false)
   const [eventoAberto, setAberto]     = useState(null)
   const [lmdAberto, setLmdAberto]     = useState(null)
+  const [prepAberta, setPrepAberta]   = useState(null)
   const [loading, setLoading]         = useState(true)
 
   const isPaisagem = () => typeof window !== 'undefined' && window.innerWidth > window.innerHeight
@@ -727,7 +729,7 @@ export function ColaboradorAgenda() {
           meusIds={meusIds} espacosIdx={espacosIdx}
           tecnicos={tecnicos} tecCorMap={tecCorMap} evTecIdx={evTecIdx}
           colaborador={colaborador}
-          onEventoClick={abrirEvento} onLmdClick={setLmdAberto} />
+          onEventoClick={abrirEvento} onLmdClick={setLmdAberto} onPrepClick={setPrepAberta} />
       )}
       {vista === 'dia' && (
         <VistaDia diaSeleccionado={diaSeleccionado}
@@ -735,7 +737,7 @@ export function ColaboradorAgenda() {
           meusIds={meusIds} espacosIdx={espacosIdx}
           tecnicos={tecnicos} tecCorMap={tecCorMap} evTecIdx={evTecIdx}
           colaborador={colaborador}
-          onEventoClick={abrirEvento} onLmdClick={setLmdAberto} />
+          onEventoClick={abrirEvento} onLmdClick={setLmdAberto} onPrepClick={setPrepAberta} />
       )}
 
       {eventoAberto && (
@@ -748,6 +750,43 @@ export function ColaboradorAgenda() {
       {lmdAberto && (
         <ModalLmd dataStr={lmdAberto} proxima={proximaAssin}
           registar={registarAssin} onFechar={() => setLmdAberto(null)} />
+      )}
+
+      {prepAberta && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setPrepAberta(null)} />
+          <div className="relative z-10 w-full max-w-sm bg-surface-1 border border-purple-500/20 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-5 pt-4 pb-3 border-b border-border/40 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
+                <Wrench size={16} className="text-purple-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-black text-accent text-[15px] truncate">{prepAberta.evento}</p>
+                <p className="text-[11px] text-purple-400/70 uppercase tracking-widest font-bold">Preparação</p>
+              </div>
+              <button onClick={() => setPrepAberta(null)}
+                className="w-8 h-8 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Data de preparação</p>
+                <p className="text-sm text-accent-muted">{cap(format(parseISO(prepAberta.data_preparacao), 'EEEE, d MMMM yyyy', { locale: pt }))}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Data do evento</p>
+                <p className="text-sm text-accent-muted">{cap(format(parseISO(prepAberta.data_evento), 'EEEE, d MMMM yyyy', { locale: pt }))}</p>
+              </div>
+              {prepAberta.notas_preparacao && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Notas</p>
+                  <p className="text-sm text-accent-muted leading-relaxed whitespace-pre-line">{prepAberta.notas_preparacao}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

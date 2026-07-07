@@ -347,8 +347,8 @@ export function ColaboradorDashboard() {
         {/* Preparação */}
         {proximaPreparacao && (
           <div onClick={() => setPrepAberta(proximaPreparacao)}
-            className="mt-3 rounded-2xl border border-blue-500/20 bg-blue-500/[0.05] p-4 cursor-pointer hover:border-blue-500/40 active:scale-[0.99] transition-all">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70 mb-2">
+            className="mt-3 rounded-2xl border border-purple-500/20 bg-purple-500/[0.07] p-4 cursor-pointer hover:border-purple-500/40 active:scale-[0.99] transition-all">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-purple-400/70 mb-2">
               Preparação
             </p>
             <p className="text-base font-bold text-accent leading-snug">{dataLonga(proximaPreparacao.data_preparacao)}</p>
