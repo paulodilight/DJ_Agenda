@@ -62,6 +62,121 @@ const hojeISO = () => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 }
 
+const ESTADOS_TAREFA = ['em curso', 'a validar', 'concluída']
+
+const ESTADO_COR = {
+  'concluída': 'bg-green-400/15 border-green-400/40 text-green-400',
+  'concluida': 'bg-green-400/15 border-green-400/40 text-green-400',
+  'em curso':  'bg-blue-400/15 border-blue-400/40 text-blue-400',
+  'a validar': 'bg-amber-400/15 border-amber-400/40 text-amber-400',
+  'a fazer':   'bg-surface-2 border-border text-accent-muted',
+}
+
+function ModalTarefa({ tarefa, onFechar, onGuardar }) {
+  const [estadoSel, setEstadoSel]   = useState(null)
+  const [aGuardar, setAGuardar]     = useState(false)
+
+  const confirmar = async () => {
+    if (!estadoSel || estadoSel === tarefa.estado) return
+    setAGuardar(true)
+    try {
+      await colaboradorApi.actualizarEstadoTarefa(tarefa.id, estadoSel)
+      onGuardar(tarefa.id, estadoSel)
+    } catch (e) {
+      alert('Não foi possível atualizar: ' + e.message)
+      setAGuardar(false)
+    }
+  }
+
+  const bloqueada = ['concluída', 'concluida'].includes(tarefa.estado)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onFechar}>
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface-1 shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}>
+        {/* Cabeçalho */}
+        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+          <ClipboardList size={14} className="text-accent-muted shrink-0" />
+          <span className="text-sm font-bold text-accent flex-1 truncate">{tarefa.tarefa}</span>
+          <button onClick={onFechar} className="text-accent-subtle hover:text-accent transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        {/* Corpo */}
+        <div className="px-5 py-4 flex flex-col gap-3">
+          {/* Estado actual */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2">Estado</p>
+            {!bloqueada ? (
+              <div className="flex flex-wrap gap-1.5">
+                {ESTADOS_TAREFA.map(s => {
+                  const isActual = s === tarefa.estado
+                  const isSel    = s === estadoSel
+                  return (
+                    <button key={s} onClick={() => setEstadoSel(isActual && !isSel ? null : s)}
+                      disabled={aGuardar}
+                      className={[
+                        'px-3 py-1 rounded-full text-[12px] font-semibold border transition-all capitalize disabled:opacity-40',
+                        isSel && !isActual
+                          ? 'ring-2 ring-offset-1 ring-offset-surface-1 ' + (ESTADO_COR[s] ?? 'bg-surface-2 border-border text-accent ring-white/30')
+                          : isActual
+                            ? (ESTADO_COR[s] ?? 'bg-surface-2 border-border text-accent-muted')
+                            : 'bg-surface-2 border-border/60 text-accent-subtle hover:text-accent hover:border-white/20',
+                      ].join(' ')}>
+                      {s}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border capitalize ${ESTADO_COR[tarefa.estado] ?? 'bg-surface-2 border-border text-accent-muted'}`}>
+                {tarefa.estado}
+              </span>
+            )}
+          </div>
+
+          {tarefa.data_conclusao && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Data limite</p>
+              <p className="text-sm text-accent-muted flex items-center gap-1.5">
+                <Clock size={12} className="shrink-0" />
+                {dataLonga(tarefa.data_conclusao)}{tarefa.hora ? ` · ${hhmm(tarefa.hora)}` : ''}
+              </p>
+            </div>
+          )}
+          {tarefa.tipo && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Tipo</p>
+              <p className="text-sm text-accent-muted">{tarefa.tipo}{tarefa.recorrencia ? ` · ${tarefa.recorrencia}` : ''}</p>
+            </div>
+          )}
+          {tarefa.criado_por && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Criado por</p>
+              <p className="text-sm text-accent-muted">{tarefa.criado_por}</p>
+            </div>
+          )}
+          {tarefa.notas_operacionais && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-1">Notas</p>
+              <p className="text-sm text-accent-muted leading-relaxed whitespace-pre-line">{tarefa.notas_operacionais}</p>
+            </div>
+          )}
+
+          {/* Botão confirmar */}
+          {estadoSel && estadoSel !== tarefa.estado && (
+            <button onClick={confirmar} disabled={aGuardar}
+              className="mt-1 w-full py-2.5 rounded-xl bg-accent/20 border border-accent/40 text-accent font-semibold text-sm hover:bg-accent/30 transition-colors disabled:opacity-50">
+              {aGuardar ? 'A guardar…' : `Confirmar → ${estadoSel}`}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CardNav({ to, Icone, rotulo }) {
   return (
     <Link to={to}
@@ -301,52 +416,14 @@ export function ColaboradorDashboard() {
 
       {/* Modal tarefa */}
       {tarefaAberta && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={() => setTarefaAberta(null)}>
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface-1 shadow-2xl overflow-hidden"
-            onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-              <ClipboardList size={14} className="text-accent-muted shrink-0" />
-              <span className="text-sm font-bold text-accent flex-1 truncate">{tarefaAberta.tarefa}</span>
-              <button onClick={() => setTarefaAberta(null)} className="text-accent-subtle hover:text-accent transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="px-5 py-4 flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle">Estado</span>
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border border-border bg-surface-2 text-accent-muted capitalize">{tarefaAberta.estado}</span>
-              </div>
-              {tarefaAberta.data_conclusao && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Data limite</p>
-                  <p className="text-sm text-accent-muted flex items-center gap-1.5">
-                    <Clock size={12} className="shrink-0" />
-                    {dataLonga(tarefaAberta.data_conclusao)}{tarefaAberta.hora ? ` · ${hhmm(tarefaAberta.hora)}` : ''}
-                  </p>
-                </div>
-              )}
-              {tarefaAberta.tipo && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Tipo</p>
-                  <p className="text-sm text-accent-muted">{tarefaAberta.tipo}{tarefaAberta.recorrencia ? ` · ${tarefaAberta.recorrencia}` : ''}</p>
-                </div>
-              )}
-              {tarefaAberta.criado_por && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Criado por</p>
-                  <p className="text-sm text-accent-muted">{tarefaAberta.criado_por}</p>
-                </div>
-              )}
-              {tarefaAberta.notas_operacionais && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-1">Notas</p>
-                  <p className="text-sm text-accent-muted leading-relaxed whitespace-pre-line">{tarefaAberta.notas_operacionais}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <ModalTarefa
+          tarefa={tarefaAberta}
+          onFechar={() => setTarefaAberta(null)}
+          onGuardar={(id, novoEstado) => {
+            setTarefas(prev => prev.map(t => t.id === id ? { ...t, estado: novoEstado } : t))
+            setTarefaAberta(null)
+          }}
+        />
       )}
 
       {/* Modal ocorrência */}
