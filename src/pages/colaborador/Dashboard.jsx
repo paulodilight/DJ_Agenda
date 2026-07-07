@@ -6,6 +6,7 @@ import { colaboradorApi } from '@/lib/colaboradorApi'
 import { supabase } from '@/lib/supabase'
 import { Avatar } from '@/components/colaborador/Avatar'
 import { EventoModal } from '@/components/colaborador/EventoModal'
+import { OcorrenciaDetalhe } from '@/components/ocorrencias/OcorrenciaDetalhe'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { hhmm, dataLonga } from '@/components/colaborador/format'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
@@ -201,8 +202,17 @@ export function ColaboradorDashboard() {
   const [aEnviarFoto, setAEnviarFoto]       = useState(false)
   const [eventoAberto, setEventoAberto]     = useState(null)
   const [tarefaAberta, setTarefaAberta]     = useState(null)
-  const [ocorrenciaAberta, setOcorrenciaAberta] = useState(null)
+  const [ocorrenciaAberta, setOcorrenciaAberta] = useState(null) // { oc, intervencoes }
+  const [prepAberta, setPrepAberta]             = useState(null)
   const fileRef = useRef(null)
+
+  const abrirOcorrencia = async (oc) => {
+    const [{ data: fullOc }, { data: ivs }] = await Promise.all([
+      supabase.from('ocorrencias').select('*, espacos(nome)').eq('id', oc.id).single(),
+      supabase.from('ocorrencias_intervencoes').select('*').eq('ocorrencia_id', oc.id).order('created_at', { ascending: true }),
+    ])
+    setOcorrenciaAberta({ oc: fullOc ?? oc, intervencoes: ivs ?? [] })
+  }
 
   useEffect(() => {
     if (!colaborador) return
@@ -212,7 +222,7 @@ export function ColaboradorDashboard() {
       colaboradorApi.eventosDoTecnico(colaborador.id),
       colaboradorApi.listarColaboradores(),
       colaboradorApi.tarefasDoColaborador(colaborador.nome),
-      supabase.from('ocorrencias').select('id, titulo, status, created_at, notas, prioridade, espacos(nome)')
+      supabase.from('ocorrencias').select('*, espacos(nome)')
         .in('status', ['aberta', 'em_processo'])
         .order('created_at', { ascending: true })
         .limit(1)
@@ -336,13 +346,14 @@ export function ColaboradorDashboard() {
 
         {/* Preparação */}
         {proximaPreparacao && (
-          <div className="mt-3 rounded-2xl border border-blue-500/20 bg-blue-500/[0.05] p-4">
+          <div onClick={() => setPrepAberta(proximaPreparacao)}
+            className="mt-3 rounded-2xl border border-blue-500/20 bg-blue-500/[0.05] p-4 cursor-pointer hover:border-blue-500/40 active:scale-[0.99] transition-all">
             <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70 mb-2">
               Preparação
             </p>
             <p className="text-base font-bold text-accent leading-snug">{dataLonga(proximaPreparacao.data_preparacao)}</p>
             {proximaPreparacao.notas_preparacao && (
-              <p className="text-sm text-accent-muted mt-1 leading-relaxed">{proximaPreparacao.notas_preparacao}</p>
+              <p className="text-sm text-accent-muted mt-1 leading-relaxed line-clamp-2">{proximaPreparacao.notas_preparacao}</p>
             )}
             <p className="text-[11px] text-accent-subtle/60 mt-2">→ {proximaPreparacao.evento}</p>
           </div>
@@ -371,7 +382,7 @@ export function ColaboradorDashboard() {
         {/* Ocorrência mais antiga em aberto */}
         <div
           className={ocorrencia ? 'mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4 cursor-pointer hover:border-white/20 active:scale-[0.99] transition-all' : 'mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4'}
-          onClick={ocorrencia ? () => setOcorrenciaAberta(ocorrencia) : undefined}
+          onClick={ocorrencia ? () => abrirOcorrencia(ocorrencia) : undefined}
         >
           <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2 flex items-center gap-1.5">
             <AlertTriangle size={11} />
@@ -426,53 +437,51 @@ export function ColaboradorDashboard() {
         />
       )}
 
-      {/* Modal ocorrência */}
+      {/* Modal ocorrência — usa OcorrenciaDetalhe igual à aba Ocorrências */}
       {ocorrenciaAberta && (
+        <OcorrenciaDetalhe
+          ocorrencia={ocorrenciaAberta.oc}
+          intervencoes={ocorrenciaAberta.intervencoes}
+          nomeUtilizador={colaborador?.nome}
+          podeEditar={false}
+          onFechar={() => setOcorrenciaAberta(null)}
+          onAtualizar={() => abrirOcorrencia(ocorrenciaAberta.oc)}
+        />
+      )}
+
+      {/* Modal preparação */}
+      {prepAberta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={() => setOcorrenciaAberta(null)}>
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface-1 shadow-2xl overflow-hidden"
+          onClick={() => setPrepAberta(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-blue-500/30 bg-surface-1 shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-amber-500/20 bg-amber-500/[0.05] flex items-center gap-2">
-              <AlertTriangle size={14} className="text-amber-400 shrink-0" />
-              <span className="text-sm font-bold text-accent flex-1 truncate">{ocorrenciaAberta.titulo}</span>
-              <button onClick={() => setOcorrenciaAberta(null)} className="text-accent-subtle hover:text-accent transition-colors">
+            <div className="px-5 py-4 border-b border-blue-500/20 bg-blue-500/[0.06] flex items-center gap-2">
+              <Wrench size={14} className="text-blue-400 shrink-0" />
+              <span className="text-sm font-bold text-blue-300 flex-1">Preparação</span>
+              <button onClick={() => setPrepAberta(null)} className="text-accent-subtle hover:text-accent transition-colors">
                 <X size={16} />
               </button>
             </div>
             <div className="px-5 py-4 flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle">Estado</span>
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border capitalize ${
-                  ocorrenciaAberta.status === 'aberta' ? 'bg-red-400/10 border-red-400/30 text-red-400' :
-                  ocorrenciaAberta.status === 'em_processo' ? 'bg-amber-400/10 border-amber-400/30 text-amber-400' :
-                  'bg-green-400/10 border-green-400/30 text-green-400'
-                }`}>{ocorrenciaAberta.status?.replace('_', ' ')}</span>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Evento</p>
+                <p className="text-sm font-semibold text-accent">{prepAberta.evento}</p>
               </div>
-              {ocorrenciaAberta.espacos?.nome && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Local</p>
-                  <p className="text-sm text-accent-muted">{ocorrenciaAberta.espacos.nome}</p>
-                </div>
-              )}
-              {ocorrenciaAberta.prioridade && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Prioridade</p>
-                  <p className="text-sm text-accent-muted capitalize">{ocorrenciaAberta.prioridade}</p>
-                </div>
-              )}
-              {ocorrenciaAberta.created_at && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Reportada em</p>
-                  <p className="text-sm text-accent-muted">
-                    {new Date(ocorrenciaAberta.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}
-                  </p>
-                </div>
-              )}
-              {ocorrenciaAberta.notas && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Data de preparação</p>
+                <p className="text-sm text-accent-muted">{dataLonga(prepAberta.data_preparacao)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-0.5">Data do evento</p>
+                <p className="text-sm text-accent-muted">{dataLonga(prepAberta.data_evento)}</p>
+              </div>
+              {prepAberta.notas_preparacao ? (
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-1">Notas</p>
-                  <p className="text-sm text-accent-muted leading-relaxed whitespace-pre-line">{ocorrenciaAberta.notas}</p>
+                  <p className="text-sm text-accent-muted leading-relaxed whitespace-pre-line">{prepAberta.notas_preparacao}</p>
                 </div>
+              ) : (
+                <p className="text-xs text-accent-subtle/50 italic">Sem notas de preparação.</p>
               )}
             </div>
           </div>
