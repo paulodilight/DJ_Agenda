@@ -86,8 +86,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   // ── Assinatura de início/fim de evento ──
   const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading, feitas: feitasAssin } = useAssinaturaDia(colaborador?.id ?? null, evento.id)
   const [assinandoEvento, setAssinandoEvento] = useState(false)
-  const mostrarInicioEvento = !assinLoading && proximaAssin?.tipo === 'evento_entrada' && proximaAssin?.eventoId === evento.id
-  const mostrarFimEvento   = !assinLoading && proximaAssin?.tipo === 'evento_saida'   && proximaAssin?.eventoId === evento.id
+  const mostrarInEvento = !assinLoading && proximaAssin?.tipo === 'in_evento' && proximaAssin?.eventoId === evento.id
 
   const assinarEvento = async (tipo) => {
     setAssinandoEvento(true)
@@ -471,26 +470,21 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
         {/* Rodapé — assinatura de início de evento + presença + fechar */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 shrink-0">
           <div className="flex flex-col gap-1.5 items-start">
-            {/* Botões de assinatura de evento */}
-            {(mostrarInicioEvento || mostrarFimEvento) && (
-              <div className="flex items-center gap-2">
-                {mostrarInicioEvento && (
-                  <button onClick={() => assinarEvento('evento_entrada')} disabled={assinandoEvento}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-green-400/30 bg-green-400/[0.07] text-green-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
-                    <PenLine size={13} />
-                    {assinandoEvento ? 'A registar…' : 'Início de Evento'}
-                  </button>
-                )}
-                {mostrarFimEvento && (
-                  <button onClick={() => assinarEvento('evento_saida')} disabled={assinandoEvento}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-400/30 bg-red-400/[0.07] text-red-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
-                    <PenLine size={13} />
-                    {assinandoEvento ? 'A registar…' : 'Fim de Evento'}
-                  </button>
-                )}
-              </div>
+            {/* Botão In Evento */}
+            {mostrarInEvento && (
+              <button onClick={() => assinarEvento('in_evento')} disabled={assinandoEvento}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-green-400/30 bg-green-400/[0.07] text-green-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
+                <PenLine size={13} />
+                {assinandoEvento ? 'A registar…' : 'In Evento'}
+              </button>
             )}
-            {/* Badges de estado: Presente e Terminado na mesma linha */}
+            {/* Badge In Evento já feito */}
+            {!mostrarInEvento && feitasAssin.some(f => f.tipo === 'in_evento') && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-400">
+                <Check size={13} /> In Evento · {new Date(feitasAssin.find(f => f.tipo === 'in_evento').registado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            {/* Presença GPS */}
             <div className="flex items-center gap-3 flex-wrap">
               {isResponsavel && pres.status === 'signed' && pres.presenca ? (
                 <span
@@ -526,11 +520,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               ) : isResponsavel ? (
                 <span className="text-accent-subtle/60 text-xs">Disponível {TOLERANCIA_MIN} min antes do início</span>
               ) : null}
-              {!mostrarInicioEvento && !mostrarFimEvento && feitasAssin.some(f => f.tipo === 'evento_saida') && (
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-status-confirmado">
-                  <Check size={16} /> Terminado · {new Date(feitasAssin.find(f => f.tipo === 'evento_saida').registado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
             </div>
           </div>
           <button onClick={onFechar}

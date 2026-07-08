@@ -12,9 +12,8 @@ import { hhmm, dataLonga } from '@/components/colaborador/format'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 
 const LABELS_ASSIN = {
-  lmd_entrada:   { label: 'Entrada LMD',    cor: 'text-indigo-400 border-indigo-400/30 bg-indigo-400/[0.07]' },
-  evento_saida:  { label: 'Fim de Evento',  cor: 'text-red-400   border-red-400/30   bg-red-400/[0.07]'   },
-  lmd_saida:     { label: 'Saída LMD',      cor: 'text-red-400   border-red-400/30   bg-red-400/[0.07]'   },
+  in_work:  { label: 'In Work',  cor: 'text-green-400  border-green-400/30  bg-green-400/[0.07]'  },
+  out_work: { label: 'Out Work', cor: 'text-red-400    border-red-400/30    bg-red-400/[0.07]'    },
 }
 
 function BotaoAssinatura({ proxima, registar }) {

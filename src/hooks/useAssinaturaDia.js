@@ -1,17 +1,16 @@
 /**
  * Determina qual a próxima assinatura do técnico para hoje.
  *
- * Fluxos:
- *  LMD → Evento → LMD : lmd_entrada → evento_entrada → evento_saida → lmd_saida
- *  Só LMD             : lmd_entrada → lmd_saida
- *  Direto a evento    : evento_entrada → evento_saida
+ * Tipos: in_work · in_evento · out_work
  *
- * temLmd = técnico tem agendamento LMD hoje (espaco_id=LMD) OU é tipo 'fixo' e não tem folga
+ * Fluxo:
+ *  Evento normal  : in_work → in_evento → out_work
+ *  Evento LMD     : in_work → out_work  (sem in_evento)
+ *  Só LMD/fixo    : in_work → out_work
  */
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
-/** Obtém posição GPS. Se recusar/falhar, resolve com nulls (assinatura grava na mesma). */
 function obterPosicao() {
   return new Promise((resolve) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -47,54 +46,44 @@ export function useAssinaturaDia(tecnicoId, eventoIdFixo = null) {
     try {
       const hoje = hojeISO()
 
-      // 1. Tem LMD hoje? — agendamento explícito com espaco_id LMD
-      const { data: agendLmd } = await supabase
-        .from('agendamentos_tecnicos')
-        .select('id')
-        .eq('tecnico_id', tecnicoId)
-        .eq('espaco_id', LMD_ESPACO_ID)
-        .eq('data', hoje)
-        .maybeSingle()
+      // 1. Eventos de hoje deste técnico
+      const [{ data: evDireto }, { data: evIds }] = await Promise.all([
+        supabase.from('supa_eventos')
+          .select('id, espaco_id')
+          .eq('tecnico_id', tecnicoId)
+          .eq('data_evento', hoje)
+          .neq('status', 'cancelado'),
+        supabase.from('evento_tecnicos').select('evento_id').eq('tecnico_id', tecnicoId),
+      ])
 
-      // Fallback: técnico é fixo e não tem folga hoje
-      let temLmd = !!agendLmd
-      let agendamentoId = agendLmd?.id ?? null
+      let evExtra = []
+      const ids = (evIds ?? []).map(r => r.evento_id)
+      if (ids.length > 0) {
+        const { data: evHoje } = await supabase
+          .from('supa_eventos').select('id, espaco_id')
+          .in('id', ids).eq('data_evento', hoje).neq('status', 'cancelado')
+        evExtra = evHoje ?? []
+      }
 
-      if (!temLmd) {
+      const todos = [...(evDireto ?? []), ...evExtra]
+        .filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i)
+
+      const eventosExterno = todos.filter(e => e.espaco_id !== LMD_ESPACO_ID)
+      const mainEventoId   = todos[0]?.id ?? null
+
+      // Determina se deve mostrar assinaturas hoje:
+      // tem eventos OU é técnico fixo sem folga
+      let temTrabalho = todos.length > 0
+      if (!temTrabalho) {
         const [{ data: tec }, { data: folga }] = await Promise.all([
           supabase.from('vw_colaboradores').select('tipo').eq('id', tecnicoId).maybeSingle(),
           supabase.from('agendamentos_tecnicos').select('id')
             .eq('tecnico_id', tecnicoId).eq('data', hoje).eq('folga', true).maybeSingle(),
         ])
-        temLmd = tec?.tipo === 'fixo' && !folga
+        temTrabalho = tec?.tipo === 'fixo' && !folga
       }
 
-      // 2. Tem evento hoje?
-      const { data: evResp } = await supabase
-        .from('supa_eventos')
-        .select('id')
-        .eq('tecnico_id', tecnicoId)
-        .eq('data_evento', hoje)
-        .neq('status', 'cancelado')
-        .limit(1)
-
-      let eventoId = evResp?.[0]?.id ?? null
-
-      if (!eventoId) {
-        const { data: evIds } = await supabase
-          .from('evento_tecnicos').select('evento_id').eq('tecnico_id', tecnicoId)
-        const ids = (evIds ?? []).map(r => r.evento_id)
-        if (ids.length > 0) {
-          const { data: evHoje } = await supabase
-            .from('supa_eventos').select('id').in('id', ids)
-            .eq('data_evento', hoje).neq('status', 'cancelado').limit(1)
-          eventoId = evHoje?.[0]?.id ?? null
-        }
-      }
-
-      const temEvento = !!eventoId
-
-      // 3. Assinaturas já feitas hoje
+      // 2. Assinaturas já feitas hoje
       const { data: assin } = await supabase
         .from('assinaturas_tecnico')
         .select('tipo, evento_id, registado_em')
@@ -102,28 +91,31 @@ export function useAssinaturaDia(tecnicoId, eventoIdFixo = null) {
         .gte('registado_em', inicioHoje())
         .lte('registado_em', fimHoje())
 
-      // LMD: olha para todos os tipos do dia
-      const tiposGeral  = new Set((assin ?? []).map(a => a.tipo))
-      // Evento: olha apenas para assinaturas do evento de hoje
-      const assinEvento = (assin ?? []).filter(a => a.evento_id === eventoId)
-      const tiposEvento = new Set(assinEvento.map(a => a.tipo))
-
-      // feitas: se foi passado eventoIdFixo (ex: EventoModal), filtra a esse evento específico
+      // feitas: para EventoModal (eventoIdFixo passado) → in_evento desse evento
       const assinFeitas = eventoIdFixo
-        ? (assin ?? []).filter(a => a.evento_id === eventoIdFixo)
-        : assinEvento
+        ? (assin ?? []).filter(a => a.evento_id === eventoIdFixo && a.tipo === 'in_evento')
+        : []
       setFeitas(assinFeitas.map(a => ({ tipo: a.tipo, registado_em: a.registado_em })))
 
-      // 4. Próxima acção
+      if (!temTrabalho) { setProxima(null); return }
+
+      const tiposGeral = new Set((assin ?? []).map(a => a.tipo))
+
+      // Eventos externos sem in_evento ainda
+      const semInEvento = eventosExterno.filter(e =>
+        !(assin ?? []).some(a => a.tipo === 'in_evento' && a.evento_id === e.id)
+      )
+      const todoInEventoFeito = eventosExterno.length === 0
+        || eventosExterno.every(e => (assin ?? []).some(a => a.tipo === 'in_evento' && a.evento_id === e.id))
+
+      // 3. Próxima acção
       let proxima = null
-      if (temLmd && !tiposGeral.has('lmd_entrada')) {
-        proxima = { tipo: 'lmd_entrada', agendamentoId }
-      } else if (temEvento && !tiposEvento.has('evento_entrada')) {
-        proxima = { tipo: 'evento_entrada', eventoId }
-      } else if (temEvento && tiposEvento.has('evento_entrada') && !tiposEvento.has('evento_saida')) {
-        proxima = { tipo: 'evento_saida', eventoId }
-      } else if (temLmd && tiposGeral.has('lmd_entrada') && !tiposGeral.has('lmd_saida')) {
-        proxima = { tipo: 'lmd_saida', agendamentoId }
+      if (!tiposGeral.has('in_work')) {
+        proxima = { tipo: 'in_work', eventoId: mainEventoId }
+      } else if (semInEvento.length > 0) {
+        proxima = { tipo: 'in_evento', eventoId: semInEvento[0].id }
+      } else if (!tiposGeral.has('out_work') && todoInEventoFeito) {
+        proxima = { tipo: 'out_work', eventoId: mainEventoId }
       }
 
       setProxima(proxima)

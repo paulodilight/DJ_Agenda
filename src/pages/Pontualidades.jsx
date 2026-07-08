@@ -111,51 +111,55 @@ function TabTecnicos() {
     Promise.all([
       supabase.from('assinaturas_tecnico')
         .select('tecnico_id, evento_id, tipo, registado_em, latitude, longitude')
-        .in('tipo', ['evento_entrada', 'evento_saida']),
+        .in('tipo', ['in_work', 'in_evento', 'out_work']),
       supabase.from('vw_colaboradores').select('id, nome'),
     ]).then(async ([{ data: assin }, { data: colab }]) => {
       const nomes = Object.fromEntries((colab ?? []).map(c => [c.id, c.nome]))
+
+      // Agrupa por DIA + TÉCNICO
       const mapa = {}
       ;(assin ?? []).forEach(r => {
-        const key = `${r.evento_id}_${r.tecnico_id}`
-        if (!mapa[key]) mapa[key] = { tecnicoId: r.tecnico_id, eventoId: r.evento_id, entrada: null, saida: null }
-        if (r.tipo === 'evento_entrada') mapa[key].entrada = r
-        else mapa[key].saida = r
+        const dia = r.registado_em?.slice(0, 10) ?? ''
+        const key = `${dia}_${r.tecnico_id}`
+        if (!mapa[key]) mapa[key] = { tecnicoId: r.tecnico_id, dia, inWork: null, inEvento: null, outWork: null }
+        if (r.tipo === 'in_work'   && !mapa[key].inWork)   mapa[key].inWork   = r
+        if (r.tipo === 'in_evento' && !mapa[key].inEvento) mapa[key].inEvento = r
+        if (r.tipo === 'out_work'  && !mapa[key].outWork)  mapa[key].outWork  = r
       })
 
-      const eventoIds = [...new Set(Object.values(mapa).map(m => m.eventoId).filter(Boolean))]
+      // Enrich com nome do evento (via in_evento)
+      const eventoIds = [...new Set(
+        Object.values(mapa).map(m => m.inEvento?.evento_id).filter(Boolean)
+      )]
       let eventos = {}
       if (eventoIds.length > 0) {
         const { data: evs } = await supabase.from('supa_eventos')
-          .select('id, evento, data_evento, hora_inicio').in('id', eventoIds)
+          .select('id, evento').in('id', eventoIds)
         ;(evs ?? []).forEach(e => { eventos[e.id] = e })
       }
 
       setTodas(Object.values(mapa).map(m => ({
         ...m,
         nome: nomes[m.tecnicoId] ?? '—',
-        evento: eventos[m.eventoId] ?? null,
+        eventoNome: eventos[m.inEvento?.evento_id]?.evento ?? null,
       })))
       setLoading(false)
     })
   }, [])
 
-  const dataLinha = (l) =>
-    l.evento?.data_evento ?? l.entrada?.registado_em?.slice(0,10) ?? l.saida?.registado_em?.slice(0,10)
-
   const nomes  = useMemo(() => [...new Set(todas.map(l => l.nome).filter(n => n !== '—'))].sort(), [todas])
   const meses  = useMemo(() => {
-    const set = new Set(todas.map(l => anoMesDeStr(dataLinha(l))).filter(Boolean))
+    const set = new Set(todas.map(l => anoMesDeStr(l.dia)).filter(Boolean))
     return [...set].sort().reverse()
   }, [todas])
 
   const linhas = useMemo(() => {
     let r = todas
     if (nomeSel) r = r.filter(l => l.nome === nomeSel)
-    if (mesSel)  r = r.filter(l => anoMesDeStr(dataLinha(l)) === mesSel)
+    if (mesSel)  r = r.filter(l => anoMesDeStr(l.dia) === mesSel)
     return r.sort((a, b) => {
-      const ta = a.entrada?.registado_em ?? a.saida?.registado_em ?? ''
-      const tb = b.entrada?.registado_em ?? b.saida?.registado_em ?? ''
+      const ta = a.inWork?.registado_em ?? a.dia ?? ''
+      const tb = b.inWork?.registado_em ?? b.dia ?? ''
       return ordem === 'desc' ? tb.localeCompare(ta) : ta.localeCompare(tb)
     })
   }, [todas, nomeSel, mesSel, ordem])
@@ -171,24 +175,26 @@ function TabTecnicos() {
       {linhas.length === 0
         ? <p className="text-accent-subtle/40 text-sm py-10 text-center italic">Sem registos.</p>
         : (
-          <Tabela cols={['Dia', 'Técnico', 'Evento', 'Entrada', 'Saída', 'Geolocalização']}>
-            {linhas.map((l, i) => {
-              const geo = l.entrada ?? l.saida
-              return (
-                <Linha key={i} cells={[
-                  fmtData(dataLinha(l)),
-                  <span className="font-semibold text-accent">{l.nome}</span>,
-                  l.evento?.evento ?? <span className="text-accent-subtle/40 italic">evento apagado</span>,
-                  <span className={clsx('font-mono', l.entrada ? 'text-green-400' : 'text-accent-subtle/40')}>
-                    {l.entrada ? fmt(l.entrada.registado_em) : '—'}
-                  </span>,
-                  <span className={clsx('font-mono', l.saida ? 'text-red-400' : 'text-accent-subtle/40')}>
-                    {l.saida ? fmt(l.saida.registado_em) : '—'}
-                  </span>,
-                  <GeoLink lat={geo?.latitude} lon={geo?.longitude} />,
-                ]} />
-              )
-            })}
+          <Tabela cols={['Dia', 'Técnico', 'Evento', 'In Work', 'In Evento', 'Out Work', 'Geo']}>
+            {linhas.map((l, i) => (
+              <Linha key={i} cells={[
+                fmtData(l.dia),
+                <span className="font-semibold text-accent">{l.nome}</span>,
+                l.eventoNome
+                  ? <span className="text-accent-muted">{l.eventoNome}</span>
+                  : <span className="text-accent-subtle/40 italic">—</span>,
+                <span className={clsx('font-mono', l.inWork ? 'text-green-400' : 'text-accent-subtle/40')}>
+                  {l.inWork ? fmt(l.inWork.registado_em) : '—'}
+                </span>,
+                <span className={clsx('font-mono', l.inEvento ? 'text-amber-400' : 'text-accent-subtle/40')}>
+                  {l.inEvento ? fmt(l.inEvento.registado_em) : '—'}
+                </span>,
+                <span className={clsx('font-mono', l.outWork ? 'text-red-400' : 'text-accent-subtle/40')}>
+                  {l.outWork ? fmt(l.outWork.registado_em) : '—'}
+                </span>,
+                <GeoLink lat={l.inWork?.latitude} lon={l.inWork?.longitude} />,
+              ]} />
+            ))}
           </Tabela>
         )
       }
