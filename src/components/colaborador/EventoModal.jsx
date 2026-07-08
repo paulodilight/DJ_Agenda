@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2 } from 'lucide-react'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
@@ -70,6 +70,9 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [eventoChecks,  setEventoChecks]  = useState(new Set())
   const [clSubmetidas,  setClSubmetidas]  = useState(new Set()) // Set de checklist_id já guardados
   const [clGuardando,   setClGuardando]   = useState(new Set()) // Set de checklist_id a guardar agora
+  const [equipItems,    setEquipItems]    = useState([])
+  const [equipInput,    setEquipInput]    = useState('')
+  const [equipAdding,   setEquipAdding]   = useState(false)
 
   // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
@@ -173,6 +176,40 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
         .eq('evento_id', evento.id).eq('checklist_item_id', itemId).eq('tecnico_id', colaborador.id)
       if (error) console.error('checklist_checks delete error:', error)
     }
+  }
+
+  useEffect(() => {
+    if (!evento?.id) return
+    let activo = true
+    supabase.from('evento_equip_items')
+      .select('id, texto, feito, criado_por, criado_em')
+      .eq('evento_id', evento.id)
+      .order('criado_em', { ascending: true })
+      .then(({ data }) => { if (activo) setEquipItems(data ?? []) })
+    return () => { activo = false }
+  }, [evento?.id])
+
+  const adicionarEquip = async () => {
+    const texto = equipInput.trim()
+    if (!texto || !colaborador?.id || equipAdding) return
+    setEquipAdding(true)
+    const { data, error } = await supabase.from('evento_equip_items').insert({
+      evento_id: evento.id, criado_por: colaborador.id, texto,
+    }).select('id, texto, feito, criado_por, criado_em').single()
+    if (!error && data) { setEquipItems(prev => [...prev, data]); setEquipInput('') }
+    setEquipAdding(false)
+  }
+
+  const removerEquip = async (id) => {
+    await supabase.from('evento_equip_items').delete().eq('id', id)
+    setEquipItems(prev => prev.filter(e => e.id !== id))
+  }
+
+  const toggleEquip = async (id, feito) => {
+    setEquipItems(prev => prev.map(e => e.id === id ? { ...e, feito: !feito } : e))
+    await supabase.from('evento_equip_items')
+      .update({ feito: !feito, feito_por: colaborador?.id ?? null })
+      .eq('id', id)
   }
 
   const guardarChecklist = async (checklistId) => {
@@ -405,6 +442,64 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   </div>
                 )
               })}
+              {/* Equipamentos do responsável */}
+              <div className="border border-white/10 rounded-xl overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
+                  <Boxes size={12} className="text-amber-400 shrink-0" />
+                  <p className="font-semibold flex-1 text-amber-400" style={{ fontSize: 12 }}>Equipamentos</p>
+                </div>
+                <div className="flex flex-col">
+                  {equipItems.map(item => (
+                    <div key={item.id}
+                      className={clsx(
+                        'flex items-center gap-3 px-3 py-2.5 border-b border-white/5 last:border-0 transition-colors',
+                        item.feito ? 'bg-green-500/10' : ''
+                      )}>
+                      <button
+                        onClick={() => isAtribuido && toggleEquip(item.id, item.feito)}
+                        disabled={!isAtribuido}
+                        className={clsx(
+                          'w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors',
+                          item.feito ? 'bg-green-500/30 border-green-500/60' : 'border-white/20',
+                          !isAtribuido && 'cursor-default'
+                        )}>
+                        {item.feito && <Check size={12} className="text-green-400" />}
+                      </button>
+                      <span className={clsx('flex-1', item.feito ? 'line-through opacity-50' : 'opacity-80')} style={{ fontSize: 13 }}>
+                        {item.texto}
+                      </span>
+                      {isResponsavel && (
+                        <button onClick={() => removerEquip(item.id)}
+                          className="text-accent-subtle/40 hover:text-red-400 transition-colors p-0.5 shrink-0">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {equipItems.length === 0 && (
+                    <p className="px-3 py-2.5 italic opacity-30" style={{ fontSize: 12 }}>Sem equipamentos adicionados.</p>
+                  )}
+                  {isResponsavel && (
+                    <div className="flex items-center gap-2 px-3 py-2 border-t border-white/5">
+                      <input
+                        value={equipInput}
+                        onChange={e => setEquipInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && adicionarEquip()}
+                        placeholder="Adicionar equipamento…"
+                        className="flex-1 bg-transparent text-accent placeholder:text-accent-subtle/40 focus:outline-none"
+                        style={{ fontSize: 13 }}
+                      />
+                      <button
+                        onClick={adicionarEquip}
+                        disabled={equipAdding || !equipInput.trim()}
+                        className="text-amber-400 hover:text-amber-300 disabled:opacity-30 transition-colors shrink-0">
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {!isAtribuido && eventoListas.length > 0 && (
                 <p className="text-center opacity-40 italic" style={{ fontSize: 12 }}>Só técnicos atribuídos podem marcar itens.</p>
               )}
@@ -412,6 +507,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
           ) : (
             <div className="flex flex-col gap-4 py-2">
+              {evento.notas_preparacao && (
+                <div className="rounded-xl border border-purple-500/20 bg-purple-500/[0.06] px-3 py-3">
+                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-purple-400/70 mb-2" style={{ fontSize: 10 }}>
+                    <StickyNote size={12} /> Notas de preparação
+                  </p>
+                  <p className="text-accent-muted whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
+                    {evento.notas_preparacao}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
                   <StickyNote size={12} /> Notas do evento
