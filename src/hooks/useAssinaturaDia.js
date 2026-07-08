@@ -26,6 +26,7 @@ function obterPosicao() {
 }
 
 const LMD_ESPACO_ID = '299fc621-afe2-42c9-ba87-5c7080f2a32d'
+const TIPOS_VALIDOS = ['in_work', 'in_evento', 'out_work']
 
 const hojeISO = () => {
   const d = new Date()
@@ -35,10 +36,11 @@ const inicioHoje = () => `${hojeISO()}T00:00:00.000Z`
 const fimHoje   = () => `${hojeISO()}T23:59:59.999Z`
 
 export function useAssinaturaDia(tecnicoId, eventoIdFixo = null) {
-  const [proxima, setProxima] = useState(null)
-  const [feitas,  setFeitas]  = useState([])
-  const [loading, setLoading] = useState(true)
-  const [versao,  setVersao]  = useState(0)
+  const [proxima,     setProxima]     = useState(null)
+  const [feitas,      setFeitas]      = useState([])
+  const [tiposFeitos, setTiposFeitos] = useState([]) // in_work / out_work já assinados hoje
+  const [loading,     setLoading]     = useState(true)
+  const [versao,      setVersao]      = useState(0)
 
   const calcular = useCallback(async () => {
     if (!tecnicoId) { setLoading(false); return }
@@ -83,11 +85,12 @@ export function useAssinaturaDia(tecnicoId, eventoIdFixo = null) {
         temTrabalho = tec?.tipo === 'fixo' && !folga
       }
 
-      // 2. Assinaturas já feitas hoje
+      // 2. Assinaturas já feitas hoje — só tipos válidos do novo sistema
       const { data: assin } = await supabase
         .from('assinaturas_tecnico')
         .select('tipo, evento_id, registado_em')
         .eq('tecnico_id', tecnicoId)
+        .in('tipo', TIPOS_VALIDOS)
         .gte('registado_em', inicioHoje())
         .lte('registado_em', fimHoje())
 
@@ -96,6 +99,10 @@ export function useAssinaturaDia(tecnicoId, eventoIdFixo = null) {
         ? (assin ?? []).filter(a => a.evento_id === eventoIdFixo && a.tipo === 'in_evento')
         : []
       setFeitas(assinFeitas.map(a => ({ tipo: a.tipo, registado_em: a.registado_em })))
+
+      // tiposFeitos: in_work / out_work já assinados hoje (para badges no Dashboard)
+      const feitos = (assin ?? []).filter(a => a.tipo === 'in_work' || a.tipo === 'out_work')
+      setTiposFeitos(feitos.map(a => ({ tipo: a.tipo, registado_em: a.registado_em })))
 
       if (!temTrabalho) { setProxima(null); return }
 
@@ -138,5 +145,5 @@ export function useAssinaturaDia(tecnicoId, eventoIdFixo = null) {
     setVersao(v => v + 1)
   }, [tecnicoId])
 
-  return { proxima, registar, loading, feitas }
+  return { proxima, registar, loading, feitas, tiposFeitos }
 }

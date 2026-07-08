@@ -16,33 +16,41 @@ const LABELS_ASSIN = {
   out_work: { label: 'Out Work', cor: 'text-red-400    border-red-400/30    bg-red-400/[0.07]'    },
 }
 
-function BotaoAssinatura({ proxima, registar }) {
-  const [loading, setLoading]     = useState(false)
-  const [registados, setRegistados] = useState([]) // [{tipo, hora}]
+function BotaoAssinatura({ proxima, registar, tiposFeitos = [] }) {
+  const [loading, setLoading] = useState(false)
 
-  if (!proxima && registados.length === 0) return null
+  // Badges: tipos já assinados hoje (vêm do DB via hook)
+  const badges = tiposFeitos
+    .filter(tf => LABELS_ASSIN[tf.tipo])
+    .map(tf => ({
+      tipo: tf.tipo,
+      hora: new Date(tf.registado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
+    }))
+
+  // Só mostrar botão se o próximo tipo ainda não está assinado hoje
+  const jaFeito     = proxima && badges.some(b => b.tipo === proxima.tipo)
+  const podeAssinar = proxima && LABELS_ASSIN[proxima.tipo] && !jaFeito
+
+  if (!podeAssinar && badges.length === 0) return null
 
   const onClick = async (e) => {
     e.stopPropagation()
-    if (!proxima || !LABELS_ASSIN[proxima.tipo]) return
+    if (!podeAssinar || loading) return
     setLoading(true)
     await registar(proxima.tipo, { eventoId: proxima.eventoId, agendamentoId: proxima.agendamentoId })
-    const agora = new Date()
-    const hora  = `${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
-    setRegistados(prev => [...prev, { tipo: proxima.tipo, hora }])
     setLoading(false)
+    // badges actualizados automaticamente pelo hook (versao incrementa após registar)
   }
 
-  const podeAssinar = proxima && LABELS_ASSIN[proxima.tipo]
-
   return (
-    <div className="mt-3 flex flex-col gap-1.5 items-end">
-      {registados.map(({ tipo, hora }) => {
+    <div className="mt-3 border-t border-white/5 pt-3 flex flex-col gap-1.5 items-end">
+      <p className="text-[10px] uppercase tracking-wider text-accent-subtle/50 w-full">Assinatura de hoje</p>
+      {badges.map(({ tipo, hora }) => {
         const cfg = LABELS_ASSIN[tipo]
         return (
-          <span key={tipo} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${cfg?.cor ?? ''}`}>
+          <span key={tipo} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${cfg.cor}`}>
             <PenLine size={11} />
-            {cfg?.label} · {hora}
+            {cfg.label} · {hora}
           </span>
         )
       })}
@@ -192,7 +200,7 @@ function CardNav({ to, Icone, rotulo }) {
 
 export function ColaboradorDashboard() {
   const { colaborador, actualizarFoto } = useColaboradorStore()
-  const { proxima: proximaAssin, registar: registarAssin } = useAssinaturaDia(colaborador?.id ?? null)
+  const { proxima: proximaAssin, registar: registarAssin, tiposFeitos } = useAssinaturaDia(colaborador?.id ?? null)
   const [loading, setLoading]           = useState(true)
   const [eventos, setEventos]           = useState([])
   const [mapaTecnicos, setMapaTecnicos] = useState({})
@@ -333,13 +341,13 @@ export function ColaboradorDashboard() {
                 </span>
               </div>
             </button>
-            <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} />
+            <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} tiposFeitos={tiposFeitos} />
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 p-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2">Próximo evento</p>
             <p className="text-sm text-accent-subtle">Sem eventos agendados de momento.</p>
-            <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} />
+            <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} tiposFeitos={tiposFeitos} />
           </div>
         )}
 
