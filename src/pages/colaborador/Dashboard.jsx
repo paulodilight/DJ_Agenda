@@ -43,7 +43,7 @@ function BotaoAssinatura({ proxima, registar, tiposFeitos = [] }) {
   }
 
   return (
-    <div className="mt-3 border-t border-white/5 pt-3 flex flex-col gap-1.5 items-end">
+    <div className="flex flex-col gap-1.5 items-end">
       <p className="text-[10px] uppercase tracking-wider text-accent-subtle/50 w-full">Assinatura de hoje</p>
       {badges.map(({ tipo, hora }) => {
         const cfg = LABELS_ASSIN[tipo]
@@ -318,8 +318,15 @@ export function ColaboradorDashboard() {
           Olá, {colaborador?.nome}!
         </p>
 
-        {proximoEvento ? (
+        {/* Assinatura de hoje — separada do próximo evento */}
+        {(proximaAssin || tiposFeitos.length > 0) && (
           <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 p-4">
+            <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} tiposFeitos={tiposFeitos} />
+          </div>
+        )}
+
+        {proximoEvento ? (
+          <div className="mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4">
             <button onClick={() => setEventoAberto(proximoEvento)}
               className="w-full text-left hover:opacity-80 active:scale-[0.99] transition-all group">
               <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-2 group-hover:text-amber-400 transition-colors">
@@ -341,13 +348,11 @@ export function ColaboradorDashboard() {
                 </span>
               </div>
             </button>
-            <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} tiposFeitos={tiposFeitos} />
           </div>
         ) : (
-          <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 p-4">
+          <div className="mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2">Próximo evento</p>
             <p className="text-sm text-accent-subtle">Sem eventos agendados de momento.</p>
-            <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} tiposFeitos={tiposFeitos} />
           </div>
         )}
 
