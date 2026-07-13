@@ -1240,6 +1240,44 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
           {abaActiva === 'execucao' && (
             <div className="flex flex-col gap-5">
 
+              {/* Assinaturas / Fases */}
+              <div className="flex flex-col gap-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
+                  Assinaturas / Fases <span className="font-normal normal-case tracking-normal text-accent-subtle/40">recolhidas in-loco via Apoio T</span>
+                </p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { label: 'Saída LMD',             key: 'assinatura_lmd_at' },
+                    { label: 'IN — Chegada ao evento', key: 'assinatura_in_at' },
+                    { label: 'OUT — Fim do evento',    key: 'assinatura_out_at' },
+                  ].map(({ label, key }) => {
+                    const val = evento?.[key]
+                    return (
+                      <div key={key} className="flex items-center gap-3 p-3 rounded-lg bg-surface-2/50 border border-border/40">
+                        <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-status-confirmado' : 'bg-border')} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-accent">{label}</p>
+                          <p className="text-[10px] text-accent-subtle/60 mt-0.5">
+                            {val ? new Date(val).toLocaleString('pt-PT') : 'Pendente — registo via Apoio T'}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="p-3 bg-surface-2/50 border border-border/40 rounded-lg flex items-center gap-3">
+                  <span className={clsx(
+                    'text-xs font-semibold px-2.5 py-1 rounded-full',
+                    (form.fase === 'concluido' || form.fase === 'faturado')
+                      ? 'bg-status-confirmado/15 text-status-confirmado'
+                      : 'bg-surface-3 text-accent-muted'
+                  )}>
+                    {({ criacao: 'Criação', preparacao: 'Preparação', execucao: 'Execução', concluido: 'Concluído', faturado: 'Faturado' })[form.fase || 'criacao'] || 'Criação'}
+                  </span>
+                  <p className="text-[10px] text-accent-subtle/50">Fase actualizada pelo Apoio T.</p>
+                </div>
+              </div>
+
               {/* Checklists com estado — via Apoio T */}
               {eventoChecklists.filter(ec => !ec.removed && ec.itens.length > 0).length > 0 && (
                 <div className="flex flex-col gap-3">
@@ -1338,44 +1376,6 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 )) : (
                   <p className="text-[11px] text-accent-subtle/30 italic px-1">Aguarda input do técnico via Apoio T…</p>
                 )}
-              </div>
-
-              {/* Assinaturas / Fases */}
-              <div className="flex flex-col gap-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
-                  Assinaturas / Fases <span className="font-normal normal-case tracking-normal text-accent-subtle/40">recolhidas in-loco via Apoio T</span>
-                </p>
-                <div className="flex flex-col gap-2">
-                  {[
-                    { label: 'Saída LMD',             key: 'assinatura_lmd_at' },
-                    { label: 'IN — Chegada ao evento', key: 'assinatura_in_at' },
-                    { label: 'OUT — Fim do evento',    key: 'assinatura_out_at' },
-                  ].map(({ label, key }) => {
-                    const val = evento?.[key]
-                    return (
-                      <div key={key} className="flex items-center gap-3 p-3 rounded-lg bg-surface-2/50 border border-border/40">
-                        <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-status-confirmado' : 'bg-border')} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-medium text-accent">{label}</p>
-                          <p className="text-[10px] text-accent-subtle/60 mt-0.5">
-                            {val ? new Date(val).toLocaleString('pt-PT') : 'Pendente — registo via Apoio T'}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="p-3 bg-surface-2/50 border border-border/40 rounded-lg flex items-center gap-3">
-                  <span className={clsx(
-                    'text-xs font-semibold px-2.5 py-1 rounded-full',
-                    (form.fase === 'concluido' || form.fase === 'faturado')
-                      ? 'bg-status-confirmado/15 text-status-confirmado'
-                      : 'bg-surface-3 text-accent-muted'
-                  )}>
-                    {({ criacao: 'Criação', preparacao: 'Preparação', execucao: 'Execução', concluido: 'Concluído', faturado: 'Faturado' })[form.fase || 'criacao'] || 'Criação'}
-                  </span>
-                  <p className="text-[10px] text-accent-subtle/50">Fase actualizada pelo Apoio T.</p>
-                </div>
               </div>
 
             </div>
