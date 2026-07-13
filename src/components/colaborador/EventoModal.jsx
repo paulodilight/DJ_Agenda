@@ -149,13 +149,24 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
         .select('checklist_id')
         .eq('evento_id', evento.id)
         .eq('tecnico_id', colaborador.id) : Promise.resolve({ data: [] }),
-    ]).then(([{ data: ecs }, { data: chks }, { data: subs }]) => {
+      supabase.from('checklists')
+        .select('id, nome, fase, checklist_itens(id, texto, ordem)')
+        .eq('fase', 'saida'),
+    ]).then(([{ data: ecs }, { data: chks }, { data: subs }, { data: saidaLists }]) => {
       if (!activo) return
-      setEventoListas((ecs ?? []).map(ec => ({
+      const linked = (ecs ?? []).map(ec => ({
         clId: ec.checklist_id, nome: ec.checklists?.nome ?? '?',
         fase: ec.checklists?.fase ?? null,
         itens: (ec.checklists?.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem),
-      })))
+      }))
+      const linkedIds = new Set(linked.map(l => l.clId))
+      const globalSaida = (saidaLists ?? [])
+        .filter(cl => !linkedIds.has(cl.id))
+        .map(cl => ({
+          clId: cl.id, nome: cl.nome, fase: cl.fase,
+          itens: (cl.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem),
+        }))
+      setEventoListas([...linked, ...globalSaida])
       setEventoChecks(new Set((chks ?? []).map(c => c.checklist_item_id)))
       setClSubmetidas(new Set((subs ?? []).map(s => s.checklist_id)))
     })
