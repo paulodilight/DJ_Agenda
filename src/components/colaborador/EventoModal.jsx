@@ -85,6 +85,9 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   })
   const [assinEvSaving,  setAssinEvSaving]  = useState({})
   const [concluindoFase, setConcluindoFase] = useState(false)
+  const [carros,         setCarros]         = useState([])
+  const [eventoCarros,   setEventoCarros]   = useState({ carro_id: '', condutor_id: '', km_saida: '', km_chegada: '' })
+  const [veiculoSaving,  setVeiculoSaving]  = useState(false)
 
   // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
@@ -114,6 +117,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [aConfirmarPres, setConfirmarPres] = useState(false)
   const presDisponivel = podeAssinar(evento.data_evento, evento.hora_inicio)
   const presAtrasada = presencaAtrasada(pres.presenca, evento.data_evento, evento.hora_inicio)
+
+  useEffect(() => {
+    supabase.from('carros').select('id, marca, modelo, matricula').eq('ativo', true).order('marca')
+      .then(({ data }) => setCarros(data ?? []))
+  }, [])
 
   useEffect(() => {
     if (!evento?.id || !colaborador?.id || !isAtribuido) { setNotas(''); return }
@@ -219,6 +227,25 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   useEffect(() => {
     if (!evento?.id) return
     let activo = true
+    supabase.from('evento_carros')
+      .select('carro_id, condutor_id, km_saida, km_chegada')
+      .eq('evento_id', evento.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!activo || !data) return
+        setEventoCarros({
+          carro_id:    data.carro_id    ?? '',
+          condutor_id: data.condutor_id ?? '',
+          km_saida:    data.km_saida    != null ? String(data.km_saida)    : '',
+          km_chegada:  data.km_chegada  != null ? String(data.km_chegada)  : '',
+        })
+      })
+    return () => { activo = false }
+  }, [evento?.id])
+
+  useEffect(() => {
+    if (!evento?.id) return
+    let activo = true
     supabase.from('evento_equip_items')
       .select('id, texto, feito, criado_por, criado_em')
       .eq('evento_id', evento.id)
@@ -278,6 +305,22 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     const { error } = await supabase.from('supa_eventos').update({ fase: novaFase }).eq('id', evento.id)
     if (!error) setFaseLocal(novaFase)
     setConcluindoFase(false)
+  }
+
+  const guardarVeiculo = async () => {
+    if (!isAtribuido || veiculoSaving) return
+    setVeiculoSaving(true)
+    await supabase.from('evento_carros').delete().eq('evento_id', evento.id)
+    if (eventoCarros.carro_id || eventoCarros.condutor_id || eventoCarros.km_saida || eventoCarros.km_chegada) {
+      await supabase.from('evento_carros').insert({
+        evento_id:   evento.id,
+        carro_id:    eventoCarros.carro_id    || null,
+        condutor_id: eventoCarros.condutor_id || null,
+        km_saida:    eventoCarros.km_saida    !== '' ? Number(eventoCarros.km_saida)    : null,
+        km_chegada:  eventoCarros.km_chegada  !== '' ? Number(eventoCarros.km_chegada)  : null,
+      })
+    }
+    setVeiculoSaving(false)
   }
 
   const guardarFeedback = async () => {
@@ -641,6 +684,65 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   })}
                 </div>
               </div>
+
+              {/* Veículo */}
+              {isAtribuido && (
+                <div>
+                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Veículo</p>
+                  <div className="flex flex-col gap-2 p-3 rounded-xl border border-white/10 bg-white/[0.03]">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-accent-subtle/60 mb-1" style={{ fontSize: 10 }}>Carro</p>
+                        <select value={eventoCarros.carro_id}
+                          onChange={e => setEventoCarros(p => ({ ...p, carro_id: e.target.value }))}
+                          className="w-full bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-accent focus:outline-none focus:border-white/30"
+                          style={{ fontSize: 12 }}>
+                          <option value="">— Selecionar —</option>
+                          {carros.map(c => <option key={c.id} value={c.id}>{c.marca} {c.modelo} · {c.matricula}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <p className="text-accent-subtle/60 mb-1" style={{ fontSize: 10 }}>Condutor</p>
+                        <select value={eventoCarros.condutor_id}
+                          onChange={e => setEventoCarros(p => ({ ...p, condutor_id: e.target.value }))}
+                          className="w-full bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-accent focus:outline-none focus:border-white/30"
+                          style={{ fontSize: 12 }}>
+                          <option value="">— Selecionar —</option>
+                          {Object.entries(mapaTecnicos).map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-accent-subtle/60 mb-1" style={{ fontSize: 10 }}>Km saída</p>
+                        <input type="number" min="0" step="1"
+                          value={eventoCarros.km_saida}
+                          onChange={e => setEventoCarros(p => ({ ...p, km_saida: e.target.value }))}
+                          placeholder="—"
+                          className="w-full bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-accent placeholder:text-accent-subtle/30 focus:outline-none focus:border-white/30"
+                          style={{ fontSize: 12 }} />
+                      </div>
+                      <div>
+                        <p className="text-accent-subtle/60 mb-1" style={{ fontSize: 10 }}>Km chegada</p>
+                        <input type="number" min="0" step="1"
+                          value={eventoCarros.km_chegada}
+                          onChange={e => setEventoCarros(p => ({ ...p, km_chegada: e.target.value }))}
+                          placeholder="—"
+                          className="w-full bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-accent placeholder:text-accent-subtle/30 focus:outline-none focus:border-white/30"
+                          style={{ fontSize: 12 }} />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <button onClick={guardarVeiculo} disabled={veiculoSaving}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
+                        style={{ fontSize: 12 }}>
+                        <Save size={12} />
+                        {veiculoSaving ? 'A guardar…' : 'Guardar'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Feedback / notas de execução */}
               {isAtribuido && (
