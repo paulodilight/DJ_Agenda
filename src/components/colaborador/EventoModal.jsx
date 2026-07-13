@@ -638,6 +638,48 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
           ) : aba === 'execucao' ? (
             <div className="flex flex-col gap-4 py-2">
+
+              {/* Checklist de preparação */}
+              {eventoListas.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {eventoListas.map(lista => {
+                    const submetida = clSubmetidas.has(lista.clId)
+                    return (
+                      <div key={lista.clId} className="rounded-xl border border-white/10 overflow-hidden">
+                        <div className="px-3 py-1.5 bg-amber-400/[0.08] border-b border-amber-400/20">
+                          <p className="font-bold text-amber-400 uppercase tracking-wider" style={{ fontSize: 10 }}>{lista.nome}</p>
+                        </div>
+                        <div className="flex flex-col">
+                          {lista.itens.map(item => {
+                            const checked = eventoChecks.has(item.id)
+                            return (
+                              <button key={item.id}
+                                onClick={() => toggleCheck(item.id, lista.clId)}
+                                disabled={!isAtribuido || submetida}
+                                className={clsx(
+                                  'flex items-center gap-3 px-3 py-2.5 border-b border-white/5 last:border-0 text-left transition-colors',
+                                  checked ? 'bg-green-500/10' : 'hover:bg-white/5',
+                                  (!isAtribuido || submetida) ? 'cursor-default' : 'cursor-pointer'
+                                )}>
+                                <span className={clsx(
+                                  'w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors',
+                                  checked ? 'bg-green-500/30 border-green-500/60' : 'border-white/20'
+                                )}>
+                                  {checked && <Check size={12} className="text-green-400" />}
+                                </span>
+                                <span className={clsx('flex-1', checked ? 'line-through opacity-50' : 'opacity-80')} style={{ fontSize: 13 }}>
+                                  {item.texto}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               {/* Fase do evento */}
               <div>
                 <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Fase do Evento</p>
