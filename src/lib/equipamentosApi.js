@@ -1,0 +1,73 @@
+import { supabase } from './supabase'
+
+const TABLE = 'equipamentos'
+const CATEGORIAS_DEFAULT = ['Som', 'Iluminação', 'DJ', 'Vídeo', 'Estrutura', 'Outros']
+
+export const equipamentosApi = {
+
+  async listar() {
+    const [{ data: equip, error }, { data: emUso }] = await Promise.all([
+      supabase.from(TABLE).select('*').eq('ativo', true).order('nome'),
+      supabase.from('evento_equipamentos')
+        .select('equipamento_id, evento_id, supa_eventos(evento, data_evento)')
+        .not('saida_at', 'is', null)
+        .is('retorno_at', null),
+    ])
+    if (error) throw error
+    const emUsoMap = {}
+    ;(emUso ?? []).forEach(r => {
+      emUsoMap[r.equipamento_id] = r.supa_eventos
+    })
+    return (equip ?? []).map(e => ({
+      ...e,
+      em_uso: !!emUsoMap[e.id],
+      evento_atual: emUsoMap[e.id] ?? null,
+    }))
+  },
+
+  async criar(dados) {
+    const { data, error } = await supabase
+      .from(TABLE).insert(this._payload(dados)).select().single()
+    if (error) throw error
+    return data
+  },
+
+  async actualizar(id, dados) {
+    const { data, error } = await supabase
+      .from(TABLE).update(this._payload(dados)).eq('id', id).select().single()
+    if (error) throw error
+    return data
+  },
+
+  async apagar(id) {
+    const { error } = await supabase
+      .from(TABLE).update({ ativo: false }).eq('id', id)
+    if (error) throw error
+  },
+
+  _payload(dados) {
+    const COLS = ['nome', 'categoria', 'qr_code', 'valor_custo', 'valor_aluguer_dia', 'foto_url', 'notas', 'ativo']
+    return Object.fromEntries(COLS.filter(k => k in dados).map(k => [k, dados[k]]))
+  },
+
+  async listarMovimentacoes({ limite = 30 } = {}) {
+    const { data, error } = await supabase
+      .from('evento_equipamentos')
+      .select('*, equipamentos(nome, categoria), supa_eventos(evento, data_evento, espacos(nome))')
+      .not('equipamento_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(limite)
+    if (error) throw error
+    return data ?? []
+  },
+
+  gerarQrCode(nome) {
+    const slug = nome.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
+    return `EQ-${slug}-${rand}`
+  },
+
+  get categorias() {
+    return CATEGORIAS_DEFAULT
+  },
+}

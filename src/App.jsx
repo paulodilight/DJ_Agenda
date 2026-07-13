@@ -8,7 +8,7 @@ import { DJs } from '@/pages/DJs'
 import { DJPerfil } from '@/pages/DJPerfil'
 import { Espacos } from '@/pages/Espacos'
 import { Agenda } from '@/pages/Agenda'
-import { Bloqueios } from '@/pages/Bloqueios'
+import { Producao } from '@/pages/Producao'
 import { Configuracoes } from '@/pages/Configuracoes'
 import { EspacoPerfil } from '@/pages/EspacoPerfil'
 import { Atuacoes } from '@/pages/Atuacoes'
@@ -25,6 +25,7 @@ import { Eventos } from '@/pages/Eventos'
 import { ApoioTecnico } from '@/pages/ApoioTecnico'
 import { DJConvidados } from '@/pages/DJConvidados'
 import { Artistas } from '@/pages/Artistas'
+import { Equipamentos } from '@/pages/equipamentos/Equipamentos'
 import { ArtistaPerfil } from '@/pages/ArtistaPerfil'
 import { Club } from '@/pages/Club'
 import { Pontualidades } from '@/pages/Pontualidades'
@@ -81,13 +82,14 @@ export default function App() {
           <Route path="convidados" element={<DJConvidados />} />
           <Route path="espacos" element={<Espacos />} />
           <Route path="espacos/:id" element={<EspacoPerfil />} />
-          <Route path="bloqueios" element={<Bloqueios />} />
+          <Route path="producao" element={<Producao />} />
           <Route path="agenda" element={<Agenda />} />
           <Route path="atuacoes" element={<Atuacoes />} />
           <Route path="equilibrio" element={<Equilibrio />} />
           <Route path="eventos" element={<Eventos />} />
           <Route path="apoio-tecnico" element={<ApoioTecnico />} />
           <Route path="artistas" element={<Artistas />} />
+          <Route path="equipamentos" element={<Equipamentos />} />
           <Route path="artistas/:id" element={<ArtistaPerfil />} />
           <Route path="comunicacao" element={<Comunicacao />} />
           <Route path="contas" element={<Contas />}>

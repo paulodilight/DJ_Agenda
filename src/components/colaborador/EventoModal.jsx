@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2 } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag } from 'lucide-react'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
@@ -73,6 +73,17 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [equipItems,    setEquipItems]    = useState([])
   const [equipInput,    setEquipInput]    = useState('')
   const [equipAdding,   setEquipAdding]   = useState(false)
+  const [execucaoNotas,  setExecucaoNotas]  = useState('')
+  const [execucaoSaving, setExecucaoSaving] = useState(false)
+  const [feedbackId,     setFeedbackId]     = useState(null)
+  const [faseLocal,      setFaseLocal]      = useState(evento.fase || 'criacao')
+  const [assinEvento,    setAssinEvento]    = useState({
+    assinatura_lmd_at: evento.assinatura_lmd_at ?? null,
+    assinatura_in_at:  evento.assinatura_in_at  ?? null,
+    assinatura_out_at: evento.assinatura_out_at ?? null,
+  })
+  const [assinEvSaving,  setAssinEvSaving]  = useState({})
+  const [concluindoFase, setConcluindoFase] = useState(false)
 
   // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
@@ -179,6 +190,22 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   }
 
   useEffect(() => {
+    if (!evento?.id || !colaborador?.id) return
+    let activo = true
+    supabase.from('evento_feedback')
+      .select('id, texto')
+      .eq('evento_id', evento.id)
+      .eq('tecnico_id', colaborador.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!activo || !data) return
+        setFeedbackId(data.id)
+        setExecucaoNotas(data.texto ?? '')
+      })
+    return () => { activo = false }
+  }, [evento?.id, colaborador?.id])
+
+  useEffect(() => {
     if (!evento?.id) return
     let activo = true
     supabase.from('evento_equip_items')
@@ -225,13 +252,44 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     setClGuardando(prev => { const s = new Set(prev); s.delete(checklistId); return s })
   }
 
+  const registarAssinEvento = async (campo) => {
+    if (!isAtribuido || assinEvento[campo] || assinEvSaving[campo]) return
+    const agora = new Date().toISOString()
+    setAssinEvSaving(prev => ({ ...prev, [campo]: true }))
+    const { error } = await supabase.from('supa_eventos').update({ [campo]: agora }).eq('id', evento.id)
+    if (!error) setAssinEvento(prev => ({ ...prev, [campo]: agora }))
+    setAssinEvSaving(prev => ({ ...prev, [campo]: false }))
+  }
+
+  const marcarFase = async (novaFase) => {
+    if (!isAtribuido || concluindoFase) return
+    setConcluindoFase(true)
+    const { error } = await supabase.from('supa_eventos').update({ fase: novaFase }).eq('id', evento.id)
+    if (!error) setFaseLocal(novaFase)
+    setConcluindoFase(false)
+  }
+
+  const guardarFeedback = async () => {
+    if (!colaborador?.id || execucaoSaving) return
+    setExecucaoSaving(true)
+    if (feedbackId) {
+      await supabase.from('evento_feedback').update({ texto: execucaoNotas }).eq('id', feedbackId)
+    } else {
+      const { data } = await supabase.from('evento_feedback')
+        .insert({ evento_id: evento.id, tecnico_id: colaborador.id, texto: execucaoNotas })
+        .select('id').maybeSingle()
+      if (data?.id) setFeedbackId(data.id)
+    }
+    setExecucaoSaving(false)
+  }
+
   const goAba = (novaAba, direcao) => {
     if (novaAba === aba) return
     setDir(direcao)
     setAba(novaAba)
   }
 
-  const ABAS_ORDER = ['detalhes', 'notas', 'checklist']
+  const ABAS_ORDER = ['detalhes', 'notas', 'checklist', 'execucao']
   const onTouchStart = (e) => { touchX.current = e.changedTouches[0].clientX }
   const onTouchEnd   = (e) => {
     if (touchX.current === null) return
@@ -266,9 +324,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
         {/* Abas */}
         <div className="flex border-b border-border px-5 shrink-0 items-center">
           {[
-            { id: 'detalhes',  label: 'Detalhes',           d: 'left' },
-            { id: 'notas',     label: 'Notas & Equip.',     d: 'right' },
-            { id: 'checklist', label: 'Checklist',          d: 'right' },
+            { id: 'detalhes',  label: 'Detalhes',       d: 'left' },
+            { id: 'notas',     label: 'Notas & Equip.', d: 'right' },
+            { id: 'checklist', label: 'Checklist',      d: 'right' },
+            { id: 'execucao',  label: 'Execução',       d: 'right' },
           ].map(t => (
             <button key={t.id} onClick={() => goAba(t.id, t.d)}
               className={clsx(
@@ -502,6 +561,114 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
               {!isAtribuido && eventoListas.length > 0 && (
                 <p className="text-center opacity-40 italic" style={{ fontSize: 12 }}>Só técnicos atribuídos podem marcar itens.</p>
+              )}
+            </div>
+
+          ) : aba === 'execucao' ? (
+            <div className="flex flex-col gap-4 py-2">
+              {/* Fase do evento */}
+              <div>
+                <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Fase do Evento</p>
+                <div className="flex items-center gap-1.5 p-2.5 bg-white/5 rounded-xl border border-white/10 overflow-x-auto">
+                  {[
+                    { id: 'criacao',    label: 'Criação' },
+                    { id: 'preparacao', label: 'Prep.' },
+                    { id: 'execucao',   label: 'Exec.' },
+                    { id: 'concluido',  label: 'Concluído' },
+                    { id: 'faturado',   label: 'Faturado' },
+                  ].map(({ id, label }, i, arr) => {
+                    const fases = ['criacao', 'preparacao', 'execucao', 'concluido', 'faturado']
+                    const idxAtual = fases.indexOf(faseLocal)
+                    const done = i <= idxAtual
+                    return (
+                      <div key={id} className="flex items-center gap-1 shrink-0">
+                        <div className={clsx('w-1.5 h-1.5 rounded-full shrink-0', done ? 'bg-amber-400' : 'bg-white/20')} />
+                        <span className={clsx(done ? 'text-amber-400' : 'text-white/30')} style={{ fontSize: 10 }}>{label}</span>
+                        {i < arr.length - 1 && <div className={clsx('w-4 h-px shrink-0', i < idxAtual ? 'bg-amber-400/40' : 'bg-white/10')} />}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Assinaturas / timestamps */}
+              <div>
+                <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Registo de Fases</p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { campo: 'assinatura_lmd_at', label: 'Saída LMD' },
+                    { campo: 'assinatura_in_at',  label: 'IN — Chegada ao evento' },
+                    { campo: 'assinatura_out_at', label: 'OUT — Fim do evento' },
+                  ].map(({ campo, label }) => {
+                    const val    = assinEvento[campo]
+                    const saving = assinEvSaving[campo]
+                    return (
+                      <div key={campo} className="flex items-center gap-3 p-2.5 rounded-xl border border-white/10 bg-white/[0.03]">
+                        <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-green-400' : 'bg-white/20')} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-accent" style={{ fontSize: 12 }}>{label}</p>
+                          {val && (
+                            <p className="text-accent-subtle/60 tabular-nums mt-0.5" style={{ fontSize: 10 }}>
+                              {new Date(val).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          )}
+                        </div>
+                        {!val && isAtribuido ? (
+                          <button
+                            onClick={() => registarAssinEvento(campo)}
+                            disabled={!!saving}
+                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-medium hover:bg-amber-400/20 disabled:opacity-40 transition-colors"
+                            style={{ fontSize: 11 }}>
+                            <Clock size={11} />
+                            {saving ? '…' : 'Registar'}
+                          </button>
+                        ) : val ? (
+                          <Check size={14} className="text-green-400 shrink-0" />
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Feedback / notas de execução */}
+              {isAtribuido && (
+                <div>
+                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Feedback / Notas</p>
+                  <textarea
+                    value={execucaoNotas}
+                    onChange={e => setExecucaoNotas(e.target.value)}
+                    rows={3}
+                    placeholder="Feedback sobre o evento, ocorrências, observações…"
+                    style={{ fontSize: 13 }}
+                    className="w-full bg-surface-2 border border-white/20 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/40 resize-none"
+                  />
+                  <div className="flex justify-end mt-2">
+                    <button onClick={guardarFeedback} disabled={execucaoSaving}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
+                      style={{ fontSize: 12 }}>
+                      <Save size={12} />
+                      {execucaoSaving ? 'A guardar…' : 'Guardar'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Marcar como Concluído */}
+              {isAtribuido && (faseLocal === 'execucao' || faseLocal === 'preparacao' || faseLocal === 'criacao') && (
+                <button
+                  onClick={() => marcarFase('concluido')}
+                  disabled={concluindoFase}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 font-semibold hover:bg-green-500/20 disabled:opacity-40 transition-colors"
+                  style={{ fontSize: 14 }}>
+                  <Flag size={16} />
+                  {concluindoFase ? 'A marcar…' : 'Marcar como Concluído'}
+                </button>
+              )}
+              {faseLocal === 'concluido' && (
+                <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 font-semibold" style={{ fontSize: 14 }}>
+                  <Check size={16} /> Evento Concluído
+                </div>
               )}
             </div>
 

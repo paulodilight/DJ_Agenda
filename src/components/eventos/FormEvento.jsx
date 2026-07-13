@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react'
-import { X, Database, Star, Plus, Check, Trash2, ListChecks } from 'lucide-react'
+import { X, Database, Star, Plus, Check, Trash2, ListChecks, Send } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
@@ -53,7 +53,9 @@ const VAZIO = {
   todos_tecnicos:    false,
   rider_url:         '',
   data_preparacao:   '',
+  hora_preparacao:   '',
   notas_preparacao:  '',
+  fase:              '',
 }
 
 const ESTADO_PAG_OPCOES = [
@@ -75,12 +77,15 @@ const BILLING_CAMPOS = [
   { key: 'extras',                tipo: 'extra',                label: 'Extras' },
 ]
 
-function Field({ label, children, required }) {
+function Field({ label, children, required, action }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-[11px] font-medium text-accent-subtle uppercase tracking-wider">
-        {label}{required && <span className="text-status-cancelado ml-0.5">*</span>}
-      </label>
+      <div className="flex items-center justify-between min-h-[14px]">
+        <label className="text-[11px] font-medium text-accent-subtle uppercase tracking-wider">
+          {label}{required && <span className="text-status-cancelado ml-0.5">*</span>}
+        </label>
+        {action}
+      </div>
       {children}
     </div>
   )
@@ -187,16 +192,29 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
     equipamentos_comprado: [],
     extras: [],
   })
+  // Equipamentos do evento (evento_equipamentos)
+  const [equipRows, setEquipRows] = useState({ proprio: [], alugado: [], comprado: [], extra: [] })
+  const [equipamentosList, setEquipamentosList] = useState([])
+  const [carros, setCarros] = useState([])
+  const [eventoCarros, setEventoCarros] = useState({ carro_id: '', condutor_id: '', km_saida: '', km_chegada: '' })
+  const [checksByItem, setChecksByItem] = useState({})
+  const [checkSubs, setCheckSubs] = useState({})
+  const [tecnicosNotas, setTecnicosNotas] = useState([])
+  const [feedbackTecnico, setFeedbackTecnico] = useState([])
 
   useEffect(() => {
     supabase.from('tipo_eventos').select('id, nome, tem_artista').order('nome')
       .then(({ data }) => setTipos(data ?? []))
       .catch(console.error)
     supaEventosApi.listarEspacos().then(setEspacos).catch(console.error)
-    supabase.from('tecnicos').select('id, nome').eq('ativo', true).order('nome')
+    supabase.from('tecnicos').select('id, nome, telefone').eq('ativo', true).order('nome')
       .then(({ data }) => setTecnicos(data ?? []))
       .catch(console.error)
     artistasApi.listar().then(setArtistas).catch(console.error)
+    supabase.from('equipamentos').select('id, nome, valor_custo').eq('ativo', true).order('nome')
+      .then(({ data }) => setEquipamentosList(data ?? [])).catch(console.error)
+    supabase.from('carros').select('id, marca, modelo, matricula').eq('ativo', true).order('marca')
+      .then(({ data }) => setCarros(data ?? [])).catch(console.error)
     supabase.from('checklists')
       .select('id, nome, tipo_evento_id, checklist_itens(id, texto, ordem)')
       .order('nome')
@@ -209,6 +227,12 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
     setErro(null)
     setAba('geral')
     setBilling({ equipamentos_alugado: [], equipamentos_comprado: [], extras: [] })
+    setEquipRows({ proprio: [], alugado: [], comprado: [], extra: [] })
+    setEventoCarros({ carro_id: '', condutor_id: '', km_saida: '', km_chegada: '' })
+    setChecksByItem({})
+    setCheckSubs({})
+    setTecnicosNotas([])
+    setFeedbackTecnico([])
     if (evento?.id) {
       setForm({
         ...VAZIO,
@@ -231,8 +255,10 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         hora_inicio:     evento.hora_inicio?.slice(0, 5)     ?? '',
         hora_fim:        evento.hora_fim?.slice(0, 5)        ?? '',
         hora_instalacao: evento.hora_instalacao?.slice(0, 5) ?? '',
-        data_preparacao:  evento.data_preparacao  ?? '',
-        notas_preparacao: evento.notas_preparacao ?? '',
+        data_preparacao:  evento.data_preparacao             ?? '',
+        hora_preparacao:  evento.hora_preparacao?.slice(0,5)  ?? '',
+        notas_preparacao: evento.notas_preparacao             ?? '',
+        fase:             evento.fase                         ?? 'criacao',
       })
       // Carregar itens de billing existentes para este evento
       supabase.from('contas_clientes').select('*').eq('evento_id', evento.id)
@@ -245,6 +271,57 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             extras:                data.filter(r => r.tipo === 'extra').map(toItem),
           })
         })
+      // Carregar equipamentos do evento
+      supabase.from('evento_equipamentos')
+        .select('id, equipamento_id, descricao_manual, tipo, quantidade, valor_custo, margem')
+        .eq('evento_id', evento.id)
+        .then(({ data }) => {
+          const byTipo = { proprio: [], alugado: [], comprado: [], extra: [] }
+          ;(data ?? []).forEach(r => {
+            const tipo = r.tipo || 'proprio'
+            if (byTipo[tipo]) {
+              byTipo[tipo].push({
+                _key: uidF(), id: r.id,
+                equipamento_id: r.equipamento_id ?? null,
+                descricao: r.descricao_manual ?? '',
+                valor_custo: r.valor_custo != null ? String(r.valor_custo) : '',
+                margem: r.margem != null ? String(r.margem) : '',
+                unidades: r.quantidade ?? 1,
+              })
+            }
+          })
+          setEquipRows(byTipo)
+        })
+        .catch(console.error)
+      // Carregar evento_carros
+      supabase.from('evento_carros').select('carro_id, condutor_id, km_saida, km_chegada')
+        .eq('evento_id', evento.id).maybeSingle()
+        .then(({ data }) => { if (data) setEventoCarros({ carro_id: data.carro_id ?? '', condutor_id: data.condutor_id ?? '', km_saida: data.km_saida != null ? String(data.km_saida) : '', km_chegada: data.km_chegada != null ? String(data.km_chegada) : '' }) })
+        .catch(console.error)
+      // Carregar estado das checklists (por item e por submissão)
+      supabase.from('checklist_checks').select('checklist_item_id, tecnico_id, checked_at').eq('evento_id', evento.id)
+        .then(({ data }) => {
+          const byItem = {}
+          ;(data ?? []).forEach(c => {
+            if (!byItem[c.checklist_item_id]) byItem[c.checklist_item_id] = []
+            byItem[c.checklist_item_id].push({ tecnico_id: c.tecnico_id, checked_at: c.checked_at })
+          })
+          setChecksByItem(byItem)
+        }).catch(console.error)
+      supabase.from('checklist_submissoes').select('checklist_id, tecnico_id').eq('evento_id', evento.id)
+        .then(({ data }) => {
+          const byCl = {}
+          ;(data ?? []).forEach(s => { if (!byCl[s.checklist_id]) byCl[s.checklist_id] = []; byCl[s.checklist_id].push(s.tecnico_id) })
+          setCheckSubs(byCl)
+        }).catch(console.error)
+      // Carregar notas dos técnicos (evento_tecnicos)
+      supabase.from('evento_tecnicos').select('tecnico_id, notas').eq('evento_id', evento.id)
+        .then(({ data }) => setTecnicosNotas((data ?? []).filter(r => r.notas?.trim())))
+        .catch(console.error)
+      // Carregar feedback dos técnicos (evento_feedback)
+      supabase.from('evento_feedback').select('tecnico_id, texto').eq('evento_id', evento.id)
+        .then(({ data }) => setFeedbackTecnico((data ?? []).filter(r => r.texto?.trim())))
+        .catch(console.error)
       // Carregar checklists do evento
       supabase.from('evento_checklists')
         .select('id, checklist_id, checklists(id, nome, tipo_evento_id, checklist_itens(id, texto, ordem))')
@@ -271,7 +348,48 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
     }
   }, [aberto, evento, dataInicial])
 
+  const [notifState, setNotifState] = useState({}) // { 1: 'loading'|'ok', 2: 'loading'|'ok' }
+
   const set = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }))
+
+  async function dispararNotificacao(num) {
+    const tecId = num === 1
+      ? (form.tecnico_id === 'todos' ? null : form.tecnico_id)
+      : form.tecnico2_id
+    if (!tecId) return
+    const tec = tecnicos.find(t => t.id === tecId)
+    if (!tec?.telefone) return
+    const digits = tec.telefone.replace(/[^0-9]/g, '')
+    const wa_id = digits.length === 9 ? '351' + digits : digits
+    if (!wa_id) return
+    const espaco = espacos.find(e => e.id === form.espaco_id)
+    setNotifState(s => ({ ...s, [num]: 'loading' }))
+    try {
+      await fetch('https://i4dj.app.n8n.cloud/webhook/evento-criado-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'MANUAL',
+          table: 'supa_eventos',
+          record: {
+            evento:          form.evento || '',
+            responsavel:     tec.nome || '',
+            cliente:         espaco?.nome || '',
+            data_evento:     form.data_evento   || null,
+            hora_inicio:     form.hora_inicio   || null,
+            dia_instalacao:  form.dia_instalacao  || null,
+            hora_instalacao: form.hora_instalacao || null,
+            wa_id,
+            wa_id_tecnico2: '',
+          },
+        }),
+      })
+      setNotifState(s => ({ ...s, [num]: 'ok' }))
+      setTimeout(() => setNotifState(s => { const n = { ...s }; delete n[num]; return n }), 3000)
+    } catch {
+      setNotifState(s => { const n = { ...s }; delete n[num]; return n })
+    }
+  }
 
   const guardar = async () => {
     if (!form.evento.trim()) { setErro('Nome do evento obrigatório.'); return }
@@ -303,6 +421,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         hora_instalacao: form.hora_instalacao || null,
         dia_instalacao:  form.dia_instalacao  || null,
         data_preparacao:  form.data_preparacao  || null,
+        hora_preparacao:  form.hora_preparacao  || null,
         notas_preparacao: form.notas_preparacao?.trim() || null,
       }
       let savedId = evento?.id
@@ -336,6 +455,39 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
           })
         })
         if (inserts.length > 0) await supabase.from('contas_clientes').insert(inserts)
+      }
+
+      // Guardar evento_equipamentos
+      if (savedId) {
+        await supabase.from('evento_equipamentos').delete().eq('evento_id', savedId)
+        const equipInserts = []
+        Object.entries(equipRows).forEach(([tipo, rows]) => {
+          rows.forEach(r => {
+            if (!r.descricao.trim() && !r.equipamento_id) return
+            equipInserts.push({
+              evento_id: savedId,
+              equipamento_id: r.equipamento_id || null,
+              descricao_manual: r.descricao.trim() || null,
+              tipo,
+              quantidade: Number(r.unidades) || 1,
+              valor_custo: r.valor_custo !== '' ? Number(r.valor_custo) : null,
+              margem: r.margem !== '' ? Number(r.margem) : null,
+            })
+          })
+        })
+        if (equipInserts.length > 0) await supabase.from('evento_equipamentos').insert(equipInserts)
+      }
+
+      // Guardar evento_carros
+      if (savedId && (eventoCarros.carro_id || eventoCarros.condutor_id || eventoCarros.km_saida || eventoCarros.km_chegada)) {
+        await supabase.from('evento_carros').delete().eq('evento_id', savedId)
+        await supabase.from('evento_carros').insert({
+          evento_id:   savedId,
+          carro_id:    eventoCarros.carro_id    || null,
+          condutor_id: eventoCarros.condutor_id || null,
+          km_saida:    eventoCarros.km_saida    !== '' ? Number(eventoCarros.km_saida)    : null,
+          km_chegada:  eventoCarros.km_chegada  !== '' ? Number(eventoCarros.km_chegada)  : null,
+        })
       }
 
       // Guardar checklists
@@ -438,19 +590,19 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         </div>
 
         {/* Abas */}
-        <div className="flex border-b border-border px-6">
+        <div className="flex border-b border-border px-6 overflow-x-auto">
           {[
-            { id: 'geral',      label: 'Geral' },
-            { id: 'tecnico',    label: 'Técnico & Notas' },
-            { id: 'faturacao',  label: 'Faturação' },
-            { id: 'contas',     label: 'Contas' },
-            { id: 'checklist',  label: 'Checklist' },
+            { id: 'geral',        label: 'Geral' },
+            { id: 'equipamentos', label: 'Equipamentos' },
+            { id: 'preparacao',   label: 'Preparação' },
+            { id: 'execucao',     label: 'Execução' },
+            { id: 'financeiro',   label: 'Financeiro' },
           ].map((aba) => (
             <button
               key={aba.id}
               onClick={() => setAba(aba.id)}
               className={clsx(
-                'px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px',
+                'px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px whitespace-nowrap',
                 abaActiva === aba.id
                   ? 'border-status-confirmado text-status-confirmado'
                   : 'border-transparent text-accent-muted hover:text-accent'
@@ -467,6 +619,30 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
           {/* ── Aba Geral ── */}
           {abaActiva === 'geral' && (
             <>
+              {/* Fase do evento */}
+              {evento?.id && (
+                <div className="flex items-center gap-1.5 p-2.5 bg-surface-2/50 rounded-lg border border-border/40 overflow-x-auto">
+                  {[
+                    { id: 'criacao',    label: 'Criação' },
+                    { id: 'preparacao', label: 'Preparação' },
+                    { id: 'execucao',   label: 'Execução' },
+                    { id: 'concluido',  label: 'Concluído' },
+                    { id: 'faturado',   label: 'Faturado' },
+                  ].map(({ id, label }, i, arr) => {
+                    const fases = ['criacao', 'preparacao', 'execucao', 'concluido', 'faturado']
+                    const idxAtual = fases.indexOf(form.fase || 'criacao')
+                    const done = i <= idxAtual
+                    return (
+                      <div key={id} className="flex items-center gap-1.5 shrink-0">
+                        <div className={clsx('w-1.5 h-1.5 rounded-full shrink-0', done ? 'bg-status-confirmado' : 'bg-border')} />
+                        <span className={clsx('text-[10px]', done ? 'text-status-confirmado font-medium' : 'text-accent-subtle/40')}>{label}</span>
+                        {i < arr.length - 1 && <div className={clsx('w-6 h-px shrink-0', i < idxAtual ? 'bg-status-confirmado/40' : 'bg-border/40')} />}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               {/* Nome + Tipo */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
@@ -596,9 +772,24 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 ) : null
               })()}
 
-              {/* Técnico Responsável + Contacto */}
+              {/* Técnico Responsável + 2º Técnico */}
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Técnico Responsável">
+                <Field label="Técnico Responsável" action={
+                  form.tecnico_id && form.tecnico_id !== 'todos' ? (
+                    <button type="button" onClick={() => dispararNotificacao(1)}
+                      disabled={notifState[1] === 'loading'}
+                      title="Enviar notificação WhatsApp"
+                      className={clsx(
+                        'flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors disabled:opacity-50',
+                        notifState[1] === 'ok'
+                          ? 'border-status-confirmado/40 bg-status-confirmado/10 text-status-confirmado'
+                          : 'border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20'
+                      )}>
+                      <Send size={9} />
+                      {notifState[1] === 'loading' ? '...' : notifState[1] === 'ok' ? 'Enviado' : 'Notificar'}
+                    </button>
+                  ) : null
+                }>
                   <select
                     className={inputCls}
                     value={form.tecnico_id}
@@ -611,7 +802,22 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     ))}
                   </select>
                 </Field>
-                <Field label="2º Técnico de Apoio">
+                <Field label="2º Técnico de Apoio" action={
+                  form.tecnico2_id ? (
+                    <button type="button" onClick={() => dispararNotificacao(2)}
+                      disabled={notifState[2] === 'loading'}
+                      title="Enviar notificação WhatsApp"
+                      className={clsx(
+                        'flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors disabled:opacity-50',
+                        notifState[2] === 'ok'
+                          ? 'border-status-confirmado/40 bg-status-confirmado/10 text-status-confirmado'
+                          : 'border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20'
+                      )}>
+                      <Send size={9} />
+                      {notifState[2] === 'loading' ? '...' : notifState[2] === 'ok' ? 'Enviado' : 'Notificar'}
+                    </button>
+                  ) : null
+                }>
                   <select
                     className={inputCls}
                     value={form.tecnico2_id}
@@ -624,6 +830,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   </select>
                 </Field>
               </div>
+
+              {/* Contacto */}
               <div className="grid grid-cols-1 gap-3">
                 <Field label="Contacto pelo evento">
                   <input
@@ -695,172 +903,499 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   />
                 </Field>
               </div>
+            </>
+          )}
 
-              {/* Preparação */}
-              <div className="border-t border-border/40 pt-4 flex flex-col gap-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Preparação</p>
-                <Field label="Data de preparação">
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={form.data_preparacao}
-                    onChange={(e) => set('data_preparacao', e.target.value)}
-                  />
-                </Field>
-                {form.data_preparacao && (
-                  <Field label="Nota de preparação">
-                    <textarea
-                      className={textareaCls}
-                      rows={3}
-                      value={form.notas_preparacao}
-                      onChange={(e) => set('notas_preparacao', e.target.value)}
-                      placeholder="O que é para preparar…"
-                    />
+          {/* ── Aba Equipamentos ── */}
+          {abaActiva === 'equipamentos' && (() => {
+            const emptyEquipRow = () => ({ _key: uidF(), id: null, equipamento_id: null, descricao: '', valor_custo: '', margem: '', unidades: 1 })
+            const SECOES = [
+              { key: 'proprio',  label: 'Equipamentos para o evento', hasDbPicker: true },
+              { key: 'alugado',  label: 'Equipamentos Alugados',       hasDbPicker: false },
+              { key: 'comprado', label: 'Equipamentos Comprados',      hasDbPicker: false },
+              { key: 'extra',    label: 'Extras',                       hasDbPicker: false },
+            ]
+            const updRow = (secKey, rowKey, field, val) => setEquipRows(prev => ({
+              ...prev,
+              [secKey]: prev[secKey].map(r => r._key === rowKey ? { ...r, [field]: val } : r),
+            }))
+            const remRow = (secKey, rowKey) => setEquipRows(prev => ({
+              ...prev, [secKey]: prev[secKey].filter(r => r._key !== rowKey),
+            }))
+            const addRow = (secKey, fromEquip = null) => {
+              const row = { _key: uidF(), id: null, equipamento_id: null, descricao: '', valor_custo: '', margem: '', unidades: 1 }
+              if (fromEquip) {
+                row.equipamento_id = fromEquip.id
+                row.descricao = fromEquip.nome
+                row.valor_custo = fromEquip.valor_custo != null ? String(fromEquip.valor_custo) : ''
+              }
+              setEquipRows(prev => ({ ...prev, [secKey]: [...prev[secKey], row] }))
+            }
+            const cellCls = 'px-2 py-1.5 text-xs text-accent bg-transparent border-r border-border/20 focus:outline-none focus:bg-surface-3/20'
+            return (
+              <>
+                {SECOES.map(({ key, label, hasDbPicker }) => {
+                  const rows = equipRows[key]
+                  return (
+                    <div key={key} className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between min-h-[22px]">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">{label}</p>
+                        <div className="flex items-center gap-2">
+                          {hasDbPicker && equipamentosList.length > 0 && (
+                            <select
+                              className={inputCls + ' text-[11px] py-0.5 px-2 w-44 h-7'}
+                              value=""
+                              onChange={e => {
+                                const eq = equipamentosList.find(x => x.id === e.target.value)
+                                if (eq) addRow(key, eq)
+                              }}
+                            >
+                              <option value="">+ Adicionar da BD…</option>
+                              {equipamentosList.map(eq => (
+                                <option key={eq.id} value={eq.id}>{eq.nome}</option>
+                              ))}
+                            </select>
+                          )}
+                          <button type="button" onClick={() => addRow(key)}
+                            className="flex items-center gap-1 text-[11px] text-accent-subtle/50 hover:text-status-confirmado/70 transition-colors whitespace-nowrap">
+                            <Plus size={11} />Linha
+                          </button>
+                        </div>
+                      </div>
+
+                      {rows.length > 0 ? (
+                        <div className="border border-border rounded-lg overflow-hidden">
+                          <div className="grid grid-cols-[1fr_68px_68px_44px_68px_22px] bg-surface-2/60 border-b border-border/40">
+                            {['Descrição', 'Custo €', 'Margem €', 'Un.', 'Valor', ''].map((h, i) => (
+                              <div key={i} className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-accent-subtle/50 border-r border-border/20 last:border-0">{h}</div>
+                            ))}
+                          </div>
+                          {rows.map(r => {
+                            const custo = r.valor_custo !== '' ? Number(r.valor_custo) : 0
+                            const marg  = r.margem      !== '' ? Number(r.margem)      : 0
+                            const valor = (Number(r.unidades) || 1) * (custo + marg)
+                            return (
+                              <div key={r._key} className="grid grid-cols-[1fr_68px_68px_44px_68px_22px] border-b border-border/15 last:border-0 hover:bg-surface-3/20">
+                                <input value={r.descricao} onChange={e => updRow(key, r._key, 'descricao', e.target.value)}
+                                  placeholder="Descrição…" className={cellCls} />
+                                <input type="number" min="0" step="0.01" value={r.valor_custo} onChange={e => updRow(key, r._key, 'valor_custo', e.target.value)}
+                                  placeholder="0" className={cellCls + ' text-right'} />
+                                <input type="number" min="0" step="0.01" value={r.margem} onChange={e => updRow(key, r._key, 'margem', e.target.value)}
+                                  placeholder="0" className={cellCls + ' text-right'} />
+                                <input type="number" min="1" step="1" value={r.unidades} onChange={e => updRow(key, r._key, 'unidades', e.target.value)}
+                                  className={cellCls + ' text-center'} />
+                                <div className={cellCls + ' text-right text-accent-muted tabular-nums select-none'}>
+                                  {valor > 0 ? valor.toFixed(2) : '—'}
+                                </div>
+                                <button type="button" onClick={() => remRow(key, r._key)}
+                                  className="flex items-center justify-center text-border/30 hover:text-red-400/60 transition-colors">
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-accent-subtle/25 italic pl-1">Sem itens — clique em + Linha para adicionar</p>
+                      )}
+                    </div>
+                  )
+                })}
+
+                <div className="border-t border-border/40 pt-4 flex flex-col gap-4">
+                  <Field label="Notas Operacionais">
+                    <textarea className={textareaCls} rows={4}
+                      value={form.notas_operacionais}
+                      onChange={(e) => set('notas_operacionais', e.target.value)}
+                      placeholder="Informações operacionais do evento…" />
                   </Field>
+
+                  <Field label="Rider Técnico">
+                    <div className="flex flex-col gap-2">
+                      {form.rider_url ? (
+                        <div className="flex items-center gap-2">
+                          <a href={form.rider_url} target="_blank" rel="noopener noreferrer"
+                            className="text-xs text-accent underline truncate flex-1">
+                            {form.rider_url.split('/').pop()}
+                          </a>
+                          <button type="button" onClick={() => set('rider_url', '')}
+                            className="text-xs text-status-cancelado hover:opacity-70 flex-shrink-0">
+                            Remover
+                          </button>
+                        </div>
+                      ) : null}
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <span className={`${inputCls} flex items-center gap-2 cursor-pointer text-accent-muted`}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                          {form.rider_url ? 'Substituir ficheiro' : 'Carregar ficheiro (PDF, Word…)'}
+                        </span>
+                        <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (!file) return
+                            const ext = file.name.split('.').pop()
+                            const path = `riders/${crypto.randomUUID()}.${ext}`
+                            const { error } = await supabase.storage.from('eventos-riders').upload(path, file)
+                            if (error) { alert('Erro ao carregar ficheiro: ' + error.message); return }
+                            const { data: pub } = supabase.storage.from('eventos-riders').getPublicUrl(path)
+                            set('rider_url', pub.publicUrl)
+                            e.target.value = ''
+                          }} />
+                      </label>
+                    </div>
+                  </Field>
+
+                  <details>
+                    <summary className="flex items-center gap-2 cursor-pointer list-none select-none">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/40">Notas de Faturação</span>
+                      <span className="text-[10px] text-accent-subtle/25 italic">(Folha de Contas)</span>
+                    </summary>
+                    <div className="mt-2">
+                      <textarea className={textareaCls} rows={3}
+                        value={form.notas_faturacao}
+                        onChange={(e) => set('notas_faturacao', e.target.value)}
+                        placeholder="Notas que aparecem na fatura / documento de contas…" />
+                    </div>
+                  </details>
+                </div>
+              </>
+            )
+          })()}
+
+          {/* ── Aba Preparação ── */}
+          {abaActiva === 'preparacao' && (
+            <div className="flex flex-col gap-5">
+
+              {/* Secção admin */}
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Data de preparação">
+                    <input type="date" className={inputCls} value={form.data_preparacao}
+                      onChange={e => set('data_preparacao', e.target.value)} />
+                  </Field>
+                  <Field label="Hora de preparação">
+                    <input type="time" className={inputCls} value={form.hora_preparacao}
+                      onChange={e => set('hora_preparacao', e.target.value)} />
+                  </Field>
+                </div>
+                <Field label="Notas de preparação">
+                  <textarea className={textareaCls} rows={4} value={form.notas_preparacao}
+                    onChange={e => set('notas_preparacao', e.target.value)}
+                    placeholder="O que é para preparar…" />
+                </Field>
+              </div>
+
+              {/* Checklists (movidas da antiga aba Checklist) */}
+              <div className="border-t border-border/40 pt-4 flex flex-col gap-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Checklists</p>
+                {eventoChecklists.filter(ec => !ec.removed).map((ec) => (
+                  <div key={ec._key} className="border border-border rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 bg-surface-2 border-b border-border/50">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <ListChecks size={13} className="text-accent-subtle shrink-0" />
+                        <input
+                          className="flex-1 text-[13px] font-semibold text-accent bg-transparent outline-none min-w-0"
+                          value={ec.nome}
+                          onChange={e => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? { ...x, nome: e.target.value } : x))}
+                        />
+                      </div>
+                      <button
+                        onClick={() => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? { ...x, removed: true } : x))}
+                        className="text-accent-subtle/30 hover:text-status-cancelado transition-colors ml-2 shrink-0"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <div className="px-3 py-2.5 flex flex-col gap-1.5">
+                      {ec.itens.map((item, idx) => (
+                        <div key={item._key} className="flex items-center gap-2">
+                          <span className="text-accent-subtle/30 text-[11px] w-4 text-right shrink-0">{idx + 1}.</span>
+                          <input
+                            className="flex-1 text-[12px] text-accent bg-transparent border-b border-border/30 focus:border-accent/40 outline-none py-0.5"
+                            value={item.texto}
+                            placeholder={`Item ${idx + 1}…`}
+                            onChange={e => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? {
+                              ...x, itens: x.itens.map(it => it._key === item._key ? { ...it, texto: e.target.value } : it)
+                            } : x))}
+                          />
+                          <button
+                            onClick={() => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? {
+                              ...x,
+                              itens: x.itens.filter(it => it._key !== item._key),
+                              _deletedItemIds: item.id ? [...(x._deletedItemIds || []), item.id] : (x._deletedItemIds || []),
+                            } : x))}
+                            className="text-accent-subtle/25 hover:text-status-cancelado transition-colors shrink-0"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? {
+                          ...x, itens: [...x.itens, { _key: uidF(), id: null, texto: '' }]
+                        } : x))}
+                        className="flex items-center gap-1 text-[11px] text-accent-subtle/40 hover:text-status-confirmado/70 transition-colors mt-1"
+                      >
+                        <Plus size={11} />Adicionar item
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex flex-col gap-2">
+                  <select className={inputCls} value=""
+                    onChange={e => {
+                      const clId = e.target.value
+                      if (!clId) return
+                      const cl = allChecklists.find(c => String(c.id) === clId)
+                      if (!cl) return
+                      setEventoChecklists(prev => [...prev, {
+                        _key: uidF(), ecId: null, clId: cl.id,
+                        nome: cl.nome, tipo_evento_id: cl.tipo_evento_id,
+                        itens: (cl.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem).map(it => ({ _key: uidF(), id: it.id, texto: it.texto })),
+                        removed: false, _deletedItemIds: [],
+                      }])
+                    }}>
+                    <option value="">— Adicionar template de checklist —</option>
+                    {allChecklists
+                      .filter(cl => !eventoChecklists.some(ec => ec.clId === cl.id && !ec.removed))
+                      .map(cl => <option key={cl.id} value={cl.id}>{cl.nome}</option>)
+                    }
+                  </select>
+                  <button
+                    onClick={() => setEventoChecklists(prev => [...prev, {
+                      _key: uidF(), ecId: null, clId: null,
+                      nome: 'Nova Checklist', tipo_evento_id: null,
+                      itens: [], removed: false, _deletedItemIds: [],
+                    }])}
+                    className="flex items-center gap-1 text-[11px] text-accent-subtle/40 hover:text-status-confirmado/70 transition-colors"
+                  >
+                    <Plus size={11} />Criar nova checklist
+                  </button>
+                </div>
+              </div>
+
+              {/* Apoio T — read-only (só aparece se evento guardado e houver dados) */}
+              {evento?.id && (tecnicosNotas.length > 0 || Object.keys(checksByItem).length > 0) && (
+                <div className="border-t border-border/40 pt-4 flex flex-col gap-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
+                    Apoio T <span className="font-normal normal-case tracking-normal text-accent-subtle/40">— só leitura</span>
+                  </p>
+                  {tecnicosNotas.map(r => (
+                    <div key={r.tecnico_id} className="rounded-lg border border-border/40 bg-surface-2/40 px-3 py-2.5">
+                      <p className="text-[10px] font-semibold text-accent-subtle/60 uppercase tracking-wider mb-1.5">
+                        Notas de {tecnicos.find(t => t.id === r.tecnico_id)?.nome ?? '—'}
+                      </p>
+                      <p className="text-xs text-accent-muted whitespace-pre-wrap">{r.notas}</p>
+                    </div>
+                  ))}
+                  {eventoChecklists.filter(ec => !ec.removed && ec.itens.length > 0).map(ec => {
+                    const totalMarcados = ec.itens.filter(it => (checksByItem[it.id] ?? []).length > 0).length
+                    if (totalMarcados === 0) return null
+                    return (
+                      <div key={ec._key + '_apoiot'} className="rounded-lg border border-border/40 overflow-hidden">
+                        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2/60 border-b border-border/30">
+                          <p className="text-[11px] font-semibold text-accent">{ec.nome}</p>
+                          <p className="text-[10px] text-accent-subtle/50">{totalMarcados}/{ec.itens.length}</p>
+                        </div>
+                        {ec.itens.map(item => {
+                          const checks = checksByItem[item.id] ?? []
+                          if (checks.length === 0) return null
+                          return (
+                            <div key={item._key} className="flex items-start gap-2.5 px-3 py-2 border-b border-border/15 last:border-0 bg-status-confirmado/5">
+                              <div className="w-4 h-4 rounded border flex items-center justify-center shrink-0 mt-0.5 bg-status-confirmado/20 border-status-confirmado/40">
+                                <Check size={10} className="text-status-confirmado" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-accent-muted line-through">{item.texto}</p>
+                                {checks.map(c => (
+                                  <p key={c.tecnico_id} className="text-[10px] text-accent-subtle/50 mt-0.5">
+                                    {tecnicos.find(t => t.id === c.tecnico_id)?.nome ?? '—'} · {new Date(c.checked_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Aba Execução ── */}
+          {abaActiva === 'execucao' && (
+            <div className="flex flex-col gap-5">
+
+              {/* Checklists com estado — via Apoio T */}
+              {eventoChecklists.filter(ec => !ec.removed && ec.itens.length > 0).length > 0 && (
+                <div className="flex flex-col gap-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
+                    Checklist de Preparação <span className="font-normal normal-case tracking-normal text-accent-subtle/40">— via Apoio T</span>
+                  </p>
+                  {eventoChecklists.filter(ec => !ec.removed && ec.itens.length > 0).map(ec => {
+                    const submittedBy = checkSubs[ec.clId] ?? []
+                    const totalMarcados = ec.itens.filter(it => (checksByItem[it.id] ?? []).length > 0).length
+                    return (
+                      <div key={ec._key} className="rounded-lg border border-border/40 overflow-hidden">
+                        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2/60 border-b border-border/30">
+                          <p className="text-[11px] font-semibold text-accent">{ec.nome}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[10px] text-accent-subtle/50">{totalMarcados}/{ec.itens.length}</p>
+                            {submittedBy.length > 0 && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-status-confirmado">
+                                <Check size={10} />{submittedBy.map(tid => tecnicos.find(t => t.id === tid)?.nome ?? '—').join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {ec.itens.map(item => {
+                          const checks = checksByItem[item.id] ?? []
+                          const checked = checks.length > 0
+                          return (
+                            <div key={item._key} className={clsx(
+                              'flex items-start gap-2.5 px-3 py-2 border-b border-border/15 last:border-0',
+                              checked ? 'bg-status-confirmado/5' : ''
+                            )}>
+                              <div className={clsx('w-4 h-4 rounded border flex items-center justify-center shrink-0 mt-0.5',
+                                checked ? 'bg-status-confirmado/20 border-status-confirmado/40' : 'border-border'
+                              )}>
+                                {checked && <Check size={10} className="text-status-confirmado" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={clsx('text-xs', checked ? 'text-accent-muted' : 'text-accent')}>{item.texto}</p>
+                                {checks.map(c => (
+                                  <p key={c.tecnico_id} className="text-[10px] text-accent-subtle/50 mt-0.5">
+                                    {tecnicos.find(t => t.id === c.tecnico_id)?.nome ?? '—'} · {new Date(c.checked_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Veículo */}
+              <div className="flex flex-col gap-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Veículo</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Carro">
+                    <select className={inputCls} value={eventoCarros.carro_id}
+                      onChange={e => setEventoCarros(p => ({ ...p, carro_id: e.target.value }))}>
+                      <option value="">— Selecionar —</option>
+                      {carros.map(c => <option key={c.id} value={c.id}>{c.marca} {c.modelo} · {c.matricula}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Condutor">
+                    <select className={inputCls} value={eventoCarros.condutor_id}
+                      onChange={e => setEventoCarros(p => ({ ...p, condutor_id: e.target.value }))}>
+                      <option value="">— Selecionar —</option>
+                      {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Km saída">
+                    <input type="number" min="0" step="1" className={inputCls}
+                      value={eventoCarros.km_saida}
+                      onChange={e => setEventoCarros(p => ({ ...p, km_saida: e.target.value }))}
+                      placeholder="—" />
+                  </Field>
+                  <Field label="Km chegada">
+                    <input type="number" min="0" step="1" className={inputCls}
+                      value={eventoCarros.km_chegada}
+                      onChange={e => setEventoCarros(p => ({ ...p, km_chegada: e.target.value }))}
+                      placeholder="—" />
+                  </Field>
+                </div>
+              </div>
+
+              {/* Notas do técnico — via Apoio T */}
+              <div className="flex flex-col gap-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
+                  Notas do técnico <span className="font-normal normal-case tracking-normal text-accent-subtle/40">via Apoio T</span>
+                </p>
+                {feedbackTecnico.length > 0 ? feedbackTecnico.map(r => (
+                  <div key={r.tecnico_id} className="rounded-lg border border-border/40 bg-surface-2/40 px-3 py-2.5">
+                    <p className="text-[10px] font-semibold text-accent-subtle/60 uppercase tracking-wider mb-1">
+                      {tecnicos.find(t => t.id === r.tecnico_id)?.nome ?? '—'}
+                    </p>
+                    <p className="text-xs text-accent-muted whitespace-pre-wrap">{r.texto}</p>
+                  </div>
+                )) : (
+                  <p className="text-[11px] text-accent-subtle/30 italic px-1">Aguarda input do técnico via Apoio T…</p>
                 )}
               </div>
-            </>
-          )}
 
-          {/* ── Aba Técnico & Notas ── */}
-          {abaActiva === 'tecnico' && (
-            <>
-              <Field label="Equipamentos">
-                <textarea
-                  className={textareaCls}
-                  rows={4}
-                  value={form.Equipamentos}
-                  onChange={(e) => set('Equipamentos', e.target.value)}
-                  placeholder="Lista de equipamentos necessários…"
-                />
-              </Field>
-
-              <Field label="Notas operacionais">
-                <textarea
-                  className={textareaCls}
-                  rows={4}
-                  value={form.notas_operacionais}
-                  onChange={(e) => set('notas_operacionais', e.target.value)}
-                  placeholder="Informações operacionais do evento…"
-                />
-              </Field>
-
-              <Field label="Rider Técnico">
+              {/* Assinaturas / Fases */}
+              <div className="flex flex-col gap-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
+                  Assinaturas / Fases <span className="font-normal normal-case tracking-normal text-accent-subtle/40">recolhidas in-loco via Apoio T</span>
+                </p>
                 <div className="flex flex-col gap-2">
-                  {form.rider_url ? (
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={form.rider_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-accent underline truncate flex-1"
-                      >
-                        {form.rider_url.split('/').pop()}
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => set('rider_url', '')}
-                        className="text-xs text-status-cancelado hover:opacity-70 flex-shrink-0"
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  ) : null}
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <span className={`${inputCls} flex items-center gap-2 cursor-pointer text-accent-muted`}>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                      {form.rider_url ? 'Substituir ficheiro' : 'Carregar ficheiro (PDF, Word…)'}
-                    </span>
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        const ext = file.name.split('.').pop()
-                        const path = `riders/${crypto.randomUUID()}.${ext}`
-                        const { error } = await supabase.storage.from('eventos-riders').upload(path, file)
-                        if (error) { alert('Erro ao carregar ficheiro: ' + error.message); return }
-                        const { data: pub } = supabase.storage.from('eventos-riders').getPublicUrl(path)
-                        set('rider_url', pub.publicUrl)
-                        e.target.value = ''
-                      }}
-                    />
-                  </label>
-                </div>
-              </Field>
-            </>
-          )}
-
-          {/* ── Aba Faturação ── */}
-          {abaActiva === 'faturacao' && (
-            <>
-              <Field label="Notas de faturação">
-                <textarea
-                  className={textareaCls}
-                  rows={3}
-                  value={form.notas_faturacao}
-                  onChange={(e) => set('notas_faturacao', e.target.value)}
-                  placeholder="Notas que aparecem na fatura / documento de contas…"
-                />
-              </Field>
-
-              {BILLING_CAMPOS.map(({ key, label }) => {
-                const items = billing[key]
-                const addItem = () => setBilling(b => ({ ...b, [key]: [...b[key], emptyItem()] }))
-                const updItem = (k, field, val) => setBilling(b => ({
-                  ...b,
-                  [key]: b[key].map(it => it._key === k ? { ...it, [field]: val } : it),
-                }))
-                const remItem = (k) => setBilling(b => ({ ...b, [key]: b[key].filter(it => it._key !== k) }))
-                return (
-                  <div key={key} className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-medium text-accent-subtle uppercase tracking-wider">{label}</label>
-                      <button type="button" onClick={addItem}
-                        className="flex items-center gap-1 text-[11px] text-accent-subtle/50 hover:text-status-confirmado/70 transition-colors">
-                        <Plus size={11} />Adicionar
-                      </button>
-                    </div>
-                    {items.length === 0 && (
-                      <p className="text-[11px] text-accent-subtle/25 italic pl-1">Sem itens</p>
-                    )}
-                    {items.map(it => (
-                      <div key={it._key} className="grid grid-cols-[1fr_52px_76px_24px] gap-1.5 items-center">
-                        <input type="text" value={it.descricao}
-                          onChange={e => updItem(it._key, 'descricao', e.target.value)}
-                          placeholder="Descrição…"
-                          className={inputCls} />
-                        <input type="number" min="0" step="1" value={it.unidades}
-                          onChange={e => updItem(it._key, 'unidades', e.target.value)}
-                          className={inputCls + ' text-center px-1'} />
-                        <input type="number" min="0" step="0.01" value={it.valor_unitario}
-                          onChange={e => updItem(it._key, 'valor_unitario', e.target.value)}
-                          placeholder="€/un"
-                          className={inputCls + ' text-right px-2'} />
-                        <button type="button" onClick={() => remItem(it._key)}
-                          className="flex items-center justify-center text-border/30 hover:text-red-400/60 transition-colors">
-                          <Trash2 size={12} />
-                        </button>
+                  {[
+                    { label: 'Saída LMD',             key: 'assinatura_lmd_at' },
+                    { label: 'IN — Chegada ao evento', key: 'assinatura_in_at' },
+                    { label: 'OUT — Fim do evento',    key: 'assinatura_out_at' },
+                  ].map(({ label, key }) => {
+                    const val = evento?.[key]
+                    return (
+                      <div key={key} className="flex items-center gap-3 p-3 rounded-lg bg-surface-2/50 border border-border/40">
+                        <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-status-confirmado' : 'bg-border')} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-accent">{label}</p>
+                          <p className="text-[10px] text-accent-subtle/60 mt-0.5">
+                            {val ? new Date(val).toLocaleString('pt-PT') : 'Pendente — registo via Apoio T'}
+                          </p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )
-              })}
-            </>
+                    )
+                  })}
+                </div>
+                <div className="p-3 bg-surface-2/50 border border-border/40 rounded-lg flex items-center gap-3">
+                  <span className={clsx(
+                    'text-xs font-semibold px-2.5 py-1 rounded-full',
+                    (form.fase === 'concluido' || form.fase === 'faturado')
+                      ? 'bg-status-confirmado/15 text-status-confirmado'
+                      : 'bg-surface-3 text-accent-muted'
+                  )}>
+                    {({ criacao: 'Criação', preparacao: 'Preparação', execucao: 'Execução', concluido: 'Concluído', faturado: 'Faturado' })[form.fase || 'criacao'] || 'Criação'}
+                  </span>
+                  <p className="text-[10px] text-accent-subtle/50">Fase actualizada pelo Apoio T.</p>
+                </div>
+              </div>
+
+            </div>
           )}
 
-          {/* ── Aba Contas ── */}
-          {abaActiva === 'contas' && (() => {
+
+          {/* ── Aba Financeiro ── */}
+          {abaActiva === 'financeiro' && (() => {
             const vApoio  = form.valor_apoio_tecnico === '' ? 0 : Number(form.valor_apoio_tecnico) || 0
             const vMargem = form.margem       === '' ? 0 : Number(form.margem)       || 0
             const vTransp = form.transporte   === '' ? 0 : Number(form.transporte)   || 0
             const vExtras = form.extras_contas === '' ? 0 : Number(form.extras_contas) || 0
             const totalCli = vApoio + vMargem + vTransp + vExtras
             const fmt = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v)
+            const tec1 = form.tecnico_id === 'todos' ? 'Todos os técnicos' : tecnicos.find(t => t.id === form.tecnico_id)?.nome
+            const tec2 = tecnicos.find(t => t.id === form.tecnico2_id)?.nome
             return (
               <div className="flex flex-col gap-5">
+                {(tec1 || tec2) && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Técnicos</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {tec1 && <span className="px-2.5 py-1 rounded-full bg-surface-2 border border-border text-xs text-accent">{tec1}</span>}
+                      {tec2 && <span className="px-2.5 py-1 rounded-full bg-surface-2 border border-border text-xs text-accent-muted">{tec2} <span className="text-accent-subtle/40">(apoio)</span></span>}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Valores</p>
                   <div className="grid grid-cols-4 gap-3">
@@ -927,6 +1462,13 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   </div>
                 </div>
 
+                <Field label="Notas de faturação">
+                  <textarea className={textareaCls} rows={3}
+                    value={form.notas_faturacao}
+                    onChange={(e) => set('notas_faturacao', e.target.value)}
+                    placeholder="Notas que aparecem na fatura / documento de contas…" />
+                </Field>
+
                 <Field label="Notas de contas">
                   <textarea className={textareaCls} rows={3}
                     value={form.notas_contas}
@@ -936,104 +1478,6 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               </div>
             )
           })()}
-
-          {/* ── Aba Checklist ── */}
-          {abaActiva === 'checklist' && (
-            <div className="flex flex-col gap-4">
-              {eventoChecklists.filter(ec => !ec.removed).map((ec) => (
-                <div key={ec._key} className="border border-border rounded-xl overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 bg-surface-2 border-b border-border/50">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <ListChecks size={13} className="text-accent-subtle shrink-0" />
-                      <input
-                        className="flex-1 text-[13px] font-semibold text-accent bg-transparent outline-none min-w-0"
-                        value={ec.nome}
-                        onChange={e => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? { ...x, nome: e.target.value } : x))}
-                      />
-                    </div>
-                    <button
-                      onClick={() => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? { ...x, removed: true } : x))}
-                      className="text-accent-subtle/30 hover:text-status-cancelado transition-colors ml-2 shrink-0"
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                  <div className="px-3 py-2.5 flex flex-col gap-1.5">
-                    {ec.itens.map((item, idx) => (
-                      <div key={item._key} className="flex items-center gap-2">
-                        <span className="text-accent-subtle/30 text-[11px] w-4 text-right shrink-0">{idx + 1}.</span>
-                        <input
-                          className="flex-1 text-[12px] text-accent bg-transparent border-b border-border/30 focus:border-accent/40 outline-none py-0.5"
-                          value={item.texto}
-                          placeholder={`Item ${idx + 1}…`}
-                          onChange={e => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? {
-                            ...x, itens: x.itens.map(it => it._key === item._key ? { ...it, texto: e.target.value } : it)
-                          } : x))}
-                        />
-                        <button
-                          onClick={() => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? {
-                            ...x,
-                            itens: x.itens.filter(it => it._key !== item._key),
-                            _deletedItemIds: item.id ? [...(x._deletedItemIds || []), item.id] : (x._deletedItemIds || []),
-                          } : x))}
-                          className="text-accent-subtle/25 hover:text-status-cancelado transition-colors shrink-0"
-                        >
-                          <X size={11} />
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      onClick={() => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? {
-                        ...x, itens: [...x.itens, { _key: uidF(), id: null, texto: '' }]
-                      } : x))}
-                      className="flex items-center gap-1 text-[11px] text-accent-subtle/40 hover:text-status-confirmado/70 transition-colors mt-1"
-                    >
-                      <Plus size={11} />Adicionar item
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {/* Adicionar template existente */}
-              <div className="flex flex-col gap-2">
-                <p className="text-[11px] font-medium text-accent-subtle uppercase tracking-wider">Adicionar checklist</p>
-                <select
-                  className={inputCls}
-                  value=""
-                  onChange={e => {
-                    const clId = e.target.value
-                    if (!clId) return
-                    const cl = allChecklists.find(c => String(c.id) === clId)
-                    if (!cl) return
-                    setEventoChecklists(prev => [...prev, {
-                      _key: uidF(), ecId: null, clId: cl.id,
-                      nome: cl.nome, tipo_evento_id: cl.tipo_evento_id,
-                      itens: (cl.checklist_itens ?? [])
-                        .sort((a, b) => a.ordem - b.ordem)
-                        .map(it => ({ _key: uidF(), id: it.id, texto: it.texto })),
-                      removed: false, _deletedItemIds: [],
-                    }])
-                  }}
-                >
-                  <option value="">— Seleccionar template —</option>
-                  {allChecklists
-                    .filter(cl => !eventoChecklists.some(ec => ec.clId === cl.id && !ec.removed))
-                    .map(cl => <option key={cl.id} value={cl.id}>{cl.nome}</option>)
-                  }
-                </select>
-                <button
-                  onClick={() => setEventoChecklists(prev => [...prev, {
-                    _key: uidF(), ecId: null, clId: null,
-                    nome: 'Nova Checklist', tipo_evento_id: null,
-                    itens: [], removed: false, _deletedItemIds: [],
-                  }])}
-                  className="flex items-center gap-1 text-[11px] text-accent-subtle/40 hover:text-status-confirmado/70 transition-colors"
-                >
-                  <Plus size={11} />Criar nova checklist
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer */}

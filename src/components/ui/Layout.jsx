@@ -1,9 +1,10 @@
 ﻿import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, MapPin, CalendarDays, Ban,
-  Settings, LogOut, Mic2, Bell, Music2, Scale, Send, Wallet,
-  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw, Building2, Clock, ShieldCheck,
+  LayoutDashboard, Users, MapPin, CalendarDays,
+  Settings, LogOut, Mic2, Bell, Music2, Scale, Send,
+  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw, Building2, ShieldCheck, ClipboardList,
+  UserCheck, GraduationCap, Mic, Gem, Wallet, Package,
 } from 'lucide-react'
 import { useAuthStore, useMesStore, useAppStore } from '@/store'
 import { configuracoesApi } from '@/lib/api'
@@ -14,22 +15,24 @@ import { format, addMonths } from 'date-fns'
 import { pt } from 'date-fns/locale'
 
 const ROTAS = [
-  { path: '/',              label: 'Dashboard' },
-  { path: '/equilibrio',    label: 'Equilíbrio' },
-  { path: '/agenda',        label: 'Agenda' },
-  { path: '/eventos',       label: 'Eventos' },
-  { path: '/atuacoes',      label: 'Atuações' },
-  { path: '/comunicacao',   label: 'Comunicação' },
-  { path: '/contas',        label: 'Contas' },
-  { path: '/djs',           label: 'DJs' },
-  { path: '/convidados',    label: 'DJ Convidados' },
-  { path: '/artistas',      label: 'Artistas' },
-  { path: '/espacos',       label: 'Clientes' },
-  { path: '/bloqueios',     label: 'Bloqueios' },
+  { path: '/',               label: 'Dashboard' },
+  { path: '/equilibrio',     label: 'Equilíbrio' },
+  { path: '/agenda',         label: 'Agenda' },
+  { path: '/eventos',        label: 'Eventos' },
+  { path: '/atuacoes',       label: 'Atuações' },
+  { path: '/equipamentos',   label: 'Equipamentos' },
+  { path: '/comunicacao',    label: 'Comunicação' },
+  { path: '/contas',         label: 'Contas' },
+  { path: '/djs',            label: 'DJs' },
+  { path: '/convidados',     label: 'DJ Convidados' },
+  { path: '/artistas',       label: 'Artistas' },
+  { path: '/espacos',        label: 'Clientes' },
   { path: '/apoio-tecnico',  label: 'Apoio T.' },
-  { path: '/pontualidades', label: 'Pontualidades' },
-  { path: '/configuracoes', label: 'Configurações' },
-  { path: '/utilizadores',  label: 'Utilizadores' },
+  { path: '/producao',       label: 'Produção' },
+  { path: '/pontualidades',  label: 'Presenças' },
+  { path: '/club',           label: 'Publi' },
+  { path: '/configuracoes',  label: 'Configurações' },
+  { path: '/utilizadores',   label: 'Utilizadores' },
 ]
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -51,26 +54,53 @@ function labelContexto(anoMes) {
   return diff > 0 ? 'preparação' : 'histórico'
 }
 
-const navPrincipal = [
-  { para: '/',              icone: LayoutDashboard, label: 'Dashboard' },
-  { para: '/equilibrio',    icone: Scale,           label: 'Equilíbrio' },
-  { para: '/agenda',        icone: CalendarDays,    label: 'Agenda' },
-  { para: '/eventos',       icone: Star,            label: 'Eventos' },
-  { para: '/comunicacao',   icone: Send,            label: 'Comunicação' },
-  { para: '/contas',        icone: Wallet,          label: 'Contas' },
-  { para: '/apoio-tecnico',   icone: Headphones, label: 'Apoio T.' },
-  { para: '/club',            icone: Building2,  label: 'Club' },
-  { para: '/pontualidades',   icone: Clock,      label: 'Pontualidades' },
+const navAgenda = [
+  { para: '/',               icone: LayoutDashboard, label: 'Dashboard' },
+  { para: '/agenda',         icone: CalendarDays,    label: 'Agenda' },
+  { para: '/atuacoes',       icone: Mic2,            label: 'Atuações' },
+  { para: '/eventos',        icone: Star,            label: 'Eventos' },
+  { para: '/equipamentos',   icone: Package,         label: 'Equipamentos' },
+  { para: '/apoio-tecnico',  icone: Headphones,      label: 'Apoio T.' },
+  { para: '/producao',       icone: ClipboardList,   label: 'Produção' },
+  { para: '/pontualidades',  icone: UserCheck,       label: 'Presenças' },
+  { para: '/comunicacao',    icone: Send,            label: 'Comunicação' },
+  { para: '/equilibrio',     icone: Scale,           label: 'Equilíbrio' },
+  { para: '/contas',         icone: Wallet,          label: 'Contas' },
 ]
 
-const navGestao = [
-  { para: '/atuacoes',      icone: Mic2,    label: 'Atuações' },
-  { para: '/djs',           icone: Users,   label: 'DJs' },
-  { para: '/convidados',    icone: Star,    label: 'DJ Convidados' },
-  { para: '/artistas',      icone: Guitar,  label: 'Artistas' },
-  { para: '/espacos',       icone: MapPin,  label: 'Clientes' },
-  { para: '/bloqueios',     icone: Ban,     label: 'Bloqueios' },
+const navRH = [
+  { para: '/djs',        icone: Users,  label: 'DJs' },
+  { para: '/convidados', icone: Star,   label: 'DJ Convidados' },
+  { para: '/artistas',   icone: Guitar, label: 'Artistas' },
+  { para: '/espacos',    icone: MapPin, label: 'Clientes' },
 ]
+
+const navClub = [
+  { icone: Building2,     label: 'Publi' },
+  { icone: GraduationCap, label: 'Alunos' },
+  { icone: Mic,           label: 'Estúdio' },
+  { icone: Gem,           label: 'Pontos' },
+]
+
+function NavItemBrevemente({ icone: Icone, label, collapsed }) {
+  return (
+    <div
+      title={collapsed ? label : undefined}
+      className={clsx(
+        'flex items-center rounded text-xs tracking-wider opacity-35 cursor-not-allowed select-none',
+        collapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2',
+      )}
+    >
+      <Icone size={15} />
+      {!collapsed && <span className="uppercase flex-1">{label}</span>}
+      {!collapsed && (
+        <span className="text-[9px] bg-surface-3 px-1.5 py-0.5 rounded font-normal normal-case tracking-normal text-accent-subtle/60">
+          brevemente
+        </span>
+      )}
+    </div>
+  )
+}
 
 function NavItem({ para, icone: Icone, label, collapsed }) {
   return (
@@ -109,8 +139,8 @@ export function Layout() {
   const displayName = utilizadorNome ?? user?.email?.split('@')[0] ?? 'Admin'
   const displayInitial = displayName.charAt(0).toUpperCase()
 
-  const navPrincipalFiltrado = isAdmin ? navPrincipal : navPrincipal.filter(i => permissoes.includes(i.para))
-  const navGestaoFiltrado   = isAdmin ? navGestao   : navGestao.filter(i => permissoes.includes(i.para))
+  const navAgendaFiltrado = isAdmin ? navAgenda : navAgenda.filter(i => permissoes.includes(i.para))
+  const navRHFiltrado     = isAdmin ? navRH     : navRH.filter(i => permissoes.includes(i.para))
 
   useEffect(() => {
     if (Object.keys(config).length === 0) {
@@ -213,28 +243,41 @@ export function Layout() {
 
         {/* Nav */}
         <nav className={clsx('flex-1 py-4 flex flex-col gap-5 overflow-y-auto', collapsed ? 'px-1' : 'px-2')}>
-          {navPrincipalFiltrado.length > 0 && (
+          {navAgendaFiltrado.length > 0 && (
             <div>
               {!collapsed && (
                 <p className="px-3 mb-2 text-[10px] font-semibold text-accent-subtle uppercase tracking-widest">
-                  Principal
+                  Agenda
                 </p>
               )}
               <div className="flex flex-col gap-0.5">
-                {navPrincipalFiltrado.map((item) => <NavItem key={item.para} {...item} collapsed={collapsed} />)}
+                {navAgendaFiltrado.map((item) => <NavItem key={item.para} {...item} collapsed={collapsed} />)}
               </div>
             </div>
           )}
-          {navGestaoFiltrado.length > 0 && (
+          {navRHFiltrado.length > 0 && (
             <div>
               {!collapsed && (
                 <p className="px-3 mb-2 text-[10px] font-semibold text-accent-subtle uppercase tracking-widest">
-                  Gestão
+                  RH
                 </p>
               )}
               {collapsed && <div className="border-t border-border/30 mx-2 mb-2" />}
               <div className="flex flex-col gap-0.5">
-                {navGestaoFiltrado.map((item) => <NavItem key={item.para} {...item} collapsed={collapsed} />)}
+                {navRHFiltrado.map((item) => <NavItem key={item.para} {...item} collapsed={collapsed} />)}
+              </div>
+            </div>
+          )}
+          {isAdmin && (
+            <div>
+              {!collapsed && (
+                <p className="px-3 mb-2 text-[10px] font-semibold text-accent-subtle uppercase tracking-widest">
+                  i4DJ Club
+                </p>
+              )}
+              {collapsed && <div className="border-t border-border/30 mx-2 mb-2" />}
+              <div className="flex flex-col gap-0.5">
+                {navClub.map((item) => <NavItemBrevemente key={item.label} {...item} collapsed={collapsed} />)}
               </div>
             </div>
           )}
