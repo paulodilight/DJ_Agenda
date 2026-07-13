@@ -139,7 +139,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     let activo = true
     Promise.all([
       supabase.from('evento_checklists')
-        .select('checklist_id, checklists(id, nome, checklist_itens(id, texto, ordem))')
+        .select('checklist_id, checklists(id, nome, fase, checklist_itens(id, texto, ordem))')
         .eq('evento_id', evento.id),
       colaborador?.id ? supabase.from('checklist_checks')
         .select('checklist_item_id')
@@ -153,6 +153,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
       if (!activo) return
       setEventoListas((ecs ?? []).map(ec => ({
         clId: ec.checklist_id, nome: ec.checklists?.nome ?? '?',
+        fase: ec.checklists?.fase ?? null,
         itens: (ec.checklists?.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem),
       })))
       setEventoChecks(new Set((chks ?? []).map(c => c.checklist_item_id)))
@@ -639,10 +640,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
           ) : aba === 'execucao' ? (
             <div className="flex flex-col gap-4 py-2">
 
-              {/* Checklist de preparação */}
-              {eventoListas.length > 0 && (
+              {/* Checklist de saída */}
+              {eventoListas.some(l => l.fase === 'saida') && (
                 <div className="flex flex-col gap-2">
-                  {eventoListas.map(lista => {
+                  {eventoListas.filter(l => l.fase === 'saida').map(lista => {
                     const submetida = clSubmetidas.has(lista.clId)
                     return (
                       <div key={lista.clId} className="rounded-xl border border-white/10 overflow-hidden">

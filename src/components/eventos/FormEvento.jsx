@@ -216,7 +216,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
     supabase.from('carros').select('id, marca, modelo, matricula').eq('ativo', true).order('marca')
       .then(({ data }) => setCarros(data ?? [])).catch(console.error)
     supabase.from('checklists')
-      .select('id, nome, tipo_evento_id, checklist_itens(id, texto, ordem)')
+      .select('id, nome, fase, tipo_evento_id, checklist_itens(id, texto, ordem)')
       .order('nome')
       .then(({ data }) => setAllChecklists(data ?? []))
       .catch(console.error)
@@ -324,12 +324,12 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         .catch(console.error)
       // Carregar checklists do evento
       supabase.from('evento_checklists')
-        .select('id, checklist_id, checklists(id, nome, tipo_evento_id, checklist_itens(id, texto, ordem))')
+        .select('id, checklist_id, checklists(id, nome, fase, tipo_evento_id, checklist_itens(id, texto, ordem))')
         .eq('evento_id', evento.id)
         .then(({ data }) => {
           setEventoChecklists((data ?? []).map(ec => ({
             _key: uidF(), ecId: ec.id, clId: ec.checklist_id,
-            nome: ec.checklists.nome, tipo_evento_id: ec.checklists.tipo_evento_id,
+            nome: ec.checklists.nome, tipo_evento_id: ec.checklists.tipo_evento_id, fase: ec.checklists.fase ?? null,
             itens: (ec.checklists.checklist_itens ?? [])
               .sort((a, b) => a.ordem - b.ordem)
               .map(it => ({ _key: uidF(), id: it.id, texto: it.texto })),
@@ -500,9 +500,11 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
           let clId = ec.clId
           if (!clId) {
             const { data: newCl } = await supabase.from('checklists')
-              .insert({ nome: ec.nome, tipo_evento_id: ec.tipo_evento_id ?? null })
+              .insert({ nome: ec.nome, tipo_evento_id: ec.tipo_evento_id ?? null, fase: ec.fase ?? null })
               .select('id').single()
             clId = newCl?.id
+          } else {
+            await supabase.from('checklists').update({ nome: ec.nome, fase: ec.fase ?? null }).eq('id', clId)
           }
           if (!clId) continue
           // Apagar itens removidos
@@ -673,7 +675,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                               if (!next.some(ec => ec.clId === cl.id && !ec.removed)) {
                                 next = [...next, {
                                   _key: uidF(), ecId: null, clId: cl.id,
-                                  nome: cl.nome, tipo_evento_id: cl.tipo_evento_id,
+                                  nome: cl.nome, tipo_evento_id: cl.tipo_evento_id, fase: cl.fase ?? null,
                                   itens: (cl.checklist_itens ?? [])
                                     .sort((a, b) => a.ordem - b.ordem)
                                     .map(it => ({ _key: uidF(), id: it.id, texto: it.texto })),
@@ -1100,6 +1102,15 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                           onChange={e => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? { ...x, nome: e.target.value } : x))}
                         />
                       </div>
+                      <select
+                        className="text-[10px] text-accent-subtle/60 bg-transparent border border-border/30 rounded px-1.5 py-0.5 outline-none ml-2"
+                        value={ec.fase ?? ''}
+                        onChange={e => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? { ...x, fase: e.target.value || null } : x))}
+                      >
+                        <option value="">— fase —</option>
+                        <option value="preparacao">Preparação</option>
+                        <option value="saida">Saída</option>
+                      </select>
                       <button
                         onClick={() => setEventoChecklists(prev => prev.map(x => x._key === ec._key ? { ...x, removed: true } : x))}
                         className="text-accent-subtle/30 hover:text-status-cancelado transition-colors ml-2 shrink-0"
@@ -1151,7 +1162,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                       if (!cl) return
                       setEventoChecklists(prev => [...prev, {
                         _key: uidF(), ecId: null, clId: cl.id,
-                        nome: cl.nome, tipo_evento_id: cl.tipo_evento_id,
+                        nome: cl.nome, tipo_evento_id: cl.tipo_evento_id, fase: cl.fase ?? null,
                         itens: (cl.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem).map(it => ({ _key: uidF(), id: it.id, texto: it.texto })),
                         removed: false, _deletedItemIds: [],
                       }])
@@ -1165,7 +1176,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   <button
                     onClick={() => setEventoChecklists(prev => [...prev, {
                       _key: uidF(), ecId: null, clId: null,
-                      nome: 'Nova Checklist', tipo_evento_id: null,
+                      nome: 'Nova Checklist', tipo_evento_id: null, fase: null,
                       itens: [], removed: false, _deletedItemIds: [],
                     }])}
                     className="flex items-center gap-1 text-[11px] text-accent-subtle/40 hover:text-status-confirmado/70 transition-colors"
@@ -1281,39 +1292,35 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 </div>
               )}
 
-              {/* Veículo */}
-              <div className="flex flex-col gap-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Veículo</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Carro">
-                    <select className={inputCls} value={eventoCarros.carro_id}
-                      onChange={e => setEventoCarros(p => ({ ...p, carro_id: e.target.value }))}>
-                      <option value="">— Selecionar —</option>
-                      {carros.map(c => <option key={c.id} value={c.id}>{c.marca} {c.modelo} · {c.matricula}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Condutor">
-                    <select className={inputCls} value={eventoCarros.condutor_id}
-                      onChange={e => setEventoCarros(p => ({ ...p, condutor_id: e.target.value }))}>
-                      <option value="">— Selecionar —</option>
-                      {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                    </select>
-                  </Field>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Km saída">
-                    <input type="number" min="0" step="1" className={inputCls}
-                      value={eventoCarros.km_saida}
-                      onChange={e => setEventoCarros(p => ({ ...p, km_saida: e.target.value }))}
-                      placeholder="—" />
-                  </Field>
-                  <Field label="Km chegada">
-                    <input type="number" min="0" step="1" className={inputCls}
-                      value={eventoCarros.km_chegada}
-                      onChange={e => setEventoCarros(p => ({ ...p, km_chegada: e.target.value }))}
-                      placeholder="—" />
-                  </Field>
-                </div>
+              {/* Veículo — read-only, via Apoio T */}
+              <div className="flex flex-col gap-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
+                  Veículo <span className="font-normal normal-case tracking-normal text-accent-subtle/40">via Apoio T</span>
+                </p>
+                {eventoCarros.carro_id || eventoCarros.condutor_id || eventoCarros.km_saida || eventoCarros.km_chegada ? (() => {
+                  const carro    = carros.find(c => c.id === eventoCarros.carro_id)
+                  const condutor = tecnicos.find(t => t.id === eventoCarros.condutor_id)
+                  const kmS      = eventoCarros.km_saida   !== '' ? Number(eventoCarros.km_saida)   : null
+                  const kmC      = eventoCarros.km_chegada !== '' ? Number(eventoCarros.km_chegada) : null
+                  const diff     = kmS != null && kmC != null ? kmC - kmS : null
+                  return (
+                    <div className="rounded-lg border border-border/40 bg-surface-2/40 px-3 py-2.5 flex flex-col gap-1.5">
+                      {[
+                        { label: 'Carro',      valor: carro ? `${carro.marca} ${carro.modelo} · ${carro.matricula}` : null },
+                        { label: 'Condutor',   valor: condutor?.nome ?? null },
+                        { label: 'Km saída',   valor: kmS != null ? String(kmS) : null },
+                        { label: 'Km chegada', valor: kmC != null ? `${kmC}${diff != null ? `  (+${diff} km)` : ''}` : null },
+                      ].map(({ label, valor }) => valor ? (
+                        <div key={label} className="flex items-baseline gap-2">
+                          <span className="text-[10px] text-accent-subtle/50 uppercase tracking-wider w-20 shrink-0">{label}</span>
+                          <span className="text-xs text-accent-muted">{valor}</span>
+                        </div>
+                      ) : null)}
+                    </div>
+                  )
+                })() : (
+                  <p className="text-[11px] text-accent-subtle/30 italic px-1">Aguarda registo via Apoio T…</p>
+                )}
               </div>
 
               {/* Notas do técnico — via Apoio T */}
