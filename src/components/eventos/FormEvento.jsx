@@ -1451,40 +1451,47 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 </div>
 
                 {/* 2. Equipamentos */}
-                {gruposComItens.length > 0 && (
-                  <div className="flex flex-col gap-3">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Equipamentos</p>
-                    {gruposComItens.map(g => {
-                      const sub = subtotalGrupo(g.rows)
-                      return (
-                        <div key={g.tipo} className="rounded-lg border border-border/40 overflow-hidden">
-                          <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2/60 border-b border-border/30">
-                            <p className="text-[11px] font-semibold text-accent">{g.label}</p>
-                            {sub > 0 && <span className="text-[11px] font-semibold text-accent tabular-nums">{fmt(sub)}</span>}
-                          </div>
-                          <div className="flex flex-col">
-                            {g.rows.map((r, i) => {
-                              const nome = equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao || '—'
-                              const preco = num(r.valor_custo)
-                              return (
-                                <div key={i} className="flex items-center justify-between px-3 py-2 border-b border-border/10 last:border-0">
-                                  <span className="text-xs text-accent-muted flex-1 min-w-0 truncate">
-                                    {r.unidades > 1 ? `${r.unidades}× ` : ''}{nome}
-                                  </span>
-                                  {preco > 0 && (
-                                    <span className="text-xs text-accent-subtle/70 tabular-nums shrink-0 ml-2">
-                                      {fmt((r.unidades || 1) * preco)}
-                                    </span>
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
+                <div className="flex flex-col gap-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Equipamentos</p>
+                  {GRUPOS_EQUIP.map(g => {
+                    const rows = equipRows[g.tipo] ?? []
+                    const sub = rows.reduce((s, r) => s + (r.unidades || 1) * num(r.valor_custo), 0)
+                    return (
+                      <div key={g.tipo} className="rounded-lg border border-border/40 overflow-hidden">
+                        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2/60 border-b border-border/30">
+                          <p className="text-[11px] font-semibold text-accent">{g.label}</p>
+                          {sub > 0 && <span className="text-[11px] font-semibold text-accent tabular-nums">{fmt(sub)}</span>}
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
+                        <div className="flex flex-col">
+                          {rows.length === 0 ? (
+                            <p className="px-3 py-2 text-[11px] text-accent-subtle/30 italic">Sem itens</p>
+                          ) : rows.map((r, i) => {
+                            const nome = equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao_manual || r.descricao || '—'
+                            const linhaTotal = (r.unidades || 1) * num(r.valor_custo)
+                            return (
+                              <div key={r._key ?? i} className="flex items-center gap-3 px-3 py-2 border-b border-border/10 last:border-0">
+                                <span className="text-xs text-accent-muted flex-1 min-w-0 truncate">
+                                  {(r.unidades || 1) > 1 ? `${r.unidades}× ` : ''}{nome}
+                                </span>
+                                <input type="number" min="0" step="0.01"
+                                  className="w-24 shrink-0 rounded-md border border-border/50 bg-surface-2 px-2 py-1 text-xs text-accent text-right focus:outline-none focus:border-accent/40"
+                                  value={r.valor_custo ?? ''}
+                                  placeholder="0"
+                                  onChange={e => setEquipRows(prev => ({
+                                    ...prev,
+                                    [g.tipo]: (prev[g.tipo] ?? []).map((x, idx) => idx === i ? { ...x, valor_custo: e.target.value } : x)
+                                  }))} />
+                                <span className="text-[11px] text-accent-subtle/60 tabular-nums w-16 text-right shrink-0">
+                                  {linhaTotal > 0 ? fmt(linhaTotal) : '—'}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
 
                 {/* 3. Notas de Faturação */}
                 <Field label="Notas de faturação">
