@@ -1550,28 +1550,65 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                         <div className="flex flex-col">
                           {rows.length === 0 ? (
                             <p className="px-3 py-2 text-[11px] text-accent-subtle/30 italic">Sem itens</p>
-                          ) : rows.map((r, i) => {
-                            const nome = equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao_manual || r.descricao || '—'
-                            const linhaTotal = (r.unidades || 1) * num(r.valor_custo)
-                            return (
-                              <div key={r._key ?? i} className="flex items-center gap-3 px-3 py-2 border-b border-border/10 last:border-0">
-                                <span className="text-xs text-accent-muted flex-1 min-w-0 truncate">
-                                  {(r.unidades || 1) > 1 ? `${r.unidades}× ` : ''}{nome}
-                                </span>
-                                <input type="number" min="0" step="0.01"
-                                  className="w-24 shrink-0 rounded-md border border-border/50 bg-surface-2 px-2 py-1 text-xs text-accent text-right focus:outline-none focus:border-accent/40"
-                                  value={r.valor_custo ?? ''}
-                                  placeholder="0"
-                                  onChange={e => setEquipRows(prev => ({
-                                    ...prev,
-                                    [g.tipo]: (prev[g.tipo] ?? []).map((x, idx) => idx === i ? { ...x, valor_custo: e.target.value } : x)
-                                  }))} />
-                                <span className="text-[11px] text-accent-subtle/60 tabular-nums w-16 text-right shrink-0">
-                                  {linhaTotal > 0 ? fmt(linhaTotal) : '—'}
-                                </span>
-                              </div>
-                            )
-                          })}
+                          ) : (<>
+                            <div className="flex items-center gap-2 px-3 py-1 border-b border-border/20 bg-surface-1/30">
+                              <span className="text-[10px] text-accent-subtle/40 uppercase tracking-wider flex-1 min-w-0">Equipamento</span>
+                              <span className="text-[10px] text-accent-subtle/40 uppercase tracking-wider w-12 text-right shrink-0">Un.</span>
+                              <span className="text-[10px] text-accent-subtle/40 uppercase tracking-wider w-20 text-right shrink-0">Custo</span>
+                              <span className="text-[10px] text-accent-subtle/40 uppercase tracking-wider w-16 text-right shrink-0">Total</span>
+                            </div>
+                            {rows.map((r, i) => {
+                              const linhaTotal = (r.unidades || 1) * num(r.valor_custo)
+                              const upd = (field, val) => setEquipRows(prev => ({
+                                ...prev,
+                                [g.tipo]: (prev[g.tipo] ?? []).map((x, idx) => idx === i ? { ...x, [field]: val } : x)
+                              }))
+                              return (
+                                <div key={r._key ?? i} className="flex items-center gap-2 px-3 py-2 border-b border-border/10 last:border-0">
+                                  {r.equipamento_id != null ? (
+                                    <select
+                                      className="flex-1 min-w-0 rounded-md border border-border/50 bg-surface-2 px-2 py-1 text-xs text-accent focus:outline-none focus:border-accent/40"
+                                      value={r.equipamento_id ?? ''}
+                                      onChange={e => {
+                                        const eq = equipamentosList.find(x => x.id === Number(e.target.value))
+                                        if (eq) setEquipRows(prev => ({
+                                          ...prev,
+                                          [g.tipo]: (prev[g.tipo] ?? []).map((x, idx) => idx === i
+                                            ? { ...x, equipamento_id: eq.id, descricao: eq.nome, valor_custo: eq.valor_custo != null ? String(eq.valor_custo) : x.valor_custo }
+                                            : x)
+                                        }))
+                                      }}
+                                    >
+                                      {equipamentosList.map(eq => (
+                                        <option key={eq.id} value={eq.id}>{eq.nome}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <input type="text"
+                                      className="flex-1 min-w-0 rounded-md border border-border/50 bg-surface-2 px-2 py-1 text-xs text-accent focus:outline-none focus:border-accent/40"
+                                      value={r.descricao || ''}
+                                      placeholder="Descrição"
+                                      onChange={e => upd('descricao', e.target.value)}
+                                    />
+                                  )}
+                                  <input type="number" min="1" step="1"
+                                    className="w-12 shrink-0 rounded-md border border-border/50 bg-surface-2 px-2 py-1 text-xs text-accent text-right focus:outline-none focus:border-accent/40"
+                                    value={r.unidades || 1}
+                                    onChange={e => upd('unidades', parseInt(e.target.value) || 1)}
+                                  />
+                                  <input type="number" min="0" step="0.01"
+                                    className="w-20 shrink-0 rounded-md border border-border/50 bg-surface-2 px-2 py-1 text-xs text-accent text-right focus:outline-none focus:border-accent/40"
+                                    value={r.valor_custo ?? ''}
+                                    placeholder="0"
+                                    onChange={e => upd('valor_custo', e.target.value)}
+                                  />
+                                  <span className="text-[11px] text-accent-subtle/60 tabular-nums w-16 text-right shrink-0">
+                                    {linhaTotal > 0 ? fmt(linhaTotal) : '—'}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </>)}
                         </div>
                       </div>
                     )
