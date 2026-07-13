@@ -173,6 +173,20 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     return () => { activo = false }
   }, [evento?.id, colaborador?.id])
 
+  // Preparação → Execução automático 4h antes do evento
+  useEffect(() => {
+    if (!evento?.data_evento || !evento?.hora_inicio || faseLocal !== 'preparacao') return
+    const verificar = () => {
+      const [h, m] = evento.hora_inicio.split(':').map(Number)
+      const eventoDate = new Date(`${evento.data_evento}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`)
+      const limite = new Date(eventoDate.getTime() - 4 * 60 * 60 * 1000)
+      if (new Date() >= limite) marcarFase('execucao')
+    }
+    verificar()
+    const id = setInterval(verificar, 60_000)
+    return () => clearInterval(id)
+  }, [evento?.data_evento, evento?.hora_inicio, faseLocal])
+
   const logo    = evento.espacos?.logo_url
   const cliente = evento.espacos?.nome || evento.cliente || null
   const tecNomeResp = evento.todos_tecnicos ? 'Todos os técnicos' : (mapaTecnicos[evento.tecnico_id] || evento.responsavel || null)
@@ -198,7 +212,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const toggleCheck = async (itemId, checklistId) => {
     if (!colaborador?.id || clSubmetidas.has(checklistId)) return
     const checked = eventoChecks.has(itemId)
-    setEventoChecks(prev => { const s = new Set(prev); if (checked) s.delete(itemId); else s.add(itemId); return s })
+    const newChecks = new Set(eventoChecks)
+    if (checked) newChecks.delete(itemId); else newChecks.add(itemId)
+    setEventoChecks(newChecks)
+
+    // Criação → Preparação quando todos os itens (excl. saída) estão marcados
+    if (!checked && faseLocal === 'criacao') {
+      const itens = eventoListas.filter(l => l.fase !== 'saida').flatMap(l => l.itens.map(it => it.id))
+      if (itens.length > 0 && itens.every(id => newChecks.has(id))) marcarFase('preparacao')
+    }
+
     if (!checked) {
       const { error } = await supabase.from('checklist_checks').upsert(
         { evento_id: evento.id, checklist_item_id: itemId, tecnico_id: colaborador.id },
