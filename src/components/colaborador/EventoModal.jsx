@@ -701,9 +701,9 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                       <Boxes size={12} /> Equipamentos
                     </p>
                     {comItens.map(g => (
-                      <div key={g.tipo} className="rounded-xl border border-white/10 overflow-hidden">
-                        <div className="px-3 py-1.5 bg-white/5 border-b border-white/10">
-                          <p className="font-semibold text-amber-400" style={{ fontSize: 11 }}>{g.label}</p>
+                      <div key={g.tipo} className="rounded-xl border border-white/15 overflow-hidden">
+                        <div className="px-3 py-2 bg-amber-400/[0.08] border-b border-amber-400/20">
+                          <p className="font-bold text-amber-400 uppercase tracking-wider" style={{ fontSize: 10 }}>{g.label}</p>
                         </div>
                         <div className="flex flex-col">
                           {g.itens.map((r, i) => (

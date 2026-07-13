@@ -903,6 +903,26 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   />
                 </Field>
               </div>
+
+              {/* Preparação */}
+              <div className="border-t border-border/40 pt-4 flex flex-col gap-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Preparação</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Data de preparação">
+                    <input type="date" className={inputCls} value={form.data_preparacao}
+                      onChange={e => set('data_preparacao', e.target.value)} />
+                  </Field>
+                  <Field label="Hora de preparação">
+                    <input type="time" className={inputCls} value={form.hora_preparacao}
+                      onChange={e => set('hora_preparacao', e.target.value)} />
+                  </Field>
+                </div>
+                <Field label="Notas de preparação">
+                  <textarea className={textareaCls} rows={3} value={form.notas_preparacao}
+                    onChange={e => set('notas_preparacao', e.target.value)}
+                    placeholder="O que é para preparar…" />
+                </Field>
+              </div>
             </>
           )}
 
@@ -1065,25 +1085,6 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
           {/* ── Aba Preparação ── */}
           {abaActiva === 'preparacao' && (
             <div className="flex flex-col gap-5">
-
-              {/* Secção admin */}
-              <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Data de preparação">
-                    <input type="date" className={inputCls} value={form.data_preparacao}
-                      onChange={e => set('data_preparacao', e.target.value)} />
-                  </Field>
-                  <Field label="Hora de preparação">
-                    <input type="time" className={inputCls} value={form.hora_preparacao}
-                      onChange={e => set('hora_preparacao', e.target.value)} />
-                  </Field>
-                </div>
-                <Field label="Notas de preparação">
-                  <textarea className={textareaCls} rows={4} value={form.notas_preparacao}
-                    onChange={e => set('notas_preparacao', e.target.value)}
-                    placeholder="O que é para preparar…" />
-                </Field>
-              </div>
 
               {/* Checklists (movidas da antiga aba Checklist) */}
               <div className="border-t border-border/40 pt-4 flex flex-col gap-4">
@@ -1255,17 +1256,17 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                           const checked = checks.length > 0
                           return (
                             <div key={item._key} className={clsx(
-                              'flex items-start gap-2.5 px-3 py-2 border-b border-border/15 last:border-0',
+                              'flex items-center gap-2.5 px-3 py-2 border-b border-border/15 last:border-0',
                               checked ? 'bg-status-confirmado/5' : ''
                             )}>
-                              <div className={clsx('w-4 h-4 rounded border flex items-center justify-center shrink-0 mt-0.5',
-                                checked ? 'bg-status-confirmado/20 border-status-confirmado/40' : 'border-border'
-                              )}>
-                                {checked && <Check size={10} className="text-status-confirmado" />}
-                              </div>
+                              {checked ? (
+                                <Check size={11} className="text-status-confirmado shrink-0" />
+                              ) : (
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-accent-subtle/35 shrink-0 border border-border/30 rounded px-1.5 py-0.5 whitespace-nowrap">Técnico</span>
+                              )}
                               <div className="flex-1 min-w-0">
-                                <p className={clsx('text-xs', checked ? 'text-accent-muted' : 'text-accent')}>{item.texto}</p>
-                                {checks.map(c => (
+                                <p className={clsx('text-xs', checked ? 'text-accent-muted/70 line-through' : 'text-accent')}>{item.texto}</p>
+                                {checked && checks.map(c => (
                                   <p key={c.tecnico_id} className="text-[10px] text-accent-subtle/50 mt-0.5">
                                     {tecnicos.find(t => t.id === c.tecnico_id)?.nome ?? '—'} · {new Date(c.checked_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                                   </p>
