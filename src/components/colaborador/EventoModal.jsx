@@ -704,7 +704,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Presença / Assinaturas</p>
                 <div className="flex flex-col gap-2">
                   {[
-                    { campo: 'assinatura_lmd_at', label: 'Saída LMD' },
+                    { campo: 'assinatura_lmd_at', label: 'IN - Work' },
                     { campo: 'assinatura_in_at',  label: 'IN — Chegada ao evento' },
                     { campo: 'assinatura_out_at', label: 'OUT — Fim do evento' },
                   ].map(({ campo, label }) => {
