@@ -42,6 +42,7 @@ const VAZIO = {
   valor: '',
   valor_artistico: '',
   valor_apoio_tecnico: '',
+  valor_apoio_tecnico_2: '',
   valor_alimentacao: '',
   margem: '',
   transporte: '',
@@ -240,8 +241,9 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         ...evento,
         valor:               evento.valor               != null ? String(evento.valor)               : '',
         valor_artistico:     evento.valor_artistico     != null ? String(evento.valor_artistico)     : '',
-        valor_apoio_tecnico: evento.valor_apoio_tecnico != null ? String(evento.valor_apoio_tecnico) : '',
-        valor_alimentacao:   evento.valor_alimentacao   != null ? String(evento.valor_alimentacao)   : '',
+        valor_apoio_tecnico:   evento.valor_apoio_tecnico   != null ? String(evento.valor_apoio_tecnico)   : '',
+        valor_apoio_tecnico_2: evento.valor_apoio_tecnico_2 != null ? String(evento.valor_apoio_tecnico_2) : '',
+        valor_alimentacao:     evento.valor_alimentacao     != null ? String(evento.valor_alimentacao)     : '',
         margem:          evento.margem          != null ? String(evento.margem)          : '',
         transporte:      evento.transporte      != null ? String(evento.transporte)      : '',
         extras_contas:   evento.extras_contas   != null ? String(evento.extras_contas)   : '',
@@ -405,8 +407,9 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         ...form,
         valor:               form.valor               !== '' ? Number(form.valor)               : null,
         valor_artistico:     form.valor_artistico     !== '' ? Number(form.valor_artistico)     : null,
-        valor_apoio_tecnico: form.valor_apoio_tecnico !== '' ? Number(form.valor_apoio_tecnico) : null,
-        valor_alimentacao:   form.valor_alimentacao   !== '' ? Number(form.valor_alimentacao)   : null,
+        valor_apoio_tecnico:   form.valor_apoio_tecnico   !== '' ? Number(form.valor_apoio_tecnico)   : null,
+        valor_apoio_tecnico_2: form.valor_apoio_tecnico_2 !== '' ? Number(form.valor_apoio_tecnico_2) : null,
+        valor_alimentacao:     form.valor_alimentacao     !== '' ? Number(form.valor_alimentacao)     : null,
         margem:        form.margem        !== '' ? Number(form.margem)        : null,
         transporte:    form.transporte    !== '' ? Number(form.transporte)    : null,
         extras_contas: form.extras_contas !== '' ? Number(form.extras_contas) : null,
@@ -1405,7 +1408,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             const subtotalGrupo = (rows) => rows.reduce((s, r) => s + (r.unidades || 1) * num(r.valor_custo), 0)
             const totalEquip = gruposComItens.reduce((s, g) => s + subtotalGrupo(g.rows), 0)
 
-            const vApoio   = num(form.valor_apoio_tecnico)
+            const vApoio   = num(form.valor_apoio_tecnico) + num(form.valor_apoio_tecnico_2)
             const vTransp  = num(form.transporte)
             const vAlim    = num(form.valor_alimentacao)
             const temArtista = !!(form.xclusive || form.artista_id)
@@ -1423,18 +1426,28 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 {/* 1. Técnicos */}
                 <div className="flex flex-col gap-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Técnicos</p>
-                  {(tec1 || tec2) && (
-                    <div className="flex gap-2 flex-wrap">
-                      {tec1 && <span className="px-2.5 py-1 rounded-full bg-surface-2 border border-border text-xs text-accent">{tec1}</span>}
-                      {tec2 && <span className="px-2.5 py-1 rounded-full bg-surface-2 border border-border text-xs text-accent-muted">{tec2} <span className="text-accent-subtle/40">(apoio)</span></span>}
-                    </div>
-                  )}
-                  <Field label="Apoio Técnico (€)">
-                    <input type="number" min="0" step="0.01" className={inputCls}
-                      value={form.valor_apoio_tecnico}
-                      onChange={(e) => set('valor_apoio_tecnico', e.target.value)}
-                      placeholder="0" />
-                  </Field>
+                  <div className="flex flex-col gap-2">
+                    {tec1 && (
+                      <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border/40 bg-surface-2/30">
+                        <span className="text-xs text-accent flex-1 min-w-0 truncate">{tec1}</span>
+                        <input type="number" min="0" step="0.01"
+                          className="w-28 shrink-0 rounded-md border border-border/50 bg-surface-2 px-2 py-1 text-xs text-accent text-right focus:outline-none focus:border-accent/40"
+                          value={form.valor_apoio_tecnico}
+                          onChange={(e) => set('valor_apoio_tecnico', e.target.value)}
+                          placeholder="0 €" />
+                      </div>
+                    )}
+                    {tec2 && (
+                      <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border/40 bg-surface-2/30">
+                        <span className="text-xs text-accent-muted flex-1 min-w-0 truncate">{tec2} <span className="text-accent-subtle/40">(apoio)</span></span>
+                        <input type="number" min="0" step="0.01"
+                          className="w-28 shrink-0 rounded-md border border-border/50 bg-surface-2 px-2 py-1 text-xs text-accent text-right focus:outline-none focus:border-accent/40"
+                          value={form.valor_apoio_tecnico_2}
+                          onChange={(e) => set('valor_apoio_tecnico_2', e.target.value)}
+                          placeholder="0 €" />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* 2. Equipamentos */}
