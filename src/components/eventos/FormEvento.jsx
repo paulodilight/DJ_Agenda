@@ -42,6 +42,7 @@ const VAZIO = {
   valor: '',
   valor_artistico: '',
   valor_apoio_tecnico: '',
+  valor_alimentacao: '',
   margem: '',
   transporte: '',
   extras_contas: '',
@@ -240,6 +241,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         valor:               evento.valor               != null ? String(evento.valor)               : '',
         valor_artistico:     evento.valor_artistico     != null ? String(evento.valor_artistico)     : '',
         valor_apoio_tecnico: evento.valor_apoio_tecnico != null ? String(evento.valor_apoio_tecnico) : '',
+        valor_alimentacao:   evento.valor_alimentacao   != null ? String(evento.valor_alimentacao)   : '',
         margem:          evento.margem          != null ? String(evento.margem)          : '',
         transporte:      evento.transporte      != null ? String(evento.transporte)      : '',
         extras_contas:   evento.extras_contas   != null ? String(evento.extras_contas)   : '',
@@ -404,6 +406,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         valor:               form.valor               !== '' ? Number(form.valor)               : null,
         valor_artistico:     form.valor_artistico     !== '' ? Number(form.valor_artistico)     : null,
         valor_apoio_tecnico: form.valor_apoio_tecnico !== '' ? Number(form.valor_apoio_tecnico) : null,
+        valor_alimentacao:   form.valor_alimentacao   !== '' ? Number(form.valor_alimentacao)   : null,
         margem:        form.margem        !== '' ? Number(form.margem)        : null,
         transporte:    form.transporte    !== '' ? Number(form.transporte)    : null,
         extras_contas: form.extras_contas !== '' ? Number(form.extras_contas) : null,
@@ -1384,75 +1387,157 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
 
           {/* ── Aba Financeiro ── */}
           {abaActiva === 'financeiro' && (() => {
-            const vApoio  = form.valor_apoio_tecnico === '' ? 0 : Number(form.valor_apoio_tecnico) || 0
-            const vMargem = form.margem       === '' ? 0 : Number(form.margem)       || 0
-            const vTransp = form.transporte   === '' ? 0 : Number(form.transporte)   || 0
-            const vExtras = form.extras_contas === '' ? 0 : Number(form.extras_contas) || 0
-            const totalCli = vApoio + vMargem + vTransp + vExtras
             const fmt = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v)
+            const num = (v) => v === '' || v == null ? 0 : Number(v) || 0
+
             const tec1 = form.tecnico_id === 'todos' ? 'Todos os técnicos' : tecnicos.find(t => t.id === form.tecnico_id)?.nome
             const tec2 = tecnicos.find(t => t.id === form.tecnico2_id)?.nome
+
+            const GRUPOS_EQUIP = [
+              { tipo: 'proprio',  label: 'Equipamentos para o evento' },
+              { tipo: 'alugado',  label: 'Equipamentos Alugados' },
+              { tipo: 'comprado', label: 'Equipamentos Comprados' },
+              { tipo: 'extra',    label: 'Extras' },
+            ]
+            const gruposComItens = GRUPOS_EQUIP
+              .map(g => ({ ...g, rows: equipRows[g.tipo] ?? [] }))
+              .filter(g => g.rows.length > 0)
+            const subtotalGrupo = (rows) => rows.reduce((s, r) => s + (r.unidades || 1) * num(r.valor_custo), 0)
+            const totalEquip = gruposComItens.reduce((s, g) => s + subtotalGrupo(g.rows), 0)
+
+            const vApoio   = num(form.valor_apoio_tecnico)
+            const vTransp  = num(form.transporte)
+            const vAlim    = num(form.valor_alimentacao)
+            const temArtista = !!(form.xclusive || form.artista_id)
+            const vArtista = temArtista ? num(form.valor_artistico) : 0
+
+            const kmS  = eventoCarros.km_saida   !== '' ? Number(eventoCarros.km_saida)   : null
+            const kmC  = eventoCarros.km_chegada !== '' ? Number(eventoCarros.km_chegada) : null
+            const kmDiff = kmS != null && kmC != null ? kmC - kmS : null
+
+            const total = vApoio + totalEquip + vTransp + vAlim + vArtista
+
             return (
               <div className="flex flex-col gap-5">
-                {(tec1 || tec2) && (
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Técnicos</p>
+
+                {/* 1. Técnicos */}
+                <div className="flex flex-col gap-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Técnicos</p>
+                  {(tec1 || tec2) && (
                     <div className="flex gap-2 flex-wrap">
                       {tec1 && <span className="px-2.5 py-1 rounded-full bg-surface-2 border border-border text-xs text-accent">{tec1}</span>}
                       {tec2 && <span className="px-2.5 py-1 rounded-full bg-surface-2 border border-border text-xs text-accent-muted">{tec2} <span className="text-accent-subtle/40">(apoio)</span></span>}
                     </div>
+                  )}
+                  <Field label="Apoio Técnico (€)">
+                    <input type="number" min="0" step="0.01" className={inputCls}
+                      value={form.valor_apoio_tecnico}
+                      onChange={(e) => set('valor_apoio_tecnico', e.target.value)}
+                      placeholder="0" />
+                  </Field>
+                </div>
+
+                {/* 2. Equipamentos */}
+                {gruposComItens.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Equipamentos</p>
+                    {gruposComItens.map(g => {
+                      const sub = subtotalGrupo(g.rows)
+                      return (
+                        <div key={g.tipo} className="rounded-lg border border-border/40 overflow-hidden">
+                          <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2/60 border-b border-border/30">
+                            <p className="text-[11px] font-semibold text-accent">{g.label}</p>
+                            {sub > 0 && <span className="text-[11px] font-semibold text-accent tabular-nums">{fmt(sub)}</span>}
+                          </div>
+                          <div className="flex flex-col">
+                            {g.rows.map((r, i) => {
+                              const nome = equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao || '—'
+                              const preco = num(r.valor_custo)
+                              return (
+                                <div key={i} className="flex items-center justify-between px-3 py-2 border-b border-border/10 last:border-0">
+                                  <span className="text-xs text-accent-muted flex-1 min-w-0 truncate">
+                                    {r.unidades > 1 ? `${r.unidades}× ` : ''}{nome}
+                                  </span>
+                                  {preco > 0 && (
+                                    <span className="text-xs text-accent-subtle/70 tabular-nums shrink-0 ml-2">
+                                      {fmt((r.unidades || 1) * preco)}
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 
+                {/* 3. Notas de Faturação */}
+                <Field label="Notas de faturação">
+                  <textarea className={textareaCls} rows={3}
+                    value={form.notas_faturacao}
+                    onChange={(e) => set('notas_faturacao', e.target.value)}
+                    placeholder="Notas que aparecem na fatura / documento de contas…" />
+                </Field>
+
+                {/* 4. Custos */}
                 <div className="flex flex-col gap-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Valores</p>
-                  <div className="grid grid-cols-4 gap-3">
-                    <Field label="Apoio Técnico (€)">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Custos</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <Field label="Transporte / Combustível (€)">
+                        <input type="number" min="0" step="0.01" className={inputCls}
+                          value={form.transporte}
+                          onChange={(e) => set('transporte', e.target.value)}
+                          placeholder="0" />
+                      </Field>
+                      {kmDiff != null && (
+                        <p className="text-[10px] text-accent-subtle/50 px-1">
+                          Veículo: {kmDiff} km ({kmS} → {kmC})
+                        </p>
+                      )}
+                    </div>
+                    <Field label="Alimentação (€)">
                       <input type="number" min="0" step="0.01" className={inputCls}
-                        value={form.valor_apoio_tecnico}
-                        onChange={(e) => set('valor_apoio_tecnico', e.target.value)}
-                        placeholder="0" />
-                    </Field>
-                    <Field label="Margem (€)">
-                      <input type="number" min="0" step="0.01" className={inputCls}
-                        value={form.margem}
-                        onChange={(e) => set('margem', e.target.value)}
-                        placeholder="0" />
-                    </Field>
-                    <Field label="Transporte (€)">
-                      <input type="number" min="0" step="0.01" className={inputCls}
-                        value={form.transporte}
-                        onChange={(e) => set('transporte', e.target.value)}
-                        placeholder="0" />
-                    </Field>
-                    <Field label="Extras (€)">
-                      <input type="number" min="0" step="0.01" className={inputCls}
-                        value={form.extras_contas}
-                        onChange={(e) => set('extras_contas', e.target.value)}
+                        value={form.valor_alimentacao}
+                        onChange={(e) => set('valor_alimentacao', e.target.value)}
                         placeholder="0" />
                     </Field>
                   </div>
+                  {temArtista && (
+                    <Field label="Valor Artista (€)">
+                      <input type="number" min="0" step="0.01" className={inputCls}
+                        value={form.valor_artistico}
+                        onChange={(e) => set('valor_artistico', e.target.value)}
+                        placeholder="0" />
+                    </Field>
+                  )}
                 </div>
 
+                {/* 5. Totais */}
                 <div className="p-3 bg-surface-3/40 border border-border/60 rounded-lg flex flex-col gap-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60 mb-1">Totais</p>
                   {[
                     { label: 'Apoio Técnico', v: vApoio },
-                    { label: 'Margem',        v: vMargem },
+                    { label: 'Equipamentos',  v: totalEquip },
                     { label: 'Transporte',    v: vTransp },
-                    { label: 'Extras',        v: vExtras },
+                    { label: 'Alimentação',   v: vAlim },
+                    ...(temArtista ? [{ label: 'Artista', v: vArtista }] : []),
                   ].filter(r => r.v > 0).map(({ label, v }) => (
                     <div key={label} className="flex justify-between text-xs text-accent-muted">
                       <span>{label}</span><span className="tabular-nums">{fmt(v)}</span>
                     </div>
                   ))}
                   <div className="flex justify-between text-xs font-semibold text-accent border-t border-border/40 pt-1.5 mt-0.5">
-                    <span>Total cliente</span>
-                    <span className="tabular-nums">{fmt(totalCli)}</span>
+                    <span>Total</span>
+                    <span className="tabular-nums">{fmt(total)}</span>
                   </div>
                 </div>
 
+                {/* 6. Pagamento */}
                 <div className="flex flex-col gap-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Pagamento</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Pagamento</p>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Estado">
                       <select className={inputCls} value={form.estado_pagamento}
@@ -1470,19 +1555,6 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   </div>
                 </div>
 
-                <Field label="Notas de faturação">
-                  <textarea className={textareaCls} rows={3}
-                    value={form.notas_faturacao}
-                    onChange={(e) => set('notas_faturacao', e.target.value)}
-                    placeholder="Notas que aparecem na fatura / documento de contas…" />
-                </Field>
-
-                <Field label="Notas de contas">
-                  <textarea className={textareaCls} rows={3}
-                    value={form.notas_contas}
-                    onChange={(e) => set('notas_contas', e.target.value)}
-                    placeholder="Notas internas sobre pagamento, acordos, condições…" />
-                </Field>
               </div>
             )
           })()}
