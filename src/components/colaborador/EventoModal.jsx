@@ -71,6 +71,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [clSubmetidas,  setClSubmetidas]  = useState(new Set()) // Set de checklist_id já guardados
   const [clGuardando,   setClGuardando]   = useState(new Set()) // Set de checklist_id a guardar agora
   const [equipItems,    setEquipItems]    = useState([])
+  const [equipEvento,   setEquipEvento]   = useState([])
   const [equipInput,    setEquipInput]    = useState('')
   const [equipAdding,   setEquipAdding]   = useState(false)
   const [execucaoNotas,  setExecucaoNotas]  = useState('')
@@ -204,6 +205,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
       })
     return () => { activo = false }
   }, [evento?.id, colaborador?.id])
+
+  useEffect(() => {
+    if (!evento?.id) return
+    let activo = true
+    supabase.from('evento_equipamentos')
+      .select('tipo, quantidade, descricao_manual, equipamentos(nome)')
+      .eq('evento_id', evento.id)
+      .then(({ data }) => { if (activo) setEquipEvento(data ?? []) })
+    return () => { activo = false }
+  }, [evento?.id])
 
   useEffect(() => {
     if (!evento?.id) return
@@ -694,16 +705,42 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   {evento.notas_operacionais || 'Sem notas de evento.'}
                 </div>
               </div>
-              <div>
-                <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
-                  <Boxes size={12} /> Equipamentos
-                </p>
-                <div className={clsx('whitespace-pre-wrap rounded-xl px-3 py-2.5 border',
-                  evento.Equipamentos ? 'text-accent-muted bg-surface-2 border-border' : 'text-accent-subtle/40 italic bg-surface-2/40 border-border/40')}
-                  style={{ fontSize: 14 }}>
-                  {evento.Equipamentos || 'Sem equipamentos definidos.'}
-                </div>
-              </div>
+              {(() => {
+                const GRUPOS = [
+                  { tipo: 'proprio',  label: 'Equipamentos para o evento' },
+                  { tipo: 'alugado',  label: 'Equipamentos Alugados' },
+                  { tipo: 'comprado', label: 'Equipamentos Comprados' },
+                  { tipo: 'extra',    label: 'Extras' },
+                ]
+                const comItens = GRUPOS.map(g => ({ ...g, itens: equipEvento.filter(r => r.tipo === g.tipo) })).filter(g => g.itens.length > 0)
+                if (comItens.length === 0) return null
+                return (
+                  <div className="flex flex-col gap-3">
+                    <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>
+                      <Boxes size={12} /> Equipamentos
+                    </p>
+                    {comItens.map(g => (
+                      <div key={g.tipo} className="rounded-xl border border-white/10 overflow-hidden">
+                        <div className="px-3 py-1.5 bg-white/5 border-b border-white/10">
+                          <p className="font-semibold text-amber-400" style={{ fontSize: 11 }}>{g.label}</p>
+                        </div>
+                        <div className="flex flex-col">
+                          {g.itens.map((r, i) => (
+                            <div key={i} className="flex items-center justify-between px-3 py-2 border-b border-white/5 last:border-0">
+                              <span className="text-accent-muted" style={{ fontSize: 13 }}>
+                                {r.descricao_manual || r.equipamentos?.nome || '—'}
+                              </span>
+                              {r.quantidade > 1 && (
+                                <span className="text-accent-subtle/60 tabular-nums shrink-0 ml-2" style={{ fontSize: 12 }}>×{r.quantidade}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
               {evento.rider_url && (
                 <div>
                   <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
