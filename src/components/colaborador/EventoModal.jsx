@@ -912,40 +912,25 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
           ) : (
             <div className="flex flex-col gap-4 py-2">
               {/* Equipamentos — topo */}
-              {(() => {
-                const GRUPOS = [
-                  { tipo: 'proprio',  label: 'Equipamentos para o evento' },
-                  { tipo: 'alugado',  label: 'Equipamentos Alugados' },
-                  { tipo: 'comprado', label: 'Equipamentos Comprados' },
-                  { tipo: 'extra',    label: 'Extras' },
-                ]
-                const comItens = GRUPOS.map(g => ({ ...g, itens: equipEvento.filter(r => r.tipo === g.tipo) })).filter(g => g.itens.length > 0)
-                if (comItens.length === 0) return null
-                return (
-                  <div className="flex flex-col gap-3">
-                    <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>
-                      <Boxes size={12} /> Equipamentos
+              {equipEvento.length > 0 && (
+                <div className="rounded-xl border border-white/15 overflow-hidden">
+                  <div className="px-3 py-2 bg-white/5 border-b border-white/10">
+                    <p className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>
+                      <Boxes size={11} /> Equipamentos para o evento
                     </p>
-                    {comItens.map(g => (
-                      <div key={g.tipo} className="rounded-xl border border-white/15 overflow-hidden">
-                        <div className="px-3 py-2 bg-amber-400/[0.08] border-b border-amber-400/20">
-                          <p className="font-bold text-amber-400 uppercase tracking-wider" style={{ fontSize: 10 }}>{g.label}</p>
-                        </div>
-                        <div className="flex flex-col">
-                          {g.itens.map((r, i) => (
-                            <div key={i} className="flex items-center gap-2 px-3 py-2 border-b border-white/5 last:border-0">
-                              <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
-                              <span className="text-accent-muted" style={{ fontSize: 13 }}>
-                                {r.descricao_manual || r.equipamentos?.nome || '—'}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                  </div>
+                  <div className="flex flex-col">
+                    {equipEvento.map((r, i) => (
+                      <div key={i} className="flex items-center gap-2 px-3 py-2 border-b border-white/5 last:border-0">
+                        <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
+                        <span className="text-accent-muted" style={{ fontSize: 13 }}>
+                          {r.descricao_manual || r.equipamentos?.nome || '—'}
+                        </span>
                       </div>
                     ))}
                   </div>
-                )
-              })()}
+                </div>
+              )}
               {evento.notas_preparacao && (
                 <div className="rounded-xl border border-purple-500/20 bg-purple-500/[0.06] px-3 py-3">
                   <p className="flex items-center gap-1.5 uppercase tracking-wider text-purple-400/70 mb-2" style={{ fontSize: 10 }}>
