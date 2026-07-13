@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera, Printer } from 'lucide-react'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
@@ -7,6 +7,8 @@ import { colaboradorApi } from '@/lib/colaboradorApi'
 import { supabase } from '@/lib/supabase'
 import { usePresenca, podeAssinar, presencaAtrasada, TOLERANCIA_MIN } from '@/hooks/usePresenca'
 import { useColaboradorStore } from '@/store'
+import { PrintModal } from '@/components/shared/PrintModal'
+import { FolhaEvento } from '@/components/shared/FolhaEvento'
 import { labelEstado } from '@/utils/formatacao'
 import { corTecnico } from '@/utils/tecnicoColor'
 import { hhmm, dataLonga, dataCompleta } from './format'
@@ -80,6 +82,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [feedbackFotos,  setFeedbackFotos]  = useState([])
   const [fotoUploading,  setFotoUploading]  = useState(false)
   const [faseLocal,      setFaseLocal]      = useState(evento.fase || 'criacao')
+  const [printEvento,    setPrintEvento]    = useState(false)
   const [assinEvento,    setAssinEvento]    = useState({
     assinatura_lmd_at: evento.assinatura_lmd_at ?? null,
     assinatura_in_at:  evento.assinatura_in_at  ?? null,
@@ -410,7 +413,44 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const dataInstal = evento.dia_instalacao || evento.data_evento
   const horaInstal = hhmm(evento.hora_instalacao)
 
+  // ── Dados normalizados para impressão ──
+  const dadosEvento = {
+    nomeEvento: evento.evento || '—',
+    data: evento.data_evento || null,
+    horaInicio: evento.hora_inicio?.slice(0, 5) || null,
+    horaFim: evento.hora_fim?.slice(0, 5) || null,
+    diaInstalacao: evento.dia_instalacao || null,
+    horaInstalacao: evento.hora_instalacao?.slice(0, 5) || null,
+    local: evento.espacos?.nome || null,
+    morada: evento.morada || null,
+    responsavel: evento.responsavel || null,
+    contacto: evento.contacto_pelo_evento || null,
+    tecnicos: [
+      evento.todos_tecnicos ? { nome: 'Todos os técnicos', label: 'Equipa' }
+        : mapaTecnicos[evento.tecnico_id] ? { nome: mapaTecnicos[evento.tecnico_id], label: 'Responsável' } : null,
+      ...outrosTecs.map(nome => ({ nome, label: 'Apoio' })),
+    ].filter(Boolean),
+    equipamentos: equipEvento.map(r => ({
+      nome: r.descricao_manual || r.equipamentos?.nome || '—',
+      quantidade: r.quantidade || 1,
+    })),
+    checklists: eventoListas.map(l => ({ nome: l.nome, fase: l.fase, itens: l.itens.map(i => i.texto) })),
+    veiculo: (() => {
+      const carro = carros.find(c => c.id === Number(eventoCarros.carro_id))
+      const condutorNome = mapaTecnicos[eventoCarros.condutor_id] || null
+      if (!carro && !condutorNome) return null
+      return {
+        descricao: carro ? carro.marca + ' ' + carro.modelo + ' · ' + carro.matricula : null,
+        condutor: condutorNome,
+      }
+    })(),
+    notasOperacionais: evento.notas_operacionais || null,
+    tipoEvento: evento.tipo || null,
+  }
+
   return (
+    <>
+
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70" onClick={onFechar} />
       <div className="relative z-10 w-full max-w-lg bg-surface-1 border border-border rounded-2xl shadow-2xl flex flex-col"
@@ -1041,6 +1081,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               ) : null}
             </div>
           </div>
+          <button onClick={() => setPrintEvento(true)}
+            title="Folha de Evento"
+            className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
+            <Printer size={18} />
+          </button>
           <button onClick={onFechar}
             className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
             <X size={22} />
@@ -1048,5 +1093,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
         </div>
       </div>
     </div>
+
+    <PrintModal aberto={printEvento} onFechar={() => setPrintEvento(false)} titulo={evento.evento || "Evento"}>
+      <FolhaEvento dados={dadosEvento} />
+    </PrintModal>
+    </>
   )
 }

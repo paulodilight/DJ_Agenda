@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react'
-import { X, Database, Star, Plus, Check, Trash2, ListChecks, Send } from 'lucide-react'
+import { X, Database, Star, Plus, Check, Trash2, ListChecks, Send, Printer, FileSpreadsheet } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
@@ -7,6 +7,9 @@ import { supabase } from '@/lib/supabase'
 import { supaEventosApi } from '@/lib/supaEventosApi'
 import { artistasApi } from '@/lib/api'
 import { useUndo } from '@/contexts/UndoContext'
+import { PrintModal } from '@/components/shared/PrintModal'
+import { FolhaEvento } from '@/components/shared/FolhaEvento'
+import { FolhaContas } from '@/components/shared/FolhaContas'
 import { clsx } from 'clsx'
 
 const STATUS_OPTS = [
@@ -199,6 +202,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   const [equipamentosList, setEquipamentosList] = useState([])
   const [carros, setCarros] = useState([])
   const [eventoCarros, setEventoCarros] = useState({ carro_id: '', condutor_id: '', km_saida: '', km_chegada: '' })
+  const [printEvento, setPrintEvento] = useState(false)
+  const [printContas, setPrintContas] = useState(false)
   const [checksByItem, setChecksByItem] = useState({})
   const [checkSubs, setCheckSubs] = useState({})
   const [tecnicosNotas, setTecnicosNotas] = useState([])
@@ -568,7 +573,78 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
 
   const titulo = evento?.id ? 'Editar Evento' : 'Novo Evento'
 
+  // ── Dados normalizados para impressão ─────────────────────────────────────
+  const GRUPOS_EQUIP_INFO = [
+    { tipo: 'proprio',  label: 'Equipamentos para o Evento' },
+    { tipo: 'alugado',  label: 'Equipamentos Alugados' },
+    { tipo: 'comprado', label: 'Equipamentos Comprados' },
+    { tipo: 'extra',    label: 'Extras' },
+  ]
+  const numP = (v) => parseFloat(v) || 0
+  const tec1obj = form.tecnico_id === 'todos' ? null : tecnicos.find(t => t.id === Number(form.tecnico_id))
+  const tec2obj = form.tecnico2_id ? tecnicos.find(t => t.id === Number(form.tecnico2_id)) : null
+  const dadosEvento = {
+    nomeEvento: form.evento || '—',
+    data: form.data_evento || null,
+    horaInicio: form.hora_inicio || null,
+    horaFim: form.hora_fim || null,
+    diaInstalacao: form.dia_instalacao || null,
+    horaInstalacao: form.hora_instalacao || null,
+    local: espacos.find(e => e.id === Number(form.espaco_id))?.nome || null,
+    morada: form.morada || null,
+    responsavel: form.responsavel || null,
+    contacto: form.contacto_pelo_evento || null,
+    tecnicos: [
+      form.tecnico_id === 'todos' ? { nome: 'Todos os técnicos', label: 'Equipa' } : tec1obj ? { nome: tec1obj.nome, label: 'Responsável' } : null,
+      tec2obj ? { nome: tec2obj.nome, label: 'Apoio' } : null,
+    ].filter(t => t?.nome),
+    equipamentos: GRUPOS_EQUIP_INFO.flatMap(g => (equipRows[g.tipo] ?? []).map(r => ({
+      nome: equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao || '—',
+      quantidade: r.unidades || 1,
+    }))),
+    checklists: eventoChecklists.map(c => ({ nome: c.nome, fase: c.fase, itens: c.itens.map(i => i.texto) })),
+    veiculo: (() => {
+      const carro = carros.find(c => c.id === Number(eventoCarros.carro_id))
+      const condutor = tecnicos.find(t => t.id === Number(eventoCarros.condutor_id))
+      if (!carro && !condutor) return null
+      return {
+        descricao: carro ? carro.marca + ' ' + carro.modelo + ' · ' + carro.matricula : null,
+        condutor: condutor?.nome || null,
+      }
+    })(),
+    notasOperacionais: form.notas_operacionais || null,
+    tipoEvento: tipos.find(t => t.id === Number(form.tipo))?.nome || null,
+  }
+  const financeiroContas = {
+    tecnicos: [
+      form.tecnico_id === 'todos' ? { nome: 'Todos os técnicos', valor: numP(form.valor_apoio_tecnico) } : tec1obj ? { nome: tec1obj.nome, valor: numP(form.valor_apoio_tecnico) } : null,
+      tec2obj ? { nome: tec2obj.nome + ' (apoio)', valor: numP(form.valor_apoio_tecnico_2) } : null,
+    ].filter(Boolean),
+    gruposEquip: GRUPOS_EQUIP_INFO.map(g => {
+      const rows = (equipRows[g.tipo] ?? []).map(r => ({
+        nome: equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao || '—',
+        quantidade: r.unidades || 1,
+        valorCusto: r.valor_custo,
+      }))
+      return { label: g.label, rows, subtotal: rows.reduce((s, r) => s + (r.quantidade || 1) * numP(r.valorCusto), 0) }
+    }),
+    transporte: form.transporte || null,
+    alimentacao: form.valor_alimentacao || null,
+    valorArtista: form.valor_artistico || null,
+    nomeArtista: artistas.find(a => a.id === Number(form.artista_id))?.nome || null,
+    total: numP(form.valor_apoio_tecnico) + numP(form.valor_apoio_tecnico_2)
+      + GRUPOS_EQUIP_INFO.flatMap(g => equipRows[g.tipo] ?? []).reduce((s, r) => s + (r.unidades || 1) * numP(r.valor_custo), 0)
+      + numP(form.transporte) + numP(form.valor_alimentacao)
+      + (form.artista_id ? numP(form.valor_artistico) : 0),
+    estadoPagamento: form.estado_pagamento || null,
+    formaPagamento: form.forma_pagamento || null,
+    notasFaturacao: form.notas_faturacao || null,
+    notasContas: form.notas_contas || null,
+  }
+
   return (
+    <>
+
     <Modal aberto={aberto} onFechar={onFechar} largura="max-w-2xl">
       <div className="flex flex-col">
 
@@ -590,6 +666,15 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               >
                 <ListChecks size={16} />
               </button>
+            )}
+
+            {evento?.id && (
+              <button onClick={() => setPrintEvento(true)} title="Folha de Evento"
+                className="text-accent-subtle hover:text-accent transition-colors"><Printer size={16} /></button>
+            )}
+            {evento?.id && (
+              <button onClick={() => setPrintContas(true)} title="Folha de Contas"
+                className="text-accent-subtle hover:text-accent transition-colors"><FileSpreadsheet size={16} /></button>
             )}
             <button onClick={onFechar} className="text-accent-subtle hover:text-accent transition-colors">
               <X size={16} />
@@ -1605,5 +1690,13 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
 
       </div>
     </Modal>
+
+    <PrintModal aberto={printEvento} onFechar={() => setPrintEvento(false)} titulo={form.evento || "Evento"}>
+      <FolhaEvento dados={dadosEvento} />
+    </PrintModal>
+    <PrintModal aberto={printContas} onFechar={() => setPrintContas(false)} titulo={(form.evento || "Evento") + " — Contas"}>
+      <FolhaContas dados={dadosEvento} financeiro={financeiroContas} />
+    </PrintModal>
+    </>
   )
 }
