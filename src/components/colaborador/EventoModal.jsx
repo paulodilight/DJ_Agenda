@@ -685,26 +685,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
           ) : (
             <div className="flex flex-col gap-4 py-2">
-              {evento.notas_preparacao && (
-                <div className="rounded-xl border border-purple-500/20 bg-purple-500/[0.06] px-3 py-3">
-                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-purple-400/70 mb-2" style={{ fontSize: 10 }}>
-                    <StickyNote size={12} /> Notas de preparação
-                  </p>
-                  <p className="text-accent-muted whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
-                    {evento.notas_preparacao}
-                  </p>
-                </div>
-              )}
-              <div>
-                <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
-                  <StickyNote size={12} /> Notas do evento
-                </p>
-                <div className={clsx('whitespace-pre-wrap rounded-xl px-3 py-2.5 border',
-                  evento.notas_operacionais ? 'text-accent-muted bg-surface-2 border-border' : 'text-accent-subtle/40 italic bg-surface-2/40 border-border/40')}
-                  style={{ fontSize: 14 }}>
-                  {evento.notas_operacionais || 'Sem notas de evento.'}
-                </div>
-              </div>
+              {/* Equipamentos — topo */}
               {(() => {
                 const GRUPOS = [
                   { tipo: 'proprio',  label: 'Equipamentos para o evento' },
@@ -726,13 +707,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                         </div>
                         <div className="flex flex-col">
                           {g.itens.map((r, i) => (
-                            <div key={i} className="flex items-center justify-between px-3 py-2 border-b border-white/5 last:border-0">
+                            <div key={i} className="flex items-center gap-2 px-3 py-2 border-b border-white/5 last:border-0">
+                              <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
                               <span className="text-accent-muted" style={{ fontSize: 13 }}>
                                 {r.descricao_manual || r.equipamentos?.nome || '—'}
                               </span>
-                              {r.quantidade > 1 && (
-                                <span className="text-accent-subtle/60 tabular-nums shrink-0 ml-2" style={{ fontSize: 12 }}>×{r.quantidade}</span>
-                              )}
                             </div>
                           ))}
                         </div>
@@ -741,6 +720,26 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   </div>
                 )
               })()}
+              {evento.notas_preparacao && (
+                <div className="rounded-xl border border-purple-500/20 bg-purple-500/[0.06] px-3 py-3">
+                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-purple-400/70 mb-2" style={{ fontSize: 10 }}>
+                    <StickyNote size={12} /> Notas de preparação
+                  </p>
+                  <p className="text-accent-muted whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
+                    {evento.notas_preparacao}
+                  </p>
+                </div>
+              )}
+              <div>
+                <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
+                  <StickyNote size={12} /> Notas do evento
+                </p>
+                <div className={clsx('whitespace-pre-wrap rounded-xl px-3 py-2.5 border',
+                  evento.notas_operacionais ? 'text-accent-muted bg-surface-2 border-border' : 'text-accent-subtle/40 italic bg-surface-2/40 border-border/40')}
+                  style={{ fontSize: 14 }}>
+                  {evento.notas_operacionais || 'Sem notas de evento.'}
+                </div>
+              </div>
               {evento.rider_url && (
                 <div>
                   <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
