@@ -674,6 +674,71 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
           ) : aba === 'execucao' ? (
             <div className="flex flex-col gap-4 py-2">
 
+              {/* Fase do evento */}
+              <div>
+                <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Fase do Evento</p>
+                <div className="flex items-center gap-1.5 p-2.5 bg-white/5 rounded-xl border border-white/10 overflow-x-auto">
+                  {[
+                    { id: 'criacao',    label: 'Criação' },
+                    { id: 'preparacao', label: 'Prep.' },
+                    { id: 'execucao',   label: 'Exec.' },
+                    { id: 'concluido',  label: 'Concluído' },
+                    { id: 'faturado',   label: 'Faturado' },
+                  ].map(({ id, label }, i, arr) => {
+                    const fases = ['criacao', 'preparacao', 'execucao', 'concluido', 'faturado']
+                    const idxAtual = fases.indexOf(faseLocal)
+                    const done = i <= idxAtual
+                    return (
+                      <div key={id} className="flex items-center gap-1 shrink-0">
+                        <div className={clsx('w-1.5 h-1.5 rounded-full shrink-0', done ? 'bg-amber-400' : 'bg-white/20')} />
+                        <span className={clsx(done ? 'text-amber-400' : 'text-white/30')} style={{ fontSize: 10 }}>{label}</span>
+                        {i < arr.length - 1 && <div className={clsx('w-4 h-px shrink-0', i < idxAtual ? 'bg-amber-400/40' : 'bg-white/10')} />}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Presença / Assinaturas */}
+              <div>
+                <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Presença / Assinaturas</p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { campo: 'assinatura_lmd_at', label: 'Saída LMD' },
+                    { campo: 'assinatura_in_at',  label: 'IN — Chegada ao evento' },
+                    { campo: 'assinatura_out_at', label: 'OUT — Fim do evento' },
+                  ].map(({ campo, label }) => {
+                    const val    = assinEvento[campo]
+                    const saving = assinEvSaving[campo]
+                    return (
+                      <div key={campo} className="flex items-center gap-3 p-2.5 rounded-xl border border-white/10 bg-white/[0.03]">
+                        <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-green-400' : 'bg-white/20')} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-accent" style={{ fontSize: 12 }}>{label}</p>
+                          {val && (
+                            <p className="text-accent-subtle/60 tabular-nums mt-0.5" style={{ fontSize: 10 }}>
+                              {new Date(val).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          )}
+                        </div>
+                        {!val && isAtribuido ? (
+                          <button
+                            onClick={() => registarAssinEvento(campo)}
+                            disabled={!!saving}
+                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-medium hover:bg-amber-400/20 disabled:opacity-40 transition-colors"
+                            style={{ fontSize: 11 }}>
+                            <Clock size={11} />
+                            {saving ? '…' : 'Registar'}
+                          </button>
+                        ) : val ? (
+                          <Check size={14} className="text-green-400 shrink-0" />
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
               {/* Checklist de saída */}
               {eventoListas.some(l => l.fase === 'saida') && (
                 <div className="flex flex-col gap-2">
@@ -714,71 +779,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   })}
                 </div>
               )}
-
-              {/* Fase do evento */}
-              <div>
-                <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Fase do Evento</p>
-                <div className="flex items-center gap-1.5 p-2.5 bg-white/5 rounded-xl border border-white/10 overflow-x-auto">
-                  {[
-                    { id: 'criacao',    label: 'Criação' },
-                    { id: 'preparacao', label: 'Prep.' },
-                    { id: 'execucao',   label: 'Exec.' },
-                    { id: 'concluido',  label: 'Concluído' },
-                    { id: 'faturado',   label: 'Faturado' },
-                  ].map(({ id, label }, i, arr) => {
-                    const fases = ['criacao', 'preparacao', 'execucao', 'concluido', 'faturado']
-                    const idxAtual = fases.indexOf(faseLocal)
-                    const done = i <= idxAtual
-                    return (
-                      <div key={id} className="flex items-center gap-1 shrink-0">
-                        <div className={clsx('w-1.5 h-1.5 rounded-full shrink-0', done ? 'bg-amber-400' : 'bg-white/20')} />
-                        <span className={clsx(done ? 'text-amber-400' : 'text-white/30')} style={{ fontSize: 10 }}>{label}</span>
-                        {i < arr.length - 1 && <div className={clsx('w-4 h-px shrink-0', i < idxAtual ? 'bg-amber-400/40' : 'bg-white/10')} />}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Assinaturas / timestamps */}
-              <div>
-                <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Registo de Fases</p>
-                <div className="flex flex-col gap-2">
-                  {[
-                    { campo: 'assinatura_lmd_at', label: 'Saída LMD' },
-                    { campo: 'assinatura_in_at',  label: 'IN — Chegada ao evento' },
-                    { campo: 'assinatura_out_at', label: 'OUT — Fim do evento' },
-                  ].map(({ campo, label }) => {
-                    const val    = assinEvento[campo]
-                    const saving = assinEvSaving[campo]
-                    return (
-                      <div key={campo} className="flex items-center gap-3 p-2.5 rounded-xl border border-white/10 bg-white/[0.03]">
-                        <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-green-400' : 'bg-white/20')} />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-accent" style={{ fontSize: 12 }}>{label}</p>
-                          {val && (
-                            <p className="text-accent-subtle/60 tabular-nums mt-0.5" style={{ fontSize: 10 }}>
-                              {new Date(val).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          )}
-                        </div>
-                        {!val && isAtribuido ? (
-                          <button
-                            onClick={() => registarAssinEvento(campo)}
-                            disabled={!!saving}
-                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-medium hover:bg-amber-400/20 disabled:opacity-40 transition-colors"
-                            style={{ fontSize: 11 }}>
-                            <Clock size={11} />
-                            {saving ? '…' : 'Registar'}
-                          </button>
-                        ) : val ? (
-                          <Check size={14} className="text-green-400 shrink-0" />
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
 
               {/* Veículo */}
               {isAtribuido && (
