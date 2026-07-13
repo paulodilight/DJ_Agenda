@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera } from 'lucide-react'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
@@ -77,6 +77,8 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [execucaoNotas,  setExecucaoNotas]  = useState('')
   const [execucaoSaving, setExecucaoSaving] = useState(false)
   const [feedbackId,     setFeedbackId]     = useState(null)
+  const [feedbackFotos,  setFeedbackFotos]  = useState([])
+  const [fotoUploading,  setFotoUploading]  = useState(false)
   const [faseLocal,      setFaseLocal]      = useState(evento.fase || 'criacao')
   const [assinEvento,    setAssinEvento]    = useState({
     assinatura_lmd_at: evento.assinatura_lmd_at ?? null,
@@ -202,7 +204,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     if (!evento?.id || !colaborador?.id) return
     let activo = true
     supabase.from('evento_feedback')
-      .select('id, texto')
+      .select('id, texto, fotos')
       .eq('evento_id', evento.id)
       .eq('tecnico_id', colaborador.id)
       .maybeSingle()
@@ -210,6 +212,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
         if (!activo || !data) return
         setFeedbackId(data.id)
         setExecucaoNotas(data.texto ?? '')
+        setFeedbackFotos(data.fotos ?? [])
       })
     return () => { activo = false }
   }, [evento?.id, colaborador?.id])
@@ -323,14 +326,29 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     setVeiculoSaving(false)
   }
 
+  const adicionarFoto = async (file) => {
+    if (!file || fotoUploading) return
+    setFotoUploading(true)
+    const ext = file.name.split('.').pop()
+    const path = `${evento.id}/${crypto.randomUUID()}.${ext}`
+    const { error } = await supabase.storage.from('eventos-feedback').upload(path, file)
+    if (!error) {
+      const { data: pub } = supabase.storage.from('eventos-feedback').getPublicUrl(path)
+      setFeedbackFotos(prev => [...prev, pub.publicUrl])
+    }
+    setFotoUploading(false)
+  }
+
+  const removerFoto = (url) => setFeedbackFotos(prev => prev.filter(u => u !== url))
+
   const guardarFeedback = async () => {
     if (!colaborador?.id || execucaoSaving) return
     setExecucaoSaving(true)
     if (feedbackId) {
-      await supabase.from('evento_feedback').update({ texto: execucaoNotas }).eq('id', feedbackId)
+      await supabase.from('evento_feedback').update({ texto: execucaoNotas, fotos: feedbackFotos }).eq('id', feedbackId)
     } else {
       const { data } = await supabase.from('evento_feedback')
-        .insert({ evento_id: evento.id, tecnico_id: colaborador.id, texto: execucaoNotas })
+        .insert({ evento_id: evento.id, tecnico_id: colaborador.id, texto: execucaoNotas, fotos: feedbackFotos })
         .select('id').maybeSingle()
       if (data?.id) setFeedbackId(data.id)
     }
@@ -756,6 +774,35 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                     style={{ fontSize: 13 }}
                     className="w-full bg-surface-2 border border-white/20 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/40 resize-none"
                   />
+                  {/* Fotos */}
+                  <div className="mt-2">
+                    {feedbackFotos.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2 mb-2">
+                        {feedbackFotos.map((url, i) => (
+                          <div key={i} className="relative rounded-lg overflow-hidden aspect-square bg-white/5">
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                            <button
+                              onClick={() => removerFoto(url)}
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors">
+                              <X size={10} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <label className={clsx(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors',
+                      fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
+                    )}>
+                      <Camera size={14} className="text-accent-subtle shrink-0" />
+                      <span className="text-accent-subtle" style={{ fontSize: 12 }}>
+                        {fotoUploading ? 'A carregar…' : 'Adicionar foto'}
+                      </span>
+                      <input type="file" accept="image/*" capture="environment" className="hidden"
+                        disabled={fotoUploading}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) adicionarFoto(f); e.target.value = '' }} />
+                    </label>
+                  </div>
                   <div className="flex justify-end mt-2">
                     <button onClick={guardarFeedback} disabled={execucaoSaving}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
