@@ -476,12 +476,12 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
         </div>
 
         {/* Abas */}
-        <div className="flex border-b border-border px-5 shrink-0 items-center">
+        <div className="flex border-b border-border px-2 shrink-0 items-center justify-center">
           {[
             { id: 'detalhes',  label: 'Detalhes',       d: 'left' },
-            { id: 'notas',     label: 'Notas & Equip.', d: 'right' },
-            { id: 'checklist', label: 'Checklist',      d: 'right' },
+            { id: 'notas',     label: 'Equip. & Notas', d: 'right' },
             { id: 'execucao',  label: 'Execução',       d: 'right' },
+            { id: 'checklist', label: 'Checklist',      d: 'right' },
           ].map(t => (
             <button key={t.id} onClick={() => goAba(t.id, t.d)}
               className={clsx(
@@ -490,7 +490,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               )}
               style={{ fontSize: 12 }}>{t.label}</button>
           ))}
-          <span className="ml-auto pr-1 select-none text-accent-subtle/30" style={{ fontSize: 9 }}>← desliza →</span>
         </div>
 
         {/* Conteúdo — altura fixa, swipe */}
@@ -595,7 +594,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               {eventoListas.length === 0 && (
                 <p className="text-center italic py-6" style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>Sem checklists neste evento.</p>
               )}
-              {eventoListas.map(lista => {
+              {eventoListas.filter(l => l.fase !== 'saida').map(lista => {
                 const submetida = clSubmetidas.has(lista.clId)
                 const aGuardar  = clGuardando.has(lista.clId)
                 const total     = lista.itens.length
@@ -655,6 +654,24 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   </div>
                 )
               })}
+              {/* Equipamentos para o evento (lista do admin) */}
+              {equipEvento.length > 0 && (
+                <div className="border border-white/10 rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
+                    <Boxes size={12} className="text-amber-400 shrink-0" />
+                    <p className="font-bold uppercase tracking-wider text-amber-400 flex-1" style={{ fontSize: 10 }}>Equipamentos para o evento</p>
+                  </div>
+                  <div className="flex flex-col">
+                    {equipEvento.map((r, i) => (
+                      <div key={i} className="flex items-center gap-2 px-3 py-2.5 border-b border-white/5 last:border-0">
+                        <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
+                        <span className="text-accent-muted" style={{ fontSize: 13 }}>{r.descricao_manual || r.equipamentos?.nome || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Equipamentos do responsável */}
               <div className="border border-white/10 rounded-xl overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
@@ -786,6 +803,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                   })}
                 </div>
               </div>
+
 
               {/* Checklist de saída */}
               {eventoListas.some(l => l.fase === 'saida') && (
@@ -963,7 +981,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
               {equipEvento.length > 0 && (
                 <div className="rounded-xl border border-white/15 overflow-hidden">
                   <div className="px-3 py-2 bg-white/5 border-b border-white/10">
-                    <p className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>
+                    <p className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-amber-400" style={{ fontSize: 10 }}>
                       <Boxes size={11} /> Equipamentos para o evento
                     </p>
                   </div>

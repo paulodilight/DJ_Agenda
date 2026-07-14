@@ -1421,35 +1421,59 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 </div>
               )}
 
-              {/* Veículo — read-only, via Apoio T */}
+              {/* Veículo */}
               <div className="flex flex-col gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
-                  Veículo <span className="font-normal normal-case tracking-normal text-accent-subtle/40">via Apoio T</span>
+                  Veículo
                 </p>
-                {eventoCarros.carro_id || eventoCarros.condutor_id || eventoCarros.km_saida || eventoCarros.km_chegada ? (() => {
-                  const carro    = carros.find(c => c.id === eventoCarros.carro_id)
-                  const condutor = tecnicos.find(t => t.id === eventoCarros.condutor_id)
-                  const kmS      = eventoCarros.km_saida   !== '' ? Number(eventoCarros.km_saida)   : null
-                  const kmC      = eventoCarros.km_chegada !== '' ? Number(eventoCarros.km_chegada) : null
-                  const diff     = kmS != null && kmC != null ? kmC - kmS : null
-                  return (
-                    <div className="rounded-lg border border-border/40 bg-surface-2/40 px-3 py-2.5 flex flex-col gap-1.5">
-                      {[
-                        { label: 'Carro',      valor: carro ? `${carro.marca} ${carro.modelo} · ${carro.matricula}` : null },
-                        { label: 'Condutor',   valor: condutor?.nome ?? null },
-                        { label: 'Km saída',   valor: kmS != null ? String(kmS) : null },
-                        { label: 'Km chegada', valor: kmC != null ? `${kmC}${diff != null ? `  (+${diff} km)` : ''}` : null },
-                      ].map(({ label, valor }) => valor ? (
-                        <div key={label} className="flex items-baseline gap-2">
-                          <span className="text-[10px] text-accent-subtle/50 uppercase tracking-wider w-20 shrink-0">{label}</span>
-                          <span className="text-xs text-accent-muted">{valor}</span>
-                        </div>
-                      ) : null)}
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-accent-subtle/50 uppercase tracking-wider">Carro</label>
+                    <select
+                      className="w-full rounded-md border border-border/50 bg-surface-2 px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
+                      value={eventoCarros.carro_id || ''}
+                      onChange={e => setEventoCarros(prev => ({ ...prev, carro_id: e.target.value || null }))}
+                    >
+                      <option value="">— Nenhum —</option>
+                      {carros.map(c => (
+                        <option key={c.id} value={c.id}>{c.marca} {c.modelo} · {c.matricula}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-accent-subtle/50 uppercase tracking-wider">Condutor</label>
+                    <select
+                      className="w-full rounded-md border border-border/50 bg-surface-2 px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
+                      value={eventoCarros.condutor_id || ''}
+                      onChange={e => setEventoCarros(prev => ({ ...prev, condutor_id: e.target.value || null }))}
+                    >
+                      <option value="">— Nenhum —</option>
+                      {tecnicos.map(t => (
+                        <option key={t.id} value={t.id}>{t.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex flex-col gap-1 flex-1">
+                      <label className="text-[10px] text-accent-subtle/50 uppercase tracking-wider">Km saída</label>
+                      <input type="number" min="0" step="1"
+                        className="w-full rounded-md border border-border/50 bg-surface-2 px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
+                        value={eventoCarros.km_saida}
+                        placeholder="0"
+                        onChange={e => setEventoCarros(prev => ({ ...prev, km_saida: e.target.value }))}
+                      />
                     </div>
-                  )
-                })() : (
-                  <p className="text-[11px] text-accent-subtle/30 italic px-1">Aguarda registo via Apoio T…</p>
-                )}
+                    <div className="flex flex-col gap-1 flex-1">
+                      <label className="text-[10px] text-accent-subtle/50 uppercase tracking-wider">Km chegada</label>
+                      <input type="number" min="0" step="1"
+                        className="w-full rounded-md border border-border/50 bg-surface-2 px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
+                        value={eventoCarros.km_chegada}
+                        placeholder="0"
+                        onChange={e => setEventoCarros(prev => ({ ...prev, km_chegada: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Notas do técnico — via Apoio T */}

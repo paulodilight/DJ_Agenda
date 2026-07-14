@@ -376,7 +376,7 @@ export function ColaboradorDashboard() {
           className={proximaTarefa ? 'mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4 cursor-pointer hover:border-white/20 active:scale-[0.99] transition-all' : 'mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4'}
           onClick={proximaTarefa ? () => setTarefaAberta(proximaTarefa) : undefined}
         >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2 flex items-center gap-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-2 flex items-center gap-1.5">
             <ClipboardList size={11} />
             Próxima tarefa
           </p>
@@ -423,11 +423,6 @@ export function ColaboradorDashboard() {
         {aEnviarFoto && <p className="text-xs text-accent-subtle mt-2">A enviar…</p>}
       </div>
 
-      {/* ── Direita: navegação ── */}
-      <div className="order-3 flex flex-col gap-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle mb-2">As minhas páginas</p>
-        <CardNav to="/apoiot/agenda"      Icone={LayoutList}    rotulo="Agenda" />
-      </div>
 
       {eventoAberto && (
         <EventoModal

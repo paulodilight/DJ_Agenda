@@ -78,13 +78,20 @@ function buildEvent(r: Record<string, any>) {
   if (r.morada) ev.location = r.morada;
 
   if (r.hora_inicio) {
-    const start = `${r.data_evento}T${hms(r.hora_inicio)}`;
-    const end = r.hora_fim ? `${r.data_evento}T${hms(r.hora_fim)}` : start;
-    ev.start = { dateTime: start, timeZone: TZ };
-    ev.end = { dateTime: end, timeZone: TZ };
+    const startT = hms(r.hora_inicio);
+    const endT   = r.hora_fim ? hms(r.hora_fim) : startT;
+    // hora_fim 00:00 ou anterior à hora_inicio → evento termina na meia-noite do dia seguinte
+    let endDate = r.data_evento;
+    if (endT <= startT) {
+      const d = new Date(r.data_evento + "T00:00:00");
+      d.setDate(d.getDate() + 1);
+      endDate = d.toISOString().slice(0, 10);
+    }
+    ev.start = { dateTime: `${r.data_evento}T${startT}`, timeZone: TZ };
+    ev.end   = { dateTime: `${endDate}T${endT}`,         timeZone: TZ };
   } else {
     ev.start = { date: r.data_evento };
-    ev.end = { date: r.data_evento };
+    ev.end   = { date: r.data_evento };
   }
   return ev;
 }
