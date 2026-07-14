@@ -135,6 +135,24 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     }
   }, [pres.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Busca timestamps de assinatura frescos da BD — o evento prop pode estar stale
+  useEffect(() => {
+    if (!evento?.id) return
+    let activo = true
+    supabase.from('supa_eventos')
+      .select('assinatura_lmd_at, assinatura_in_at, assinatura_out_at')
+      .eq('id', evento.id)
+      .single()
+      .then(({ data }) => {
+        if (activo && data) setAssinEvento({
+          assinatura_lmd_at: data.assinatura_lmd_at ?? null,
+          assinatura_in_at:  data.assinatura_in_at  ?? null,
+          assinatura_out_at: data.assinatura_out_at ?? null,
+        })
+      })
+    return () => { activo = false }
+  }, [evento?.id])
+
   useEffect(() => {
     supabase.from('carros').select('id, marca, modelo, matricula').eq('ativo', true).order('marca')
       .then(({ data }) => setCarros(data ?? []))
