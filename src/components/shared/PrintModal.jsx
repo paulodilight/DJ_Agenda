@@ -20,31 +20,32 @@ export function PrintModal({ aberto, onFechar, titulo, children }) {
   if (!aberto) return null
 
   return createPortal(
-    <div data-pm="1" className="fixed inset-0 z-[200]">
+    <div data-pm="1" className="fixed inset-0 z-[200] flex flex-col">
       {/* Backdrop */}
       <div className="print:hidden absolute inset-0 bg-black/70" onClick={onFechar} />
 
-      {/* Control bar */}
-      <div className="print:hidden absolute inset-x-4 flex justify-center z-10" style={{ top: 'max(1rem, env(safe-area-inset-top, 0px))' }}>
-        <div className="flex items-center gap-3 bg-zinc-900 border border-white/15 rounded-2xl shadow-2xl px-4 py-2.5 max-w-full">
-          <span className="text-sm font-semibold text-white truncate max-w-[200px]">{titulo}</span>
+      {/* Control bar — ocupa espaço real no topo, nunca sai do ecrã */}
+      <div className="print:hidden relative z-10 flex justify-center px-4"
+        style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: '0.75rem' }}>
+        <div className="flex items-center gap-2 bg-zinc-900 border border-white/15 rounded-2xl shadow-2xl px-3 py-2 w-full max-w-sm">
+          <span className="text-sm font-semibold text-white truncate flex-1 min-w-0">{titulo}</span>
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white text-zinc-900 text-xs font-bold hover:bg-zinc-100 transition-colors"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-zinc-900 text-xs font-bold hover:bg-zinc-100 transition-colors"
           >
             <Printer size={13} /> Imprimir
           </button>
           <button
             onClick={onFechar}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="shrink-0 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X size={15} />
           </button>
         </div>
       </div>
 
-      {/* Scrollable preview */}
-      <div className="pm-scroll absolute inset-x-0 bottom-0 overflow-auto flex justify-center py-6 bg-gray-400/20" style={{ top: 'max(4.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
+      {/* Scrollable preview — flex-1 preenche o resto */}
+      <div className="pm-scroll flex-1 overflow-auto flex justify-center py-6 bg-gray-400/20">
         <div className="w-[794px] max-w-full">
           {children}
         </div>
