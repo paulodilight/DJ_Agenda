@@ -70,6 +70,26 @@ const hojeISO = () => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 }
 
+const FASE_DOT = {
+  criacao:    { cor: 'bg-amber-400',  label: 'Criação'    },
+  preparacao: { cor: 'bg-orange-500', label: 'Preparação' },
+  execucao:   { cor: 'bg-green-400',  label: 'Execução'   },
+  concluido:  { cor: 'bg-blue-400',   label: 'Concluído'  },
+}
+
+const derivarFase = (ev) => {
+  if (!ev) return null
+  const f = ev.fase
+  if (f === 'concluido' || f === 'faturado') return 'concluido'
+  if (f === 'execucao')  return 'execucao'
+  if (f === 'preparacao') return 'preparacao'
+  if (f === 'criacao')   return 'criacao'
+  // fallback via status quando fase ainda não foi definida
+  if (ev.status === 'realizado') return 'concluido'
+  if (['confirmado', 'pré-confirmado', 'validação', 'aceitação', 'trocado'].includes(ev.status)) return 'preparacao'
+  return 'criacao'
+}
+
 const ESTADOS_TAREFA = ['em curso', 'a validar', 'concluída']
 
 const ESTADO_COR = {
@@ -329,9 +349,19 @@ export function ColaboradorDashboard() {
           <div className="mt-3 rounded-2xl border border-white/10 bg-surface-1 p-4">
             <button onClick={() => setEventoAberto(proximoEvento)}
               className="w-full text-left hover:opacity-80 active:scale-[0.99] transition-all group">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-2 group-hover:text-amber-400 transition-colors">
-                Próximo evento →
-              </p>
+              {(() => {
+                const fase = derivarFase(proximoEvento)
+                const dot  = FASE_DOT[fase] ?? FASE_DOT.criacao
+                return (
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 group-hover:text-amber-400 transition-colors flex-1">
+                      Próximo evento →
+                    </p>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${dot.cor}`} title={dot.label} />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle/50">{dot.label}</span>
+                  </div>
+                )
+              })()}
               <p className="text-lg font-bold text-accent leading-snug">{proximoEvento.evento}</p>
               {localProximo && <p className="text-sm text-accent-muted mt-0.5">{localProximo}</p>}
               <div className="mt-2 flex flex-col gap-1.5">
