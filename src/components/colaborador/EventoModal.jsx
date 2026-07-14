@@ -60,7 +60,7 @@ function Campo({ rotulo, valor, negrito, isLink, full, size = 14 }) {
   )
 }
 
-export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
+export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] }) {
   const [aba, setAba]             = useState('detalhes')
   const [dir, setDir]             = useState('right')
   const [notas, setNotas]         = useState('')
@@ -105,6 +105,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   )
   // Só o responsável principal pode assinar presença
   const isResponsavel = evento.todos_tecnicos === true || colaborador?.id === evento.tecnico_id
+  const isLmd = evento.tipo === 'Apoio LMD'
 
   // ── Assinatura de início/fim de evento ──
   const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading, feitas: feitasAssin } = useAssinaturaDia(colaborador?.id ?? null, evento.id)
@@ -406,7 +407,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
     setAba(novaAba)
   }
 
-  const ABAS_ORDER = ['detalhes', 'notas', 'checklist', 'execucao']
+  const ABAS_ORDER = isLmd ? ['detalhes'] : ['detalhes', 'notas', 'checklist', 'execucao']
   const onTouchStart = (e) => { touchX.current = e.changedTouches[0].clientX }
   const onTouchEnd   = (e) => {
     if (touchX.current === null) return
@@ -477,12 +478,15 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
 
         {/* Abas */}
         <div className="flex border-b border-border px-2 shrink-0 items-center justify-center">
-          {[
-            { id: 'detalhes',  label: 'Detalhes',       d: 'left' },
-            { id: 'notas',     label: 'Equip. & Notas', d: 'right' },
-            { id: 'execucao',  label: 'Execução',       d: 'right' },
-            { id: 'checklist', label: 'Checklist',      d: 'right' },
-          ].map(t => (
+          {(isLmd
+            ? [{ id: 'detalhes', label: 'Detalhes', d: 'left' }]
+            : [
+                { id: 'detalhes',  label: 'Detalhes',       d: 'left' },
+                { id: 'notas',     label: 'Equip. & Notas', d: 'right' },
+                { id: 'execucao',  label: 'Execução',       d: 'right' },
+                { id: 'checklist', label: 'Checklist',      d: 'right' },
+              ]
+          ).map(t => (
             <button key={t.id} onClick={() => goAba(t.id, t.d)}
               className={clsx(
                 'px-3 py-2.5 font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap',
@@ -587,6 +591,68 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 {/* Morada — coluna única */}
                 <Campo rotulo="Morada" valor={evento.morada} isLink full />
               </div>
+
+              {/* ── LMD: Assinaturas (IN Work + OUT Work) ── */}
+              {isLmd && isAtribuido && (
+                <div className="mt-3">
+                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Presença / Assinaturas</p>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      { campo: 'assinatura_lmd_at', label: 'IN — Work' },
+                      { campo: 'assinatura_out_at', label: 'OUT — Work', requiredCampo: 'assinatura_lmd_at' },
+                    ].map(({ campo, label, requiredCampo }) => {
+                      const val      = assinEvento[campo]
+                      const saving   = assinEvSaving[campo]
+                      const bloqueado = requiredCampo ? !assinEvento[requiredCampo] : false
+                      return (
+                        <div key={campo} className={clsx('flex items-center gap-3 p-2.5 rounded-xl border bg-white/[0.03]', bloqueado ? 'border-white/5 opacity-40' : 'border-white/10')}>
+                          <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-green-400' : 'bg-white/20')} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-accent" style={{ fontSize: 12 }}>{label}</p>
+                            {val && (
+                              <p className="text-accent-subtle/60 tabular-nums mt-0.5" style={{ fontSize: 10 }}>
+                                {new Date(val).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                          </div>
+                          {val ? (
+                            <Check size={14} className="text-green-400 shrink-0" />
+                          ) : !bloqueado && isAtribuido ? (
+                            <button
+                              onClick={() => registarAssinEvento(campo)}
+                              disabled={!!saving}
+                              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-medium hover:bg-amber-400/20 disabled:opacity-40 transition-colors"
+                              style={{ fontSize: 11 }}>
+                              <Clock size={11} />
+                              {saving ? '…' : 'Registar'}
+                            </button>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── LMD: Tarefas do técnico ── */}
+              {isLmd && tarefas.filter(t => !['concluída', 'concluida', 'cancelada'].includes(t.estado)).length > 0 && (
+                <div className="mt-3">
+                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>As minhas tarefas</p>
+                  <div className="flex flex-col gap-1.5">
+                    {tarefas
+                      .filter(t => !['concluída', 'concluida', 'cancelada'].includes(t.estado))
+                      .map(t => (
+                        <div key={t.id} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                          <p className="font-semibold text-accent leading-snug" style={{ fontSize: 13 }}>{t.tarefa}</p>
+                          {t.data_conclusao && (
+                            <p className="text-accent-subtle/60 mt-0.5" style={{ fontSize: 11 }}>{dataLonga(t.data_conclusao)}</p>
+                          )}
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
             </div>
 
           ) : aba === 'checklist' ? (

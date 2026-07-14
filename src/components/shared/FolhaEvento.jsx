@@ -70,7 +70,7 @@ export function FolhaEvento({ dados }) {
 
       {/* Data, hora, instalação */}
       <Secao titulo="Data & Hora">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Linha rotulo="Data" valor={data ? dataCompleta(data) : null} />
             <Linha rotulo="Hora" valor={horaStr || null} />
@@ -86,7 +86,7 @@ export function FolhaEvento({ dados }) {
       {/* Local */}
       {(local || morada || responsavel || contacto) && (
         <Secao titulo="Local & Contacto">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Linha rotulo="Local" valor={local} />
               <Linha rotulo="Morada" valor={morada} />
@@ -116,7 +116,7 @@ export function FolhaEvento({ dados }) {
       {/* Equipamentos */}
       {equipamentos.length > 0 && (
         <Secao titulo="Equipamentos para o Evento">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
             {equipamentos.map((e, i) => (
               <div key={i} className="flex items-center gap-2 py-1 border-b border-gray-100">
                 <span className="text-[12px] font-bold text-gray-400 w-6 text-right shrink-0">{e.quantidade}×</span>
@@ -133,7 +133,7 @@ export function FolhaEvento({ dados }) {
           {clPrep.map((cl, ci) => (
             <div key={ci} className={ci > 0 ? 'mt-3' : ''}>
               {clPrep.length > 1 && <p className="text-[11px] font-semibold text-gray-600 mb-1">{cl.nome}</p>}
-              <div className="grid grid-cols-2 gap-x-8 gap-y-0.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-0.5">
                 {cl.itens.map((item, ii) => (
                   <div key={ii} className="flex items-start gap-2 py-0.5">
                     <div className="w-3.5 h-3.5 border border-gray-400 rounded-sm shrink-0 mt-px" />
@@ -152,7 +152,7 @@ export function FolhaEvento({ dados }) {
           {clSaida.map((cl, ci) => (
             <div key={ci} className={ci > 0 ? 'mt-3' : ''}>
               {clSaida.length > 1 && <p className="text-[11px] font-semibold text-gray-600 mb-1">{cl.nome}</p>}
-              <div className="grid grid-cols-2 gap-x-8 gap-y-0.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-0.5">
                 {cl.itens.map((item, ii) => (
                   <div key={ii} className="flex items-start gap-2 py-0.5">
                     <div className="w-3.5 h-3.5 border border-gray-400 rounded-sm shrink-0 mt-px" />
@@ -168,7 +168,7 @@ export function FolhaEvento({ dados }) {
       {/* Veículo */}
       {veiculo && (
         <Secao titulo="Veículo">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               {veiculo.descricao && <Linha rotulo="Viatura" valor={veiculo.descricao} />}
               {veiculo.condutor  && <Linha rotulo="Condutor" valor={veiculo.condutor} />}

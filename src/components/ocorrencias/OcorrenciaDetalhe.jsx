@@ -116,6 +116,13 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
     onFechar()
   }
 
+  const marcarEmCurso = async () => {
+    setLoading(true)
+    await supabase.from('ocorrencias').update({ status: 'em_processo' }).eq('id', ocorrencia.id)
+    setLoading(false)
+    onAtualizar?.()
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="bg-surface-1 border border-border rounded-2xl w-full max-w-lg max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden">
@@ -123,9 +130,17 @@ export function OcorrenciaDetalhe({ ocorrencia, intervencoes = [], onFechar, onA
         {/* Header */}
         <div className="px-5 py-4 border-b border-border/40 flex items-start justify-between gap-3 shrink-0">
           <div className="min-w-0 flex-1">
-            <span className={clsx('inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border mb-1', cfg.cls)}>
-              <Ic size={10} />{cfg.label}
-            </span>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className={clsx('inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border', cfg.cls)}>
+                <Ic size={10} />{cfg.label}
+              </span>
+              {ocorrencia.status === 'aberta' && (
+                <button onClick={marcarEmCurso} disabled={loading}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border text-amber-400 bg-amber-400/10 border-amber-400/30 hover:bg-amber-400/20 transition-colors disabled:opacity-50">
+                  <Clock size={10} /> Em curso
+                </button>
+              )}
+            </div>
             {aEditar ? (
               <input value={editTitulo} onChange={e => setEditTitulo(e.target.value)} autoFocus
                 className="w-full bg-surface-2 border border-border rounded-lg px-2 py-1 text-[14px] font-bold text-accent focus:outline-none focus:border-white/25" />

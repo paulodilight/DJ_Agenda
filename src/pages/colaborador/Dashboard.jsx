@@ -428,6 +428,7 @@ export function ColaboradorDashboard() {
         <EventoModal
           evento={eventoAberto}
           mapaTecnicos={mapaTecnicos}
+          tarefas={tarefas}
           onFechar={() => setEventoAberto(null)}
         />
       )}

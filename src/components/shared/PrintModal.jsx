@@ -25,8 +25,8 @@ export function PrintModal({ aberto, onFechar, titulo, children }) {
       <div className="print:hidden absolute inset-0 bg-black/70" onClick={onFechar} />
 
       {/* Control bar */}
-      <div className="print:hidden absolute top-4 inset-x-0 flex justify-center z-10">
-        <div className="flex items-center gap-3 bg-zinc-900 border border-white/15 rounded-2xl shadow-2xl px-4 py-2.5">
+      <div className="print:hidden absolute inset-x-4 flex justify-center z-10" style={{ top: 'max(1rem, env(safe-area-inset-top, 0px))' }}>
+        <div className="flex items-center gap-3 bg-zinc-900 border border-white/15 rounded-2xl shadow-2xl px-4 py-2.5 max-w-full">
           <span className="text-sm font-semibold text-white truncate max-w-[200px]">{titulo}</span>
           <button
             onClick={() => window.print()}
@@ -44,7 +44,7 @@ export function PrintModal({ aberto, onFechar, titulo, children }) {
       </div>
 
       {/* Scrollable preview */}
-      <div className="pm-scroll absolute inset-0 mt-16 overflow-auto flex justify-center py-6 bg-gray-400/20">
+      <div className="pm-scroll absolute inset-x-0 bottom-0 overflow-auto flex justify-center py-6 bg-gray-400/20" style={{ top: 'max(4.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
         <div className="w-[794px] max-w-full">
           {children}
         </div>
