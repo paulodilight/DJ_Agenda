@@ -751,10 +751,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Presença / Assinaturas</p>
                 <div className="flex flex-col gap-2">
                   {[
-                    { campo: 'assinatura_lmd_at', label: 'IN — Work',  viaPres: true },
+                    { campo: 'assinatura_lmd_at', label: 'IN — Work' },
                     { campo: 'assinatura_in_at',  label: 'IN — Event', requiredCampo: 'assinatura_lmd_at' },
-                    { campo: 'assinatura_out_at', label: 'OUT — Work', requiredCampo: 'assinatura_in_at' },
-                  ].map(({ campo, label, viaPres, requiredCampo }) => {
+                    ...(!evento.xclusive ? [{ campo: 'assinatura_out_at', label: 'OUT — Work', requiredCampo: 'assinatura_in_at' }] : []),
+                  ].map(({ campo, label, requiredCampo }) => {
                     const val       = assinEvento[campo]
                     const saving    = assinEvSaving[campo]
                     const bloqueado = requiredCampo ? !assinEvento[requiredCampo] : false
@@ -771,8 +771,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                         </div>
                         {val ? (
                           <Check size={14} className="text-green-400 shrink-0" />
-                        ) : viaPres ? (
-                          <span className="text-accent-subtle/40 shrink-0" style={{ fontSize: 10 }}>↓ rodapé</span>
                         ) : !bloqueado && isAtribuido ? (
                           <button
                             onClick={() => registarAssinEvento(campo)}
