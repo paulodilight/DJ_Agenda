@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera, Printer } from 'lucide-react'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
@@ -122,6 +122,13 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
   const [aConfirmarPres, setConfirmarPres] = useState(false)
   const presDisponivel = podeAssinar(evento.data_evento, evento.hora_inicio)
   const presAtrasada = presencaAtrasada(pres.presenca, evento.data_evento, evento.hora_inicio)
+
+  // Quando Marcar Presença (GPS) é assinado, auto-regista IN-Work
+  useEffect(() => {
+    if (pres.status === 'signed' && !assinEvento.assinatura_lmd_at) {
+      registarAssinEvento('assinatura_lmd_at')
+    }
+  }, [pres.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     supabase.from('carros').select('id, marca, modelo, matricula').eq('ativo', true).order('marca')
@@ -744,14 +751,15 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                 <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Presença / Assinaturas</p>
                 <div className="flex flex-col gap-2">
                   {[
-                    { campo: 'assinatura_lmd_at', label: 'IN - Work' },
-                    { campo: 'assinatura_in_at',  label: 'IN — Chegada ao evento' },
-                    { campo: 'assinatura_out_at', label: 'OUT — Fim do evento' },
-                  ].map(({ campo, label }) => {
-                    const val    = assinEvento[campo]
-                    const saving = assinEvSaving[campo]
+                    { campo: 'assinatura_lmd_at', label: 'IN — Work',  viaPres: true },
+                    { campo: 'assinatura_in_at',  label: 'IN — Event', requiredCampo: 'assinatura_lmd_at' },
+                    { campo: 'assinatura_out_at', label: 'OUT — Work', requiredCampo: 'assinatura_in_at' },
+                  ].map(({ campo, label, viaPres, requiredCampo }) => {
+                    const val       = assinEvento[campo]
+                    const saving    = assinEvSaving[campo]
+                    const bloqueado = requiredCampo ? !assinEvento[requiredCampo] : false
                     return (
-                      <div key={campo} className="flex items-center gap-3 p-2.5 rounded-xl border border-white/10 bg-white/[0.03]">
+                      <div key={campo} className={clsx('flex items-center gap-3 p-2.5 rounded-xl border bg-white/[0.03]', bloqueado ? 'border-white/5 opacity-40' : 'border-white/10')}>
                         <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-green-400' : 'bg-white/20')} />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-accent" style={{ fontSize: 12 }}>{label}</p>
@@ -761,7 +769,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                             </p>
                           )}
                         </div>
-                        {!val && isAtribuido ? (
+                        {val ? (
+                          <Check size={14} className="text-green-400 shrink-0" />
+                        ) : viaPres ? (
+                          <span className="text-accent-subtle/40 shrink-0" style={{ fontSize: 10 }}>↓ rodapé</span>
+                        ) : !bloqueado && isAtribuido ? (
                           <button
                             onClick={() => registarAssinEvento(campo)}
                             disabled={!!saving}
@@ -770,8 +782,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar }) {
                             <Clock size={11} />
                             {saving ? '…' : 'Registar'}
                           </button>
-                        ) : val ? (
-                          <Check size={14} className="text-green-400 shrink-0" />
                         ) : null}
                       </div>
                     )
