@@ -15,7 +15,7 @@ const TIPO_OPCOES = [
 const vazio = {
   nome: '', tipo: 'club', budget_max: '', valor_avenca: '',
   dias_sem_repeticao: 14, dias_espacamento: 7, notas: '', activo: true,
-  morada: '',
+  morada: '', nif: '', nome_empresa: '', email: '',
 }
 
 /**
@@ -74,6 +74,13 @@ export function FormEspaco({ aberto, espaco, onFechar, onGuardado }) {
               {TIPO_OPCOES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </Select>
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Nome da Empresa" value={form.nome_empresa ?? ''} onChange={set('nome_empresa')} placeholder="Empresa Lda." />
+            <Input label="NIF" value={form.nif ?? ''} onChange={set('nif')} placeholder="500000000" />
+          </div>
+
+          <Input label="Email" value={form.email ?? ''} onChange={set('email')} placeholder="geral@empresa.pt" type="email" />
 
           <div className="grid grid-cols-2 gap-4">
             <Input label="Budget máximo por sessão (€)" value={form.budget_max} onChange={set('budget_max')} placeholder="200" type="number" min={0} step={0.01} />

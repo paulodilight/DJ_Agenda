@@ -158,11 +158,11 @@ export function Espacos() {
               <div className="flex items-center gap-1 pt-1">
                 <Button variante="ghost" tamanho="sm" onClick={() => abrirEditar(e)} className="flex-1 justify-center">
                   <Pencil size={12} />
-                  Editar
+                  Dados
                 </Button>
                 <Button variante="ghost" tamanho="sm" onClick={() => navigate(`/espacos/${e.id}`)} className="flex-1 justify-center">
                   <Settings2 size={12} />
-                  Turnos & DJs
+                  Configurações
                 </Button>
               </div>
             </div>
