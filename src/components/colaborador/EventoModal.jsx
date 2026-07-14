@@ -657,7 +657,25 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
 
           ) : aba === 'checklist' ? (
             <div className="flex flex-col gap-3 py-2">
-              {eventoListas.length === 0 && (
+              {/* Equipamentos para o evento (lista do admin) — topo */}
+              {equipEvento.length > 0 && (
+                <div className="border border-white/10 rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
+                    <Boxes size={12} className="text-amber-400 shrink-0" />
+                    <p className="font-bold uppercase tracking-wider text-amber-400 flex-1" style={{ fontSize: 10 }}>Equipamentos para o evento</p>
+                  </div>
+                  <div className="flex flex-col">
+                    {equipEvento.map((r, i) => (
+                      <div key={i} className="flex items-center gap-2 px-3 py-2.5 border-b border-white/5 last:border-0">
+                        <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
+                        <span className="text-accent-muted" style={{ fontSize: 13 }}>{r.descricao_manual || r.equipamentos?.nome || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {eventoListas.length === 0 && equipEvento.length === 0 && (
                 <p className="text-center italic py-6" style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>Sem checklists neste evento.</p>
               )}
               {eventoListas.filter(l => l.fase !== 'saida').map(lista => {
@@ -720,24 +738,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                   </div>
                 )
               })}
-              {/* Equipamentos para o evento (lista do admin) */}
-              {equipEvento.length > 0 && (
-                <div className="border border-white/10 rounded-xl overflow-hidden">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
-                    <Boxes size={12} className="text-amber-400 shrink-0" />
-                    <p className="font-bold uppercase tracking-wider text-amber-400 flex-1" style={{ fontSize: 10 }}>Equipamentos para o evento</p>
-                  </div>
-                  <div className="flex flex-col">
-                    {equipEvento.map((r, i) => (
-                      <div key={i} className="flex items-center gap-2 px-3 py-2.5 border-b border-white/5 last:border-0">
-                        <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
-                        <span className="text-accent-muted" style={{ fontSize: 13 }}>{r.descricao_manual || r.equipamentos?.nome || '—'}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Equipamentos do responsável */}
               <div className="border border-white/10 rounded-xl overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
@@ -876,10 +876,28 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 <div className="flex flex-col gap-2">
                   {eventoListas.filter(l => l.fase === 'saida').map(lista => {
                     const submetida = clSubmetidas.has(lista.clId)
+                    const aGuardar  = clGuardando.has(lista.clId)
+                    const total     = lista.itens.length
+                    const feitos    = lista.itens.filter(it => eventoChecks.has(it.id)).length
                     return (
                       <div key={lista.clId} className="rounded-xl border border-white/10 overflow-hidden">
-                        <div className="px-3 py-1.5 bg-amber-400/[0.08] border-b border-amber-400/20">
-                          <p className="font-bold text-amber-400 uppercase tracking-wider" style={{ fontSize: 10 }}>{lista.nome}</p>
+                        <div className="flex items-center gap-2 px-3 py-2 bg-amber-400/[0.08] border-b border-amber-400/20">
+                          <ListChecks size={12} className={submetida ? 'text-green-400 shrink-0' : 'text-amber-400 shrink-0'} />
+                          <p className={clsx('font-bold uppercase tracking-wider flex-1', submetida ? 'text-green-400' : 'text-amber-400')} style={{ fontSize: 10 }}>{lista.nome}</p>
+                          {submetida ? (
+                            <span className="inline-flex items-center gap-1 text-green-400" style={{ fontSize: 10 }}>
+                              <Lock size={10} /> Guardado
+                            </span>
+                          ) : isAtribuido && total > 0 && (
+                            <button
+                              onClick={() => guardarChecklist(lista.clId)}
+                              disabled={aGuardar}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 disabled:opacity-50 transition-all"
+                              style={{ fontSize: 10 }}>
+                              <Lock size={10} />
+                              {aGuardar ? '…' : `Guardar ${feitos}/${total}`}
+                            </button>
+                          )}
                         </div>
                         <div className="flex flex-col">
                           {lista.itens.map(item => {
