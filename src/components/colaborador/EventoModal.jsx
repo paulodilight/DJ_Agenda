@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera, Printer } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera, Printer, CheckCircle2 } from 'lucide-react'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
@@ -93,6 +93,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const [carros,         setCarros]         = useState([])
   const [eventoCarros,   setEventoCarros]   = useState({ carro_id: '', condutor_id: '', km_saida: '', km_chegada: '' })
   const [veiculoSaving,  setVeiculoSaving]  = useState(false)
+  const [veiculoSaved,   setVeiculoSaved]   = useState(false)
+  const [execucaoSaved,  setExecucaoSaved]  = useState(false)
+  const [equipEventoChecks,   setEquipEventoChecks]   = useState(new Set())
+  const [equipEventoGuardado, setEquipEventoGuardado] = useState(false)
 
   // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
@@ -267,7 +271,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     if (!evento?.id) return
     let activo = true
     supabase.from('evento_equipamentos')
-      .select('tipo, quantidade, descricao_manual, equipamentos(nome)')
+      .select('id, tipo, quantidade, descricao_manual, equipamentos(nome)')
       .eq('evento_id', evento.id)
       .then(({ data }) => { if (activo) setEquipEvento(data ?? []) })
     return () => { activo = false }
@@ -370,6 +374,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
       })
     }
     setVeiculoSaving(false)
+    setVeiculoSaved(true)
   }
 
   const adicionarFoto = async (file) => {
@@ -399,6 +404,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
       if (data?.id) setFeedbackId(data.id)
     }
     setExecucaoSaving(false)
+    setExecucaoSaved(true)
   }
 
   const goAba = (novaAba, direcao) => {
@@ -657,23 +663,61 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
 
           ) : aba === 'checklist' ? (
             <div className="flex flex-col gap-3 py-2">
-              {/* Equipamentos para o evento (lista do admin) — topo */}
-              {equipEvento.length > 0 && (
-                <div className="border border-white/10 rounded-xl overflow-hidden">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
-                    <Boxes size={12} className="text-amber-400 shrink-0" />
-                    <p className="font-bold uppercase tracking-wider text-amber-400 flex-1" style={{ fontSize: 10 }}>Equipamentos para o evento</p>
+              {/* Equipamentos para o evento (checklist interativa) — topo */}
+              {equipEvento.length > 0 && (() => {
+                const total  = equipEvento.length
+                const feitos = equipEvento.filter(r => equipEventoChecks.has(r.id)).length
+                return (
+                  <div className="border border-white/10 rounded-xl overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-400/[0.08] border-b border-amber-400/20">
+                      <Boxes size={12} className={equipEventoGuardado ? 'text-green-400 shrink-0' : 'text-amber-400 shrink-0'} />
+                      <p className={clsx('font-bold uppercase tracking-wider flex-1', equipEventoGuardado ? 'text-green-400' : 'text-amber-400')} style={{ fontSize: 10 }}>Equipamentos para o evento</p>
+                      {equipEventoGuardado ? (
+                        <span className="inline-flex items-center gap-1 text-green-400" style={{ fontSize: 10 }}>
+                          <Lock size={10} /> Guardado
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setEquipEventoGuardado(true)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 transition-all"
+                          style={{ fontSize: 10 }}>
+                          <Lock size={10} />
+                          {`Guardar ${feitos}/${total}`}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-col">
+                      {equipEvento.map((r, i) => {
+                        const checked = equipEventoChecks.has(r.id)
+                        return (
+                          <button key={i} disabled={equipEventoGuardado}
+                            onClick={() => setEquipEventoChecks(prev => {
+                              const s = new Set(prev)
+                              checked ? s.delete(r.id) : s.add(r.id)
+                              return s
+                            })}
+                            className={clsx(
+                              'flex items-center gap-2 px-3 py-2.5 border-b border-white/5 last:border-0 w-full text-left transition-colors',
+                              checked ? 'bg-green-500/5' : 'hover:bg-white/[0.03]',
+                              equipEventoGuardado && 'cursor-default'
+                            )}>
+                            <div className={clsx(
+                              'w-4 h-4 rounded-sm border shrink-0 flex items-center justify-center transition-colors',
+                              checked ? 'bg-green-500/30 border-green-500/60' : 'border-white/20'
+                            )}>
+                              {checked && <Check size={10} className="text-green-400" />}
+                            </div>
+                            <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
+                            <span className={clsx('flex-1 text-left', checked ? 'text-accent-subtle/50 line-through' : 'text-accent-muted')} style={{ fontSize: 13 }}>
+                              {r.descricao_manual || r.equipamentos?.nome || '—'}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    {equipEvento.map((r, i) => (
-                      <div key={i} className="flex items-center gap-2 px-3 py-2.5 border-b border-white/5 last:border-0">
-                        <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
-                        <span className="text-accent-muted" style={{ fontSize: 13 }}>{r.descricao_manual || r.equipamentos?.nome || '—'}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                )
+              })()}
 
               {eventoListas.length === 0 && equipEvento.length === 0 && (
                 <p className="text-center italic py-6" style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>Sem checklists neste evento.</p>
@@ -981,8 +1025,8 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                       <button onClick={guardarVeiculo} disabled={veiculoSaving}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
                         style={{ fontSize: 12 }}>
-                        <Save size={12} />
-                        {veiculoSaving ? 'A guardar…' : 'Guardar'}
+                        {veiculoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
+                        {veiculoSaving ? 'A guardar…' : veiculoSaved ? 'Guardado' : 'Guardar'}
                       </button>
                     </div>
                   </div>
@@ -1034,8 +1078,8 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                     <button onClick={guardarFeedback} disabled={execucaoSaving}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
                       style={{ fontSize: 12 }}>
-                      <Save size={12} />
-                      {execucaoSaving ? 'A guardar…' : 'Guardar'}
+                      {execucaoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
+                      {execucaoSaving ? 'A guardar…' : execucaoSaved ? 'Guardado' : 'Guardar'}
                     </button>
                   </div>
                 </div>
@@ -1126,8 +1170,8 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                     <button onClick={guardar} disabled={guardando}
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 disabled:opacity-40 transition-colors"
                       style={{ fontSize: 12 }}>
-                      <Save size={13} />
-                      {guardando ? 'A guardar…' : guardado ? 'Guardado ✓' : 'Guardar notas'}
+                      {guardado ? <CheckCircle2 size={13} className="text-green-600" /> : <Save size={13} />}
+                      {guardando ? 'A guardar…' : guardado ? 'Guardado' : 'Guardar notas'}
                     </button>
                   </div>
                 </div>
