@@ -282,7 +282,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         })
       // Carregar equipamentos do evento
       supabase.from('evento_equipamentos')
-        .select('id, equipamento_id, descricao_manual, tipo, quantidade, valor_custo, margem')
+        .select('id, equipamento_id, descricao_manual, tipo, quantidade, valor_custo, margem, observacoes')
         .eq('evento_id', evento.id)
         .then(({ data }) => {
           const byTipo = { proprio: [], alugado: [], comprado: [], extra: [] }
@@ -296,6 +296,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 valor_custo: r.valor_custo != null ? String(r.valor_custo) : '',
                 margem: r.margem != null ? String(r.margem) : '',
                 unidades: r.quantidade ?? 1,
+                observacoes: r.observacoes ?? '',
               })
             }
           })
@@ -483,6 +484,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               quantidade: Number(r.unidades) || 1,
               valor_custo: r.valor_custo !== '' ? Number(r.valor_custo) : null,
               margem: r.margem !== '' ? Number(r.margem) : null,
+              observacoes: r.observacoes?.trim() || null,
             })
           })
         })
@@ -1021,7 +1023,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
 
           {/* ── Aba Equipamentos ── */}
           {abaActiva === 'equipamentos' && (() => {
-            const emptyEquipRow = () => ({ _key: uidF(), id: null, equipamento_id: null, descricao: '', valor_custo: '', margem: '', unidades: 1 })
+            const emptyEquipRow = () => ({ _key: uidF(), id: null, equipamento_id: null, descricao: '', valor_custo: '', margem: '', unidades: 1, observacoes: '' })
             const SECOES = [
               { key: 'proprio',  label: 'Equipamentos para o evento', hasDbPicker: true },
               { key: 'alugado',  label: 'Equipamentos Alugados',       hasDbPicker: false },
@@ -1036,7 +1038,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               ...prev, [secKey]: prev[secKey].filter(r => r._key !== rowKey),
             }))
             const addRow = (secKey, fromEquip = null) => {
-              const row = { _key: uidF(), id: null, equipamento_id: null, descricao: '', valor_custo: '', margem: '', unidades: 1 }
+              const row = { _key: uidF(), id: null, equipamento_id: null, descricao: '', valor_custo: '', margem: '', unidades: 1, observacoes: '' }
               if (fromEquip) {
                 row.equipamento_id = fromEquip.id
                 row.descricao = fromEquip.nome
@@ -1088,7 +1090,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                             const marg  = r.margem      !== '' ? Number(r.margem)      : 0
                             const valor = (Number(r.unidades) || 1) * (custo + marg)
                             return (
-                              <div key={r._key} className="grid grid-cols-[1fr_68px_68px_44px_68px_22px] border-b border-border/15 last:border-0 hover:bg-surface-3/20">
+                              <div key={r._key} className="border-b border-border/15 last:border-0">
+                              <div className="grid grid-cols-[1fr_68px_68px_44px_68px_22px] hover:bg-surface-3/20">
                                 <input value={r.descricao} onChange={e => updRow(key, r._key, 'descricao', e.target.value)}
                                   placeholder="Descrição…" className={cellCls} />
                                 <input type="number" min="0" step="0.01" value={r.valor_custo} onChange={e => updRow(key, r._key, 'valor_custo', e.target.value)}
@@ -1104,6 +1107,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                                   className="flex items-center justify-center text-border/30 hover:text-red-400/60 transition-colors">
                                   <Trash2 size={11} />
                                 </button>
+                              </div>
+                              <input value={r.observacoes} onChange={e => updRow(key, r._key, 'observacoes', e.target.value)} placeholder="Observações…" className="w-full px-2 py-1 text-[11px] text-accent-muted bg-transparent border-t border-border/10 placeholder:text-accent-subtle/30 focus:outline-none focus:bg-surface-3/20" />
                               </div>
                             )
                           })}
