@@ -196,6 +196,13 @@ export function Agenda() {
 
   // ── Distribuição: scope segue o tab seleccionado (Todos = global; Cliente = só esse) ──
   const anoMesAlvo = format(referencia, 'yyyy-MM')
+  const proximoMes = (() => {
+    const [y, m] = anoMesAlvo.split('-').map(Number)
+    const d = new Date(y, m, 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })()
+  const MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']
+  const proximoMesNome = MESES_PT[parseInt(proximoMes.split('-')[1]) - 1]
   // Já houve distribuição neste mês/scope? (existe ≥1 slot automático)
   const jaDistribuido = filtroEspaco
     ? agendaMes.some(s => s.espaco_id === filtroEspaco && s.origem === 'automatico')
@@ -234,6 +241,8 @@ export function Agenda() {
   const [enviandoDatas, setEnviandoDatas] = useState(false)
   const [enviandoManager, setEnviandoManager] = useState(false)
   const [enviandoConfirmados, setEnviandoConfirmados] = useState(false)
+  const [enviandoAbertura, setEnviandoAbertura] = useState(false)
+  const [enviandoFecho, setEnviandoFecho] = useState(false)
   const [notasModalAberto, setNotasModalAberto] = useState(false)
 
   const lsKeyConfirmados = `confirmados_env_${anoMesAlvo}_${filtroEspaco || 'todos'}`
@@ -327,6 +336,32 @@ export function Agenda() {
       localStorage.setItem(lsKeyConfirmados, JSON.stringify({ count: nConfirmado }))
     } catch (e) { alert('Erro ao enviar confirmados: ' + e.message) }
     finally { setEnviandoConfirmados(false) }
+  }
+
+  const enviarAbertura = async () => {
+    if (!window.confirm(`Enviar abertura de disponibilidades para ${proximoMesNome}?`)) return
+    setEnviandoAbertura(true)
+    try {
+      fetch('https://i4dj.app.n8n.cloud/webhook/dj-abertura-disponibilidades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes: proximoMes }),
+      }).catch(() => {})
+    } catch (e) { alert('Erro ao enviar abertura: ' + e.message) }
+    finally { setEnviandoAbertura(false) }
+  }
+
+  const enviarFecho = async () => {
+    if (!window.confirm(`Enviar fecho de disponibilidades para ${proximoMesNome}?`)) return
+    setEnviandoFecho(true)
+    try {
+      fetch('https://i4dj.app.n8n.cloud/webhook/dj-fecho-disponibilidades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes: proximoMes }),
+      }).catch(() => {})
+    } catch (e) { alert('Erro ao enviar fecho: ' + e.message) }
+    finally { setEnviandoFecho(false) }
   }
 
   const distribuir = async () => {
@@ -952,6 +987,28 @@ export function Agenda() {
                 <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold">{nPreConf}</span>
               </button>
             )}
+
+            <button
+              onClick={enviarAbertura}
+              disabled={enviandoAbertura}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20"
+              title={`Enviar abertura de disponibilidades para ${proximoMesNome}`}
+            >
+              {enviandoAbertura ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+              Abertura
+              <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">{proximoMesNome}</span>
+            </button>
+
+            <button
+              onClick={enviarFecho}
+              disabled={enviandoFecho}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 border-orange-500/40 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20"
+              title={`Enviar fecho de disponibilidades para ${proximoMesNome}`}
+            >
+              {enviandoFecho ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+              Fecho
+              <span className="px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300 text-[10px] font-bold">{proximoMesNome}</span>
+            </button>
 
             {mostrarBotaoConfirmados && (
               <button
