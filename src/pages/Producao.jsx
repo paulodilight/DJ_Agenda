@@ -15,12 +15,13 @@ const STATUS_OC = {
   em_processo: { label: 'Em processo', Ic: Clock,        cls: 'text-amber-400' },
   fechada:     { label: 'Fechada',     Ic: CheckCircle,  cls: 'text-green-400' },
 }
-const ESTADOS_T = ['a fazer', 'em curso', 'a validar', 'concluída', 'cancelada']
+const ESTADOS_T = ['a fazer', 'em curso', 'a validar', 'concluída', 'fechada', 'cancelada']
 const ESTADO_CLS = {
   'a fazer':   'bg-surface-3 text-accent-subtle border-border/50',
   'em curso':  'bg-amber-400/10 text-amber-400 border-amber-400/30',
   'a validar': 'bg-blue-400/10 text-blue-400 border-blue-400/30',
   'concluída': 'bg-green-400/10 text-green-400 border-green-400/30',
+  'fechada':   'bg-emerald-900/20 text-emerald-400/70 border-emerald-400/20',
   'cancelada': 'bg-red-400/10 text-red-400/70 border-red-400/20',
 }
 const ESTADO_DOT = {
@@ -28,6 +29,7 @@ const ESTADO_DOT = {
   'em curso':  'bg-amber-400',
   'a validar': 'bg-blue-400',
   'concluída': 'bg-green-400',
+  'fechada':   'bg-emerald-500/40',
   'cancelada': 'bg-red-400/50',
 }
 
@@ -52,7 +54,8 @@ function ModalEditarTarefa({ tarefa, onFechar, onGuardada, onApagada }) {
   const guardar = async () => {
     setSaving(true)
     const concluida = form.estado === 'concluída'
-    await supaEventos.from('supa_tarefas').update({
+    const fechada   = form.estado === 'fechada'
+    const patch = {
       tarefa:             form.tarefa.trim(),
       responsavel:        form.responsavel.trim() || null,
       tipo:               form.tipo.trim() || null,
@@ -61,8 +64,10 @@ function ModalEditarTarefa({ tarefa, onFechar, onGuardada, onApagada }) {
       notas_operacionais: form.notas_operacionais.trim() || null,
       estado:             form.estado,
       confirmacao:        concluida ? 'concluida' : null,
-      concluida_em:       concluida ? new Date().toISOString() : null,
-    }).eq('id', tarefa.id)
+    }
+    if (concluida)     patch.concluida_em = new Date().toISOString()
+    else if (!fechada) patch.concluida_em = null
+    await supaEventos.from('supa_tarefas').update(patch).eq('id', tarefa.id)
     setSaving(false)
     onGuardada({ ...tarefa, ...form })
   }
@@ -251,7 +256,7 @@ function VistaTarefas({ onVoltar, limite }) {
   const [tarefas,  setTarefas]  = useState([])
   const [loading,  setLoading]  = useState(true)
   const [pesquisa, setPesquisa] = useState('')
-  const [filtro,   setFiltro]   = useState('ativas')
+  const [filtro,   setFiltro]   = useState('a-fazer')
   const [editando, setEditando] = useState(null)
   const [criando,  setCriando]  = useState(false)
 
@@ -264,7 +269,12 @@ function VistaTarefas({ onVoltar, limite }) {
   }, [])
 
   const lista = tarefas
-    .filter(t => filtro === 'todas' || !['concluída', 'cancelada'].includes(t.estado))
+    .filter(t => {
+      if (filtro === 'a-fazer')   return ['a fazer', 'em curso'].includes(t.estado)
+      if (filtro === 'a-validar') return t.estado === 'a validar'
+      if (filtro === 'concluido') return ['concluída', 'fechada'].includes(t.estado)
+      return true
+    })
     .filter(t => {
       if (!pesquisa) return true
       const q = pesquisa.toLowerCase()
@@ -284,7 +294,12 @@ function VistaTarefas({ onVoltar, limite }) {
             </button>
           )}
           <div className="flex gap-1">
-            {[{ id: 'ativas', label: 'Ativas' }, { id: 'todas', label: 'Todas' }].map(f => (
+            {[
+              { id: 'a-fazer', label: 'A fazer' },
+              { id: 'a-validar', label: 'A validar' },
+              { id: 'concluido', label: 'Concluído' },
+              { id: 'todas', label: 'Todas' },
+            ].map(f => (
               <button key={f.id} onClick={() => setFiltro(f.id)}
                 className={clsx('px-3 py-1 rounded-full border text-[11px] font-semibold transition-colors',
                   filtro === f.id

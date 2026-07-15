@@ -139,14 +139,14 @@ export const colaboradorApi = {
     if (!primeiro) return []
     const { data, error } = await supaEventos
       .from('supa_tarefas')
-      .select('id, tarefa, responsavel, estado, confirmacao, data_conclusao, hora, tipo, notas_operacionais, criado_por, foto_url, concluida_em, recorrencia')
+      .select('id, tarefa, responsavel, estado, confirmacao, data_conclusao, hora, tipo, notas_operacionais, criado_por, foto_url, concluida_em, recorrencia, motivo_validacao')
       .ilike('responsavel', `%${primeiro}%`)
       .order('data_conclusao', { ascending: true })
     if (error) throw error
     return data ?? []
   },
 
-  async actualizarEstadoTarefa(id, estado) {
+  async actualizarEstadoTarefa(id, estado, extra = {}) {
     const concluida = estado === 'concluída'
     const { error } = await supaEventos
       .from('supa_tarefas')
@@ -154,9 +154,17 @@ export const colaboradorApi = {
         estado,
         confirmacao: concluida ? 'concluida' : 'nao_concluida',
         concluida_em: concluida ? new Date().toISOString() : null,
+        ...extra,
       })
       .eq('id', id)
     if (error) throw error
+    if (concluida) {
+      fetch('https://i4dj.app.n8n.cloud/webhook/tarefa-concluida', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      }).catch(() => {})
+    }
   },
 
   async actualizarFotoTarefa(id, fotoUrl) {
