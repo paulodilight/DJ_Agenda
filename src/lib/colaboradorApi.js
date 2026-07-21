@@ -43,7 +43,7 @@ export const colaboradorApi = {
       .eq('tecnico_id', tecnicoId)
     const equipaIds = new Set((et ?? []).map((r) => r.evento_id))
 
-    const COLS = 'id,evento,tipo,status,fase,assinatura_lmd_at,assinatura_in_at,assinatura_out_at,tecnico_id,todos_tecnicos,contacto_pelo_evento,morada,dia_instalacao,hora_instalacao,data_evento,hora_inicio,hora_fim,notas_operacionais,Equipamentos,notas_colaborador,espaco_id,responsavel,data_preparacao,notas_preparacao,espacos(nome,logo_url)'
+    const COLS = 'id,evento,tipo,status,fase,assinatura_lmd_at,assinatura_in_at,assinatura_out_at,tecnico_id,todos_tecnicos,contacto_pelo_evento,morada,dia_instalacao,hora_instalacao,data_evento,hora_inicio,hora_fim,notas_operacionais,Equipamentos,notas_colaborador,espaco_id,responsavel,data_preparacao,notas_preparacao,rider_url,espacos(nome,logo_url)'
     const { data, error } = await supabase
       .from('supa_eventos')
       .select(COLS)
@@ -88,7 +88,7 @@ export const colaboradorApi = {
       .from('evento_tecnicos').select('evento_id').eq('tecnico_id', tecnicoId)
     const equipaIds = new Set((et ?? []).map(r => r.evento_id))
 
-    const COLS = 'id,evento,tipo,status,tecnico_id,contacto_pelo_evento,morada,dia_instalacao,hora_instalacao,data_evento,hora_inicio,hora_fim,notas_operacionais,Equipamentos,notas_colaborador,espaco_id,responsavel,espacos(nome)'
+    const COLS = 'id,evento,tipo,status,tecnico_id,contacto_pelo_evento,morada,dia_instalacao,hora_instalacao,data_evento,hora_inicio,hora_fim,notas_operacionais,Equipamentos,notas_colaborador,espaco_id,responsavel,rider_url,espacos(nome)'
     const { data, error } = await supabase
       .from('supa_eventos')
       .select(COLS)

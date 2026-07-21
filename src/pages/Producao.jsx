@@ -42,25 +42,34 @@ function ModalEditarTarefa({ tarefa, onFechar, onGuardada, onApagada }) {
   const [form, setForm] = useState({
     tarefa:             tarefa.tarefa ?? '',
     responsavel:        tarefa.responsavel ?? '',
-    tipo:               tarefa.tipo ?? '',
+    tipo:               tarefa.tipo || 'Pontual',
+    recorrencia:        tarefa.recorrencia ?? 'semanal',
     data_conclusao:     tarefa.data_conclusao ?? '',
     hora:               tarefa.hora ?? '',
     notas_operacionais: tarefa.notas_operacionais ?? '',
     estado:             tarefa.estado ?? 'a fazer',
   })
   const [saving, setSaving] = useState(false)
+  const [colaboradores, setColaboradores] = useState([])
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  useEffect(() => {
+    supabase.from('vw_colaboradores').select('id, nome').order('nome')
+      .then(({ data }) => setColaboradores(data ?? []))
+  }, [])
 
   const guardar = async () => {
     setSaving(true)
     const concluida = form.estado === 'concluída'
     const fechada   = form.estado === 'fechada'
+    const pontual   = form.tipo === 'Pontual'
     const patch = {
       tarefa:             form.tarefa.trim(),
-      responsavel:        form.responsavel.trim() || null,
-      tipo:               form.tipo.trim() || null,
-      data_conclusao:     form.data_conclusao || null,
-      hora:               form.hora || null,
+      responsavel:        form.responsavel || null,
+      tipo:               form.tipo,
+      recorrencia:        pontual ? null : form.recorrencia,
+      data_conclusao:     pontual ? (form.data_conclusao || null) : null,
+      hora:               pontual ? (form.hora || null) : null,
       notas_operacionais: form.notas_operacionais.trim() || null,
       estado:             form.estado,
       confirmacao:        concluida ? 'concluida' : null,
@@ -92,41 +101,61 @@ function ModalEditarTarefa({ tarefa, onFechar, onGuardada, onApagada }) {
             <input value={form.tarefa} onChange={e => set('tarefa', e.target.value)} autoFocus
               className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
           </div>
+          <div>
+            <label className="block text-[11px] text-accent-subtle mb-1">Descrição da tarefa</label>
+            <textarea value={form.notas_operacionais} onChange={e => set('notas_operacionais', e.target.value)} rows={2}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25 resize-none" />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] text-accent-subtle mb-1">Responsável</label>
-              <input value={form.responsavel} onChange={e => set('responsavel', e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
+              <select value={form.responsavel} onChange={e => set('responsavel', e.target.value)}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25">
+                <option value="">— Selecionar —</option>
+                {form.responsavel && !colaboradores.some(c => c.nome === form.responsavel) && (
+                  <option value={form.responsavel}>{form.responsavel}</option>
+                )}
+                {colaboradores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-[11px] text-accent-subtle mb-1">Tipo</label>
-              <input value={form.tipo} onChange={e => set('tipo', e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
+              <select value={form.tipo} onChange={e => set('tipo', e.target.value)}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25">
+                <option value="Pontual">Pontual</option>
+                <option value="Recorrente">Recorrente</option>
+              </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] text-accent-subtle mb-1">Data limite</label>
-              <input type="date" value={form.data_conclusao} onChange={e => set('data_conclusao', e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
+          {form.tipo === 'Pontual' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] text-accent-subtle mb-1">Data limite</label>
+                <input type="date" value={form.data_conclusao} onChange={e => set('data_conclusao', e.target.value)}
+                  className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
+              </div>
+              <div>
+                <label className="block text-[11px] text-accent-subtle mb-1">Hora</label>
+                <input type="time" value={form.hora} onChange={e => set('hora', e.target.value)}
+                  className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
+              </div>
             </div>
+          ) : (
             <div>
-              <label className="block text-[11px] text-accent-subtle mb-1">Hora</label>
-              <input type="time" value={form.hora} onChange={e => set('hora', e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
+              <label className="block text-[11px] text-accent-subtle mb-1">Repetição</label>
+              <select value={form.recorrencia} onChange={e => set('recorrencia', e.target.value)}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25">
+                <option value="semanal">Semanal</option>
+                <option value="mensal">Mensal</option>
+              </select>
             </div>
-          </div>
+          )}
           <div>
             <label className="block text-[11px] text-accent-subtle mb-1">Estado</label>
             <select value={form.estado} onChange={e => set('estado', e.target.value)}
               className={clsx('w-full border rounded-lg px-3 py-2 text-sm outline-none', ESTADO_CLS[form.estado] ?? ESTADO_CLS['a fazer'])}>
               {ESTADOS_T.map(e => <option key={e} value={e}>{e}</option>)}
             </select>
-          </div>
-          <div>
-            <label className="block text-[11px] text-accent-subtle mb-1">Notas</label>
-            <textarea value={form.notas_operacionais} onChange={e => set('notas_operacionais', e.target.value)} rows={3}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25 resize-none" />
           </div>
         </div>
         <div className="px-5 pb-4 flex items-center justify-between gap-2">
@@ -149,20 +178,29 @@ function ModalEditarTarefa({ tarefa, onFechar, onGuardada, onApagada }) {
 // ── Modal Criar Tarefa ────────────────────────────────────────────────────────
 function ModalCriarTarefa({ onFechar, onCriada }) {
   const [form, setForm] = useState({
-    tarefa: '', responsavel: '', tipo: '', data_conclusao: '', hora: '', notas_operacionais: '',
+    tarefa: '', responsavel: '', tipo: 'Pontual', recorrencia: 'semanal',
+    data_conclusao: '', hora: '', notas_operacionais: '',
   })
   const [saving, setSaving] = useState(false)
+  const [colaboradores, setColaboradores] = useState([])
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  useEffect(() => {
+    supabase.from('vw_colaboradores').select('id, nome').order('nome')
+      .then(({ data }) => setColaboradores(data ?? []))
+  }, [])
 
   const guardar = async () => {
     if (!form.tarefa.trim()) return
     setSaving(true)
+    const pontual = form.tipo === 'Pontual'
     const { data } = await supaEventos.from('supa_tarefas').insert({
       tarefa:             form.tarefa.trim(),
-      responsavel:        form.responsavel.trim() || null,
-      tipo:               form.tipo.trim() || null,
-      data_conclusao:     form.data_conclusao || null,
-      hora:               form.hora || null,
+      responsavel:        form.responsavel || null,
+      tipo:               form.tipo,
+      recorrencia:        pontual ? null : form.recorrencia,
+      data_conclusao:     pontual ? (form.data_conclusao || null) : null,
+      hora:               pontual ? (form.hora || null) : null,
       notas_operacionais: form.notas_operacionais.trim() || null,
       estado:             'a fazer',
       criado_por:         'Admin',
@@ -186,35 +224,52 @@ function ModalCriarTarefa({ onFechar, onCriada }) {
               className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25 placeholder:text-accent-subtle/40"
               placeholder="Descrição da tarefa…" />
           </div>
+          <div>
+            <label className="block text-[11px] text-accent-subtle mb-1">Descrição da tarefa</label>
+            <textarea value={form.notas_operacionais} onChange={e => set('notas_operacionais', e.target.value)} rows={2}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25 resize-none" placeholder="Detalhes…" />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] text-accent-subtle mb-1">Responsável</label>
-              <input value={form.responsavel} onChange={e => set('responsavel', e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" placeholder="Nome…" />
+              <select value={form.responsavel} onChange={e => set('responsavel', e.target.value)}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25">
+                <option value="">— Selecionar —</option>
+                {colaboradores.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-[11px] text-accent-subtle mb-1">Tipo</label>
-              <input value={form.tipo} onChange={e => set('tipo', e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" placeholder="Ex: limpeza…" />
+              <select value={form.tipo} onChange={e => set('tipo', e.target.value)}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25">
+                <option value="Pontual">Pontual</option>
+                <option value="Recorrente">Recorrente</option>
+              </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          {form.tipo === 'Pontual' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] text-accent-subtle mb-1">Data limite</label>
+                <input type="date" value={form.data_conclusao} onChange={e => set('data_conclusao', e.target.value)}
+                  className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
+              </div>
+              <div>
+                <label className="block text-[11px] text-accent-subtle mb-1">Hora</label>
+                <input type="time" value={form.hora} onChange={e => set('hora', e.target.value)}
+                  className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
+              </div>
+            </div>
+          ) : (
             <div>
-              <label className="block text-[11px] text-accent-subtle mb-1">Data limite</label>
-              <input type="date" value={form.data_conclusao} onChange={e => set('data_conclusao', e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
+              <label className="block text-[11px] text-accent-subtle mb-1">Repetição</label>
+              <select value={form.recorrencia} onChange={e => set('recorrencia', e.target.value)}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25">
+                <option value="semanal">Semanal</option>
+                <option value="mensal">Mensal</option>
+              </select>
             </div>
-            <div>
-              <label className="block text-[11px] text-accent-subtle mb-1">Hora</label>
-              <input type="time" value={form.hora} onChange={e => set('hora', e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-[11px] text-accent-subtle mb-1">Notas</label>
-            <textarea value={form.notas_operacionais} onChange={e => set('notas_operacionais', e.target.value)} rows={3}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-accent outline-none focus:border-white/25 resize-none" />
-          </div>
+          )}
         </div>
         <div className="px-5 pb-4 flex justify-end gap-2">
           <button onClick={onFechar} className="px-4 py-2 rounded-lg text-xs text-accent-subtle hover:text-accent hover:bg-surface-2 transition-colors">Cancelar</button>

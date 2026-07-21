@@ -1465,6 +1465,12 @@ export function ApoioTecnico() {
                 className="p-1.5 rounded hover:bg-surface-2 text-accent-subtle hover:text-accent transition-colors">
                 <ChevronRight size={14} />
               </button>
+              {!semana7.includes(hojeStr) && (
+                <button onClick={() => setSemanaRef(hojeStr)}
+                  className="px-2.5 py-1 rounded text-[11px] font-semibold border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
+                  Hoje
+                </button>
+              )}
             </div>
             {/* 7 cartões */}
             <div className="flex-1 overflow-auto p-3 grid grid-cols-7 gap-2 min-h-0">

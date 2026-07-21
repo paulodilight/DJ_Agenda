@@ -18,7 +18,7 @@ import { formatarData, formatarHora } from '@/utils/datas'
 import { FormEvento } from '@/components/eventos/FormEvento'
 import { DJCombobox, NovoDJLink } from './DJCombobox'
 import { supaEventosApi } from '@/lib/supaEventosApi'
-import { trocarDJ, trocarDJDireto, registarHistorico } from '@/lib/trocas'
+import { trocarDJ, trocarDJDireto, registarHistorico, enfileirarWpp, formatarWaId } from '@/lib/trocas'
 import { clsx } from 'clsx'
 import { CalendarPlus, Link2, Star, ArrowLeftRight, RotateCcw, Plus, Trash2, Clock } from 'lucide-react'
 
@@ -121,6 +121,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const [trocaLoading, setTrocaLoading]     = useState(false)
   const [trocaErro, setTrocaErro]           = useState(null)
   const [tipoTroca, setTipoTroca]           = useState('substituir')
+  const [wppEnviando, setWppEnviando]       = useState(null)
   const [trocaDataId, setTrocaDataId]       = useState('')
   const [trocaSlots, setTrocaSlots]         = useState([])
   const [trocaSlotsLoading, setTrocaSlotsLoading] = useState(false)
@@ -635,6 +636,39 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     setTrocaDjId(''); setTrocaMotivo(''); setTrocaErro(null)
     setTipoTroca('substituir'); setTrocaDataId(''); setTrocaSlots([])
     setTrocaAberta(true)
+  }
+
+  const dataCurtaSlot = (iso) => {
+    if (!iso) return ''
+    const [, m, d] = iso.split('-')
+    return `${d}/${m}`
+  }
+  const hhmm = (s) => (s ?? '').slice(0, 5)
+
+  const espacoTroca = slot?.espaco_nome ?? espacos.find(e => e.id === slot?.espaco_id)?.nome?.trim() ?? ''
+
+  const enviarAvisoSai = async () => {
+    const djSai = djs.find(d => d.id === form.dj_id)
+    if (!djSai?.telefone) return
+    setWppEnviando('sai')
+    try {
+      const nome = djSai.nome_artistico || djSai.nome || 'DJ'
+      const msg = `Olá ${nome},\nConforme combinado, informamos que a tua atuação do dia ${dataCurtaSlot(slot?.data)}, no ${espacoTroca} às ${hhmm(slot?.hora_inicio)}, foi cancelada.\nSe precisares de algum esclarecimento, fala com o Paulo DiLight.`
+      await enfileirarWpp(formatarWaId(djSai.telefone), msg, `troca_sai_agenda_${slot?.id}`)
+    } catch (e) { console.error(e) }
+    setWppEnviando(null)
+  }
+
+  const enviarConfirmacaoEntra = async () => {
+    const djEntra = djs.find(d => d.id === trocaDjId)
+    if (!djEntra?.telefone) return
+    setWppEnviando('entra')
+    try {
+      const nome = djEntra.nome_artistico || djEntra.nome || 'DJ'
+      const msg = `Olá ${nome},\nFica confirmada a tua atuação no ${espacoTroca}, dia ${dataCurtaSlot(slot?.data)}, das ${hhmm(slot?.hora_inicio)} às ${hhmm(slot?.hora_fim)}.\nSe precisares de mais esclarecimentos ou houver alguma impossibilidade, avisa o mais rapidamente possível o Paulo DiLight.`
+      await enfileirarWpp(formatarWaId(djEntra.telefone), msg, `troca_entra_agenda_${slot?.id}`)
+    } catch (e) { console.error(e) }
+    setWppEnviando(null)
   }
 
   const executarTroca = async () => {
@@ -1530,6 +1564,26 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         </div>
 
         {trocaErro && <Alerta tipo="erro" mensagem={trocaErro} />}
+
+        <div className="flex flex-col gap-1.5 pt-1 border-t border-border/30">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle">Notificar por WhatsApp</span>
+          <div className="flex gap-2">
+            <Button type="button" variante="ghost" tamanho="sm"
+              onClick={enviarAvisoSai}
+              loading={wppEnviando === 'sai'}
+              disabled={!djs.find(d => d.id === form.dj_id)?.telefone || wppEnviando != null}
+              className="flex-1 text-rose-400 border-rose-500/30 hover:bg-rose-500/10">
+              📵 Avisar saída
+            </Button>
+            <Button type="button" variante="ghost" tamanho="sm"
+              onClick={enviarConfirmacaoEntra}
+              loading={wppEnviando === 'entra'}
+              disabled={!trocaDjId || !djs.find(d => d.id === trocaDjId)?.telefone || wppEnviando != null}
+              className="flex-1 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10">
+              ✅ Confirmar entrada
+            </Button>
+          </div>
+        </div>
 
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variante="ghost" tamanho="sm" onClick={() => setTrocaAberta(false)}>Cancelar</Button>

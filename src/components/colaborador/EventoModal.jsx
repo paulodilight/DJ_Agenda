@@ -96,7 +96,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const [veiculoSaved,   setVeiculoSaved]   = useState(false)
   const [execucaoSaved,  setExecucaoSaved]  = useState(false)
   const [equipEventoChecks,   setEquipEventoChecks]   = useState(new Set())
-  const [equipEventoGuardado, setEquipEventoGuardado] = useState(false)
+  const [equipConfirmadoEm,   setEquipConfirmadoEm]   = useState(null)
 
   // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
@@ -112,7 +112,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const isLmd = evento.tipo === 'Apoio LMD'
 
   // ── Assinatura de início/fim de evento ──
-  const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading, feitas: feitasAssin } = useAssinaturaDia(colaborador?.id ?? null, evento.id)
+  const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading, feitas: feitasAssin, tiposFeitos: tiposAssinFeitos } = useAssinaturaDia(colaborador?.id ?? null, evento.id)
   const [assinandoEvento, setAssinandoEvento] = useState(false)
   const mostrarInEvento = !assinLoading && proximaAssin?.tipo === 'in_evento' && proximaAssin?.eventoId === evento.id
 
@@ -140,18 +140,37 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     if (!evento?.id) return
     let activo = true
     supabase.from('supa_eventos')
-      .select('assinatura_lmd_at, assinatura_in_at, assinatura_out_at')
+      .select('assinatura_lmd_at, assinatura_in_at, assinatura_out_at, equip_confirmado_em')
       .eq('id', evento.id)
       .single()
       .then(({ data }) => {
-        if (activo && data) setAssinEvento({
+        if (!activo || !data) return
+        setAssinEvento({
           assinatura_lmd_at: data.assinatura_lmd_at ?? null,
           assinatura_in_at:  data.assinatura_in_at  ?? null,
           assinatura_out_at: data.assinatura_out_at ?? null,
         })
+        setEquipConfirmadoEm(data.equip_confirmado_em ?? null)
       })
     return () => { activo = false }
   }, [evento?.id])
+
+  // Sincroniza assinaturas do hook (home) para supa_eventos quando ainda não estão registadas
+  useEffect(() => {
+    if (!tiposAssinFeitos?.length || !evento?.id) return
+    const inWork = tiposAssinFeitos.find(f => f.tipo === 'in_work')
+    if (inWork && !assinEvento.assinatura_lmd_at) {
+      const ts = inWork.registado_em
+      supabase.from('supa_eventos').update({ assinatura_lmd_at: ts }).eq('id', evento.id)
+        .then(({ error }) => { if (!error) setAssinEvento(prev => ({ ...prev, assinatura_lmd_at: ts })) })
+    }
+    const outWork = tiposAssinFeitos.find(f => f.tipo === 'out_work')
+    if (outWork && !assinEvento.assinatura_out_at && assinEvento.assinatura_lmd_at) {
+      const ts = outWork.registado_em
+      supabase.from('supa_eventos').update({ assinatura_out_at: ts }).eq('id', evento.id)
+        .then(({ error }) => { if (!error) setAssinEvento(prev => ({ ...prev, assinatura_out_at: ts })) })
+    }
+  }, [tiposAssinFeitos, evento?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     supabase.from('carros').select('id, marca, modelo, matricula').eq('ativo', true).order('marca')
@@ -289,7 +308,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     if (!evento?.id) return
     let activo = true
     supabase.from('evento_equipamentos')
-      .select('id, tipo, quantidade, descricao_manual, equipamentos(nome)')
+      .select('id, tipo, quantidade, descricao_manual, observacoes, equipamentos(nome)')
       .eq('evento_id', evento.id)
       .then(({ data }) => { if (activo) setEquipEvento(data ?? []) })
     return () => { activo = false }
@@ -462,10 +481,14 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
         : mapaTecnicos[evento.tecnico_id] ? { nome: mapaTecnicos[evento.tecnico_id], label: 'Responsável' } : null,
       ...outrosTecs.map(nome => ({ nome, label: 'Apoio' })),
     ].filter(Boolean),
+    status: evento.status || null,
+    fase: faseLocal || null,
     equipamentos: equipEvento.map(r => ({
       nome: r.descricao_manual || r.equipamentos?.nome || '—',
       quantidade: r.quantidade || 1,
+      observacoes: r.observacoes || null,
     })),
+    equipItemsFeitos: equipItems,
     checklists: eventoListas.map(l => ({ nome: l.nome, fase: l.fase, itens: l.itens.map(i => i.texto) })),
     veiculo: (() => {
       const carro = carros.find(c => c.id === Number(eventoCarros.carro_id))
@@ -477,6 +500,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
       }
     })(),
     notasOperacionais: evento.notas_operacionais || null,
+    notasPreparacao: evento.notas_preparacao || null,
+    dataPreparacao: evento.data_preparacao || null,
+    notasColaborador: notas || null,
+    feedbackTexto: execucaoNotas || null,
+    fotos: feedbackFotos,
+    assinaturas: {
+      lmd_at: assinEvento.assinatura_lmd_at,
+      in_at:  assinEvento.assinatura_in_at,
+      out_at: assinEvento.assinatura_out_at,
+    },
     tipoEvento: evento.tipo || null,
   }
 
@@ -688,15 +721,19 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 return (
                   <div className="border border-white/10 rounded-xl overflow-hidden">
                     <div className="flex items-center gap-2 px-3 py-2 bg-amber-400/[0.08] border-b border-amber-400/20">
-                      <Boxes size={12} className={equipEventoGuardado ? 'text-green-400 shrink-0' : 'text-amber-400 shrink-0'} />
-                      <p className={clsx('font-bold uppercase tracking-wider flex-1', equipEventoGuardado ? 'text-green-400' : 'text-amber-400')} style={{ fontSize: 10 }}>Equipamentos para o evento</p>
-                      {equipEventoGuardado ? (
+                      <Boxes size={12} className={equipConfirmadoEm ? 'text-green-400 shrink-0' : 'text-amber-400 shrink-0'} />
+                      <p className={clsx('font-bold uppercase tracking-wider flex-1', equipConfirmadoEm ? 'text-green-400' : 'text-amber-400')} style={{ fontSize: 10 }}>Equipamentos para o evento</p>
+                      {equipConfirmadoEm ? (
                         <span className="inline-flex items-center gap-1 text-green-400" style={{ fontSize: 10 }}>
                           <Lock size={10} /> Guardado
                         </span>
                       ) : (
                         <button
-                          onClick={() => setEquipEventoGuardado(true)}
+                          onClick={async () => {
+                            const ts = new Date().toISOString()
+                            const { error } = await supabase.from('supa_eventos').update({ equip_confirmado_em: ts }).eq('id', evento.id)
+                            if (!error) setEquipConfirmadoEm(ts)
+                          }}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 transition-all"
                           style={{ fontSize: 10 }}>
                           <Lock size={10} />
@@ -708,7 +745,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                       {equipEvento.map((r, i) => {
                         const checked = equipEventoChecks.has(r.id)
                         return (
-                          <button key={i} disabled={equipEventoGuardado}
+                          <button key={i} disabled={!!equipConfirmadoEm}
                             onClick={() => setEquipEventoChecks(prev => {
                               const s = new Set(prev)
                               checked ? s.delete(r.id) : s.add(r.id)
@@ -717,7 +754,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                             className={clsx(
                               'flex items-center gap-2 px-3 py-2.5 border-b border-white/5 last:border-0 w-full text-left transition-colors',
                               checked ? 'bg-green-500/5' : 'hover:bg-white/[0.03]',
-                              equipEventoGuardado && 'cursor-default'
+                              !!equipConfirmadoEm && 'cursor-default'
                             )}>
                             <div className={clsx(
                               'w-4 h-4 rounded-sm border shrink-0 flex items-center justify-center transition-colors',
@@ -1133,11 +1170,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                   </div>
                   <div className="flex flex-col">
                     {equipEvento.map((r, i) => (
-                      <div key={i} className="flex items-center gap-2 px-3 py-2 border-b border-white/5 last:border-0">
-                        <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
-                        <span className="text-accent-muted" style={{ fontSize: 13 }}>
-                          {r.descricao_manual || r.equipamentos?.nome || '—'}
-                        </span>
+                      <div key={i} className="px-3 py-2 border-b border-white/5 last:border-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
+                          <span className="text-accent-muted" style={{ fontSize: 13 }}>
+                            {r.descricao_manual || r.equipamentos?.nome || '—'}
+                          </span>
+                        </div>
+                        {r.observacoes && (
+                          <p className="text-accent-subtle/50 italic ml-6 mt-0.5" style={{ fontSize: 11 }}>{r.observacoes}</p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1248,8 +1290,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-medium hover:bg-amber-400/20 transition-colors disabled:opacity-40">
                   <MapPin size={14} /> Marcar presença
                 </button>
-              ) : isResponsavel ? (
-                <span className="text-accent-subtle/60 text-xs">Disponível {TOLERANCIA_MIN} min antes do início</span>
               ) : null}
             </div>
           </div>
