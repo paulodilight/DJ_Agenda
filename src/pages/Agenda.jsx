@@ -322,12 +322,11 @@ export function Agenda() {
   const enviarConfirmados = async () => {
     setEnviandoConfirmados(true)
     try {
-      // Apenas notificação — sem mudança de estado
-      fetch('https://i4dj.app.n8n.cloud/webhook/dj-enviar-confirmados', {
+      await fetch('https://i4dj.app.n8n.cloud/webhook/dj-enviar-confirmados', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mes: anoMesAlvo, espaco_id: filtroEspaco || null }),
-      }).catch(() => {})
+      })
     } catch (e) { alert('Erro ao enviar confirmados: ' + e.message) }
     finally { setEnviandoConfirmados(false) }
   }
@@ -1008,12 +1007,12 @@ export function Agenda() {
               <button
                 onClick={enviarConfirmados}
                 disabled={enviandoConfirmados}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                title="Enviar notificação aos DJs com agenda confirmada"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors disabled:opacity-40 border-indigo-400/40 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20"
+                title="Notificar DJs para confirmarem a agenda"
               >
                 {enviandoConfirmados ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                 Enviar p/confirmar
-                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">{nAddAgenda}</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold">{nAddAgenda}</span>
               </button>
             )}
 
