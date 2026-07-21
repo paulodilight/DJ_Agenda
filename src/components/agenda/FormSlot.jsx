@@ -736,7 +736,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
   return (
     <>
-    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-2xl' : 'max-w-7xl'}>
+    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-2xl' : 'max-w-6xl'}>
       <form onSubmit={guardar} noValidate>
         <div className="px-6 py-5 flex flex-col gap-4">
           {erro && <Alerta tipo="erro" mensagem={erro} />}

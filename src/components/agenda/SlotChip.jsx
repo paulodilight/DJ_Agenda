@@ -29,7 +29,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
       <button
         onClick={onClickVazio}
         className={clsx(
-          'w-full px-2 py-0.5 rounded border border-dashed min-h-[26px] flex items-center justify-center transition-colors',
+          'w-full px-2 py-1 rounded border border-dashed min-h-[34px] flex items-center justify-center transition-colors',
           dimmed
             ? 'border-surface-4/15 bg-black/[0.35] text-white/[0.07] hover:text-white/20 hover:border-surface-4/40'
             : 'border-surface-4 bg-surface-2 text-accent-subtle/40 hover:text-accent-subtle hover:border-border'
@@ -46,7 +46,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
       <button
         onClick={(e) => { if (!isDragging) onClick?.(e) }}
         className={clsx(
-          'w-full px-2 py-0.5 rounded border border-dashed min-h-[26px] flex items-center justify-center transition-colors',
+          'w-full px-2 py-1 rounded border border-dashed min-h-[34px] flex items-center justify-center transition-colors',
           dimmed
             ? 'border-surface-4/15 bg-black/[0.35] text-white/[0.07] hover:text-white/20 hover:border-surface-4/40'
             : 'border-surface-4 bg-surface-2 text-accent-subtle/40 hover:text-accent-subtle hover:border-border'
@@ -87,7 +87,7 @@ export function SlotChip({ slot, isLock, onClick, onClickVazio, onSugerir, onTog
       {...(dragId ? attributes : {})}
       onClick={(e) => { if (!isDragging) onClick?.(e) }}
       className={clsx(
-        'w-full text-center px-2 py-0.5 rounded border transition-colors min-h-[26px] flex items-center justify-center',
+        'w-full text-center px-2 py-1 rounded border transition-colors min-h-[34px] flex items-center justify-center',
         dragId && 'cursor-grab active:cursor-grabbing',
         isDragging && 'opacity-30',
         // Padding esquerdo para estrela
