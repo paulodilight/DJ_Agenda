@@ -17,9 +17,11 @@ function dataCurta(iso) {
 }
 
 /** Insere uma mensagem na outbox (mensagens_wpp). Ignora se não houver número. */
-export async function enfileirarWpp(wa_id, mensagem, contexto) {
+export async function enfileirarWpp(wa_id, mensagem, contexto, templateName = null, templateParams = null) {
   if (!wa_id) return
-  const { error } = await supabase.from('mensagens_wpp').insert({ wa_id, mensagem, contexto })
+  const row = { wa_id, mensagem, contexto }
+  if (templateName) { row.template_name = templateName; row.template_params = templateParams }
+  const { error } = await supabase.from('mensagens_wpp').insert(row)
   if (error) throw error
 }
 

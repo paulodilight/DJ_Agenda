@@ -652,9 +652,9 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     if (!djSai?.telefone) return
     setWppEnviando('sai')
     try {
-      const nome = djSai.nome_artistico || djSai.nome || 'DJ'
-      const msg = `Olá ${nome},\nConforme combinado, informamos que a tua atuação do dia ${dataCurtaSlot(slot?.data)}, no ${espacoTroca} às ${hhmm(slot?.hora_inicio)}, foi cancelada.\nSe precisares de algum esclarecimento, fala com o Paulo DiLight.`
-      await enfileirarWpp(formatarWaId(djSai.telefone), msg, `troca_sai_agenda_${slot?.id}`)
+      const params = [dataCurtaSlot(slot?.data), espacoTroca, hhmm(slot?.hora_inicio)]
+      const preview = `data_cancelada: ${params.join(' | ')}`
+      await enfileirarWpp(formatarWaId(djSai.telefone), preview, `troca_sai_agenda_${slot?.id}`, 'data_cancelada', params)
     } catch (e) { console.error(e) }
     setWppEnviando(null)
   }
@@ -664,9 +664,9 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     if (!djEntra?.telefone) return
     setWppEnviando('entra')
     try {
-      const nome = djEntra.nome_artistico || djEntra.nome || 'DJ'
-      const msg = `Olá ${nome},\nFica confirmada a tua atuação no ${espacoTroca}, dia ${dataCurtaSlot(slot?.data)}, das ${hhmm(slot?.hora_inicio)} às ${hhmm(slot?.hora_fim)}.\nSe precisares de mais esclarecimentos ou houver alguma impossibilidade, avisa o mais rapidamente possível o Paulo DiLight.`
-      await enfileirarWpp(formatarWaId(djEntra.telefone), msg, `troca_entra_agenda_${slot?.id}`)
+      const params = [dataCurtaSlot(slot?.data), espacoTroca, hhmm(slot?.hora_inicio), hhmm(slot?.hora_fim)]
+      const preview = `nova_data_confirmada: ${params.join(' | ')}`
+      await enfileirarWpp(formatarWaId(djEntra.telefone), preview, `troca_entra_agenda_${slot?.id}`, 'nova_data_confirmada', params)
     } catch (e) { console.error(e) }
     setWppEnviando(null)
   }
@@ -736,7 +736,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
   return (
     <>
-    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-2xl' : 'max-w-6xl'}>
+    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-2xl' : 'max-w-7xl'}>
       <form onSubmit={guardar} noValidate>
         <div className="px-6 py-5 flex flex-col gap-4">
           {erro && <Alerta tipo="erro" mensagem={erro} />}
@@ -1573,14 +1573,14 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
               loading={wppEnviando === 'sai'}
               disabled={!djs.find(d => d.id === form.dj_id)?.telefone || wppEnviando != null}
               className="flex-1 text-rose-400 border-rose-500/30 hover:bg-rose-500/10">
-              📵 Avisar saída
+              📵 Data Cancelada
             </Button>
             <Button type="button" variante="ghost" tamanho="sm"
               onClick={enviarConfirmacaoEntra}
               loading={wppEnviando === 'entra'}
               disabled={!trocaDjId || !djs.find(d => d.id === trocaDjId)?.telefone || wppEnviando != null}
               className="flex-1 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10">
-              ✅ Confirmar entrada
+              ✅ Nova Data
             </Button>
           </div>
         </div>

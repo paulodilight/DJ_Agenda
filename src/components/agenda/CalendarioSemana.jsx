@@ -309,6 +309,7 @@ export function CalendarioSemana({
                     const base    = `${dataStr}|${espaco.id}`
                     const isLock  = !!locks[base]
                     const dropId  = `${dataStr}|${espaco.id}|${turno.id ?? '_'}`
+                    const passado = isPast(dia) && !isToday(dia)
 
                     // Slots com turno_id específico + slots sem turno_id distribuídos por hora
                     const semTurnoBase = slotsIdx.semTurno[base] ?? []
@@ -331,10 +332,12 @@ export function CalendarioSemana({
                           'px-1.5 py-1.5 border-r border-b border-border align-top',
                           !operaNesteDia
                             ? 'bg-black/[0.28]'
-                            : fds(dia) ? 'bg-blue-400/[0.06]' : ''
+                            : passado
+                              ? 'bg-black/[0.12]'
+                              : fds(dia) ? 'bg-blue-400/[0.06]' : ''
                         )}
                       >
-                        <div className="flex flex-col gap-1">
+                        <div className={clsx('flex flex-col gap-1', passado && 'opacity-40')}>
                           {slots.length > 0
                             ? slots.map((slot) => (
                                 <SlotChip
