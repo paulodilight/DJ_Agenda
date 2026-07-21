@@ -1018,7 +1018,7 @@ export function Agenda() {
                 title="Enviar notificação aos DJs com agenda confirmada"
               >
                 {enviandoConfirmados ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                Enviar confirmados
+                Enviar p/confirmar
                 <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">{nConfirmado}</span>
               </button>
             )}
