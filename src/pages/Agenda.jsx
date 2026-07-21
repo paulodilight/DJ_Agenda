@@ -245,12 +245,7 @@ export function Agenda() {
   const [enviandoFecho, setEnviandoFecho] = useState(false)
   const [notasModalAberto, setNotasModalAberto] = useState(false)
 
-  const lsKeyConfirmados = `confirmados_env_${anoMesAlvo}_${filtroEspaco || 'todos'}`
-  const confirmadosEnviadosCount = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem(lsKeyConfirmados) ?? 'null')?.count ?? 0 }
-    catch { return 0 }
-  }, [lsKeyConfirmados])
-  const mostrarBotaoConfirmados = nConfirmado > confirmadosEnviadosCount
+  const mostrarBotaoConfirmados = nAddAgenda > 0
 
   const { naoLidasPorEspaco, totalNaoLidas } = useNotasNaoLidasAdmin(anoMesAlvo)
   const badgeNotas = filtroEspaco ? (naoLidasPorEspaco[filtroEspaco] ?? 0) : totalNaoLidas
@@ -333,7 +328,6 @@ export function Agenda() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mes: anoMesAlvo, espaco_id: filtroEspaco || null }),
       }).catch(() => {})
-      localStorage.setItem(lsKeyConfirmados, JSON.stringify({ count: nConfirmado }))
     } catch (e) { alert('Erro ao enviar confirmados: ' + e.message) }
     finally { setEnviandoConfirmados(false) }
   }
@@ -1019,7 +1013,7 @@ export function Agenda() {
               >
                 {enviandoConfirmados ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                 Enviar p/confirmar
-                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">{nConfirmado}</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">{nAddAgenda}</span>
               </button>
             )}
 
