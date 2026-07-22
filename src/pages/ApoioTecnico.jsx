@@ -290,15 +290,20 @@ function ModalAtribuicao({ aberto, celula, tecnicos, eventos, agendamentos, onFe
   const [conflitos, setConflitos]         = useState([])
   const [confirmar, setConfirmar]         = useState(false)
   const [tecConflito, setTecConflito]     = useState('')
+  const [dirty, setDirty]                 = useState(false)
+  const [confirmarFecho, setConfirmarFecho] = useState(false)
 
   useEffect(() => {
     if (!aberto) return
     setSeleccionados(celula?.tecIds ?? [])
     setConflitos([])
     setConfirmar(false)
+    setDirty(false)
+    setConfirmarFecho(false)
   }, [aberto, celula])
 
   const toggle = (id) => {
+    setDirty(true)
     const next = seleccionados.includes(id)
       ? seleccionados.filter(x => x !== id)
       : [...seleccionados, id]
@@ -343,16 +348,21 @@ function ModalAtribuicao({ aberto, celula, tecnicos, eventos, agendamentos, onFe
     executarGuardar(seleccionados)
   }
 
+  const tentarFechar = () => {
+    if (dirty) setConfirmarFecho(true)
+    else onFechar()
+  }
+
   return (
     <>
-      <Modal aberto={aberto} onFechar={onFechar} largura="max-w-sm">
+      <Modal aberto={aberto} onFechar={onFechar} aoTentarFechar={tentarFechar} largura="max-w-sm">
         <div className="flex flex-col">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div>
               <p className="text-sm font-semibold text-accent">Técnicos do evento</p>
               {celula && <p className="text-[11px] text-accent-subtle mt-0.5">{celula.espaco} · {celula.data}</p>}
             </div>
-            <button onClick={onFechar} className="text-accent-subtle hover:text-accent"><X size={15} /></button>
+            <button onClick={tentarFechar} className="text-accent-subtle hover:text-accent"><X size={15} /></button>
           </div>
           <div className="px-5 py-4 flex flex-col gap-3">
             {celula?.evento && (
@@ -398,6 +408,20 @@ function ModalAtribuicao({ aberto, celula, tecnicos, eventos, agendamentos, onFe
           onCancelar={() => { setConfirmar(false); setSeleccionados(seleccionados.filter(id => id !== tecConflito)) }}
         />
       )}
+      {confirmarFecho && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmarFecho(false)} />
+          <div className="relative bg-surface-1 border border-border rounded-lg shadow-2xl p-6 max-w-sm w-full flex flex-col gap-4">
+            <p className="text-sm font-semibold text-accent">Alterações não guardadas</p>
+            <p className="text-xs text-accent-subtle">Se fechar agora perdes as alterações.</p>
+            <div className="flex gap-2">
+              <Button variante="secundario" tamanho="sm" onClick={() => { setConfirmarFecho(false); onFechar() }} className="flex-1">Fechar sem guardar</Button>
+              <Button tamanho="sm" onClick={() => { setConfirmarFecho(false); guardar() }} className="flex-1">Guardar</Button>
+            </div>
+            <button onClick={() => setConfirmarFecho(false)} className="text-xs text-accent-subtle hover:text-accent text-center">Continuar a editar</button>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -406,15 +430,20 @@ function ModalAtribuicao({ aberto, celula, tecnicos, eventos, agendamentos, onFe
 function ModalFolga({ aberto, data, tecnicos, folgasHoje, agendamentos, onFechar, onGuardado }) {
   const [seleccionados, setSeleccionados] = useState([])
   const [loading, setLoading] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [confirmarFecho, setConfirmarFecho] = useState(false)
 
   useEffect(() => {
     if (!aberto) return
     setSeleccionados(folgasHoje ?? [])
+    setDirty(false)
+    setConfirmarFecho(false)
   }, [aberto, folgasHoje])
 
-  const toggle = (id) => setSeleccionados(prev =>
-    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-  )
+  const toggle = (id) => {
+    setDirty(true)
+    setSeleccionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
 
   const guardar = async () => {
     setLoading(true)
@@ -432,31 +461,52 @@ function ModalFolga({ aberto, data, tecnicos, folgasHoje, agendamentos, onFechar
     finally { setLoading(false) }
   }
 
+  const tentarFechar = () => {
+    if (dirty) setConfirmarFecho(true)
+    else onFechar()
+  }
+
   return (
-    <Modal aberto={aberto} onFechar={onFechar} largura="max-w-xs">
-      <div className="flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div>
-            <p className="text-sm font-semibold text-accent">Folgas</p>
-            {data && <p className="text-[11px] text-accent-subtle mt-0.5">{dataFmt(data)} · {nomeDiaSem(data)}</p>}
+    <>
+      <Modal aberto={aberto} onFechar={onFechar} aoTentarFechar={tentarFechar} largura="max-w-xs">
+        <div className="flex flex-col">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <div>
+              <p className="text-sm font-semibold text-accent">Folgas</p>
+              {data && <p className="text-[11px] text-accent-subtle mt-0.5">{dataFmt(data)} · {nomeDiaSem(data)}</p>}
+            </div>
+            <button onClick={tentarFechar} className="text-accent-subtle hover:text-accent"><X size={15} /></button>
           </div>
-          <button onClick={onFechar} className="text-accent-subtle hover:text-accent"><X size={15} /></button>
+          <div className="px-5 py-4 flex flex-col gap-2">
+            {tecnicos.map(t => (
+              <label key={t.id} className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={seleccionados.includes(t.id)} onChange={() => toggle(t.id)}
+                  className="w-4 h-4 rounded border-border accent-status-confirmado" />
+                <span className="text-sm text-accent">{t.nome}</span>
+              </label>
+            ))}
+          </div>
+          <div className="px-5 py-3 border-t border-border flex justify-end gap-2">
+            <Button variante="secundario" onClick={onFechar} disabled={loading}>Cancelar</Button>
+            <Button onClick={guardar} disabled={loading}>{loading ? 'A guardar…' : 'Guardar'}</Button>
+          </div>
         </div>
-        <div className="px-5 py-4 flex flex-col gap-2">
-          {tecnicos.map(t => (
-            <label key={t.id} className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={seleccionados.includes(t.id)} onChange={() => toggle(t.id)}
-                className="w-4 h-4 rounded border-border accent-status-confirmado" />
-              <span className="text-sm text-accent">{t.nome}</span>
-            </label>
-          ))}
+      </Modal>
+      {confirmarFecho && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmarFecho(false)} />
+          <div className="relative bg-surface-1 border border-border rounded-lg shadow-2xl p-6 max-w-sm w-full flex flex-col gap-4">
+            <p className="text-sm font-semibold text-accent">Alterações não guardadas</p>
+            <p className="text-xs text-accent-subtle">Se fechar agora perdes as alterações.</p>
+            <div className="flex gap-2">
+              <Button variante="secundario" tamanho="sm" onClick={() => { setConfirmarFecho(false); onFechar() }} className="flex-1">Fechar sem guardar</Button>
+              <Button tamanho="sm" onClick={() => { setConfirmarFecho(false); guardar() }} className="flex-1">Guardar</Button>
+            </div>
+            <button onClick={() => setConfirmarFecho(false)} className="text-xs text-accent-subtle hover:text-accent text-center">Continuar a editar</button>
+          </div>
         </div>
-        <div className="px-5 py-3 border-t border-border flex justify-end gap-2">
-          <Button variante="secundario" onClick={onFechar} disabled={loading}>Cancelar</Button>
-          <Button onClick={guardar} disabled={loading}>{loading ? 'A guardar…' : 'Guardar'}</Button>
-        </div>
-      </div>
-    </Modal>
+      )}
+    </>
   )
 }
 

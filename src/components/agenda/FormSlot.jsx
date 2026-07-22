@@ -125,6 +125,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const [trocaDataId, setTrocaDataId]       = useState('')
   const [trocaSlots, setTrocaSlots]         = useState([])
   const [trocaSlotsLoading, setTrocaSlotsLoading] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [confirmarFecho, setConfirmarFecho] = useState(false)
 
   // ── Setup Equipamentos ──
   const [setupEquipamentos, setSetupEquipamentos] = useState([])
@@ -183,6 +185,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         if (sub) initialForm.tipo_slot = KEY_TIPO_MAP[sub.tipo] ?? sub.tipo
       }
       setForm(initialForm)
+      setDirty(false)
+      setConfirmarFecho(false)
       setLoading(false)
       setErro(null)
       setConflitos([])
@@ -473,7 +477,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   }, [form.dj_id, form.data, form.espaco_id, slot?.id, slot?.espaco_id, djs])
 
   const guardar = async (e) => {
-    e.preventDefault()
+    e?.preventDefault()
     console.log('guardar:', { overrideRegras, conflitoCrossEspaco, bloqueioIndisponivel, conflito, conflitos })
     if (!overrideRegras && (conflitoCrossEspaco || bloqueioIndisponivel || conflito || conflitos.length > 0)) return
     setErro(null)
@@ -550,6 +554,11 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
     } finally {
       setLoading(false)
     }
+  }
+
+  const tentarFechar = () => {
+    if (dirty) setConfirmarFecho(true)
+    else onFechar()
   }
 
   const apagar = async () => {
@@ -736,8 +745,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
 
   return (
     <>
-    <Modal aberto={aberto} onFechar={onFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-2xl' : 'max-w-6xl'}>
-      <form onSubmit={guardar} noValidate>
+    <Modal aberto={aberto} onFechar={onFechar} aoTentarFechar={tentarFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-2xl' : 'max-w-6xl'}>
+      <form onSubmit={guardar} onChange={() => setDirty(true)} noValidate>
         <div className="px-6 py-5 flex flex-col gap-4">
           {erro && <Alerta tipo="erro" mensagem={erro} />}
           {conflitoCrossEspaco && (
@@ -1594,6 +1603,20 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         </div>
       </div>
     </Modal>
+    {confirmarFecho && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmarFecho(false)} />
+        <div className="relative bg-surface-1 border border-border rounded-lg shadow-2xl p-6 max-w-sm w-full flex flex-col gap-4">
+          <p className="text-sm font-semibold text-accent">Alterações não guardadas</p>
+          <p className="text-xs text-accent-subtle">Se fechar agora perdes as alterações feitas.</p>
+          <div className="flex gap-2">
+            <Button type="button" variante="secundario" tamanho="sm" onClick={() => { setConfirmarFecho(false); onFechar() }} className="flex-1">Fechar sem guardar</Button>
+            <Button type="button" tamanho="sm" onClick={async () => { setConfirmarFecho(false); await guardar() }} className="flex-1">Guardar</Button>
+          </div>
+          <button type="button" onClick={() => setConfirmarFecho(false)} className="text-xs text-accent-subtle hover:text-accent text-center">Continuar a editar</button>
+        </div>
+      </div>
+    )}
     </>
   )
 }
