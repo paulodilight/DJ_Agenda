@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo, useRef } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -125,8 +125,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   const [trocaDataId, setTrocaDataId]       = useState('')
   const [trocaSlots, setTrocaSlots]         = useState([])
   const [trocaSlotsLoading, setTrocaSlotsLoading] = useState(false)
-  const [dirty, setDirty] = useState(false)
   const [confirmarFecho, setConfirmarFecho] = useState(false)
+  const formInicialRef = useRef(null)
 
   // ── Setup Equipamentos ──
   const [setupEquipamentos, setSetupEquipamentos] = useState([])
@@ -153,7 +153,16 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       // Buscar estado fresco da BD — pode ter mudado remotamente (ex: manager aprovou)
       supabase.from('agenda').select('estado, estado_pagamento').eq('id', slot.id).maybeSingle()
         .then(({ data }) => {
-          if (data) setForm(f => ({ ...f, estado: data.estado, estado_pagamento: data.estado_pagamento ?? f.estado_pagamento }))
+          if (data) {
+            setForm(f => ({ ...f, estado: data.estado, estado_pagamento: data.estado_pagamento ?? f.estado_pagamento }))
+            // Sincronizar snapshot para não gerar falso "dirty" com dados frescos da BD
+            if (formInicialRef.current) {
+              try {
+                const snap = JSON.parse(formInicialRef.current)
+                formInicialRef.current = JSON.stringify({ ...snap, estado: data.estado, estado_pagamento: data.estado_pagamento ?? snap.estado_pagamento })
+              } catch {}
+            }
+          }
         })
     } else {
       setPresencaSignedAt(null)
@@ -185,7 +194,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         if (sub) initialForm.tipo_slot = KEY_TIPO_MAP[sub.tipo] ?? sub.tipo
       }
       setForm(initialForm)
-      setDirty(false)
+      formInicialRef.current = JSON.stringify(initialForm)
       setConfirmarFecho(false)
       setLoading(false)
       setErro(null)
@@ -557,7 +566,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   }
 
   const tentarFechar = () => {
-    if (dirty) setConfirmarFecho(true)
+    const temAlteracoes = formInicialRef.current != null && JSON.stringify(form) !== formInicialRef.current
+    if (temAlteracoes) setConfirmarFecho(true)
     else onFechar()
   }
 
@@ -746,7 +756,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
   return (
     <>
     <Modal aberto={aberto} onFechar={onFechar} aoTentarFechar={tentarFechar} titulo={slot?.id ? 'Atuação' : 'Nova Atuação'} largura={simplificado ? 'max-w-2xl' : 'max-w-6xl'}>
-      <form onSubmit={guardar} onChange={() => setDirty(true)} noValidate>
+      <form onSubmit={guardar} noValidate>
         <div className="px-6 py-5 flex flex-col gap-4">
           {erro && <Alerta tipo="erro" mensagem={erro} />}
           {conflitoCrossEspaco && (
