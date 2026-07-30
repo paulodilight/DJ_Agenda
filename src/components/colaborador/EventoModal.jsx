@@ -492,7 +492,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
       observacoes: r.observacoes || null,
     })),
     equipItemsFeitos: equipItems,
-    checklists: eventoListas.map(l => ({ nome: l.nome, fase: l.fase, itens: l.itens.map(i => i.texto) })),
+    checklists: eventoListas.map(l => ({
+      nome: l.nome, fase: l.fase,
+      itens: l.itens.map(i => i.texto),
+      submetida: clSubmetidas.has(l.clId),
+    })),
     veiculo: (() => {
       const carro = carros.find(c => c.id === Number(eventoCarros.carro_id))
       const condutorNome = mapaTecnicos[eventoCarros.condutor_id] || null
@@ -500,13 +504,17 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
       return {
         descricao: carro ? carro.marca + ' ' + carro.modelo + ' · ' + carro.matricula : null,
         condutor: condutorNome,
+        kmSaida:   eventoCarros.km_saida   || null,
+        kmChegada: eventoCarros.km_chegada || null,
       }
     })(),
+    riderNome: evento.rider_url ? decodeURIComponent(evento.rider_url.split('/').pop()) : null,
     notasOperacionais: evento.notas_operacionais || null,
     notasPreparacao: evento.notas_preparacao || null,
     dataPreparacao: evento.data_preparacao || null,
     notasColaborador: notas || null,
     feedbackTexto: execucaoNotas || null,
+    fotosEvento: evento.fotos_urls ?? [],
     fotos: feedbackFotos,
     assinaturas: {
       lmd_at: assinEvento.assinatura_lmd_at,

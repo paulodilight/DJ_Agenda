@@ -53,16 +53,6 @@ function AssinaturaBox({ label, timestamp }) {
   )
 }
 
-// dados: { nomeEvento, data, horaInicio, horaFim, diaInstalacao, horaInstalacao,
-//          local, morada, responsavel, contacto, status, fase, tipoEvento,
-//          tecnicos: [{nome, label}],
-//          equipamentos: [{nome, quantidade, observacoes}],
-//          equipItemsFeitos: [{texto, feito}],
-//          checklists: [{nome, fase, itens:[string]}],
-//          veiculo: {descricao, condutor} | null,
-//          notasOperacionais, notasColaborador, notasPreparacao, dataPreparacao,
-//          feedbackTexto, fotos: [url],
-//          assinaturas: {lmd_at, in_at, out_at} }
 export function FolhaEvento({ dados }) {
   const {
     nomeEvento, data, horaInicio, horaFim,
@@ -73,8 +63,9 @@ export function FolhaEvento({ dados }) {
     equipItemsFeitos = [],
     checklists = [],
     veiculo,
+    riderNome,
     notasOperacionais, notasColaborador, notasPreparacao, dataPreparacao,
-    feedbackTexto, fotos = [],
+    feedbackTexto, fotosEvento = [], fotos = [],
     assinaturas = {},
   } = dados
 
@@ -190,7 +181,10 @@ export function FolhaEvento({ dados }) {
         <Secao titulo="Checklist de Preparação">
           {clPrep.map((cl, ci) => (
             <div key={ci} className={ci > 0 ? 'mt-3' : ''}>
-              {clPrep.length > 1 && <p className="text-[11px] font-semibold text-gray-600 mb-1">{cl.nome}</p>}
+              <div className="flex items-center gap-2 mb-1">
+                {clPrep.length > 1 && <p className="text-[11px] font-semibold text-gray-600">{cl.nome}</p>}
+                {cl.submetida && <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-green-100 text-green-700">✓ Submetida</span>}
+              </div>
               <div className="grid grid-cols-2 gap-x-8 gap-y-0.5">
                 {cl.itens.map((item, ii) => (
                   <div key={ii} className="flex items-start gap-2 py-0.5">
@@ -209,7 +203,10 @@ export function FolhaEvento({ dados }) {
         <Secao titulo="Checklist de Saída">
           {clSaida.map((cl, ci) => (
             <div key={ci} className={ci > 0 ? 'mt-3' : ''}>
-              {clSaida.length > 1 && <p className="text-[11px] font-semibold text-gray-600 mb-1">{cl.nome}</p>}
+              <div className="flex items-center gap-2 mb-1">
+                {clSaida.length > 1 && <p className="text-[11px] font-semibold text-gray-600">{cl.nome}</p>}
+                {cl.submetida && <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-green-100 text-green-700">✓ Submetida</span>}
+              </div>
               <div className="grid grid-cols-2 gap-x-8 gap-y-0.5">
                 {cl.itens.map((item, ii) => (
                   <div key={ii} className="flex items-start gap-2 py-0.5">
@@ -220,6 +217,13 @@ export function FolhaEvento({ dados }) {
               </div>
             </div>
           ))}
+        </Secao>
+      )}
+
+      {/* Rider Técnico */}
+      {riderNome && (
+        <Secao titulo="Rider Técnico">
+          <p className="text-[12px] text-gray-700">{riderNome}</p>
         </Secao>
       )}
 
@@ -252,9 +256,22 @@ export function FolhaEvento({ dados }) {
         </Secao>
       )}
 
-      {/* Fotos */}
+      {/* Fotos do Evento (anexadas na criação) */}
+      {fotosEvento.length > 0 && (
+        <Secao titulo={`Fotos do Evento (${fotosEvento.length})`}>
+          <div className="grid grid-cols-3 gap-3">
+            {fotosEvento.map((url, i) => (
+              <div key={i} className="aspect-video rounded overflow-hidden border border-gray-200 bg-gray-100">
+                <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        </Secao>
+      )}
+
+      {/* Fotos de Execução */}
       {fotos.length > 0 && (
-        <Secao titulo={`Fotos (${fotos.length})`}>
+        <Secao titulo={`Fotos de Execução (${fotos.length})`}>
           <div className="grid grid-cols-3 gap-3">
             {fotos.map((url, i) => (
               <div key={i} className="aspect-video rounded overflow-hidden border border-gray-200 bg-gray-100">
@@ -276,11 +293,15 @@ export function FolhaEvento({ dados }) {
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold w-24 shrink-0">KM Saída</span>
-                <div className="flex-1 border-b border-gray-300" />
+                {veiculo.kmSaida
+                  ? <span className="text-[13px] font-semibold text-gray-800">{veiculo.kmSaida} km</span>
+                  : <div className="flex-1 border-b border-gray-300" />}
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold w-24 shrink-0">KM Chegada</span>
-                <div className="flex-1 border-b border-gray-300" />
+                {veiculo.kmChegada
+                  ? <span className="text-[13px] font-semibold text-gray-800">{veiculo.kmChegada} km</span>
+                  : <div className="flex-1 border-b border-gray-300" />}
               </div>
             </div>
           </div>
