@@ -1173,7 +1173,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                             <div key={i} className="relative group">
                               <img src={url} alt="" className="w-16 h-16 object-cover rounded-lg border border-border" />
                               <button type="button"
-                                onClick={() => set('fotos_urls', (form.fotos_urls ?? []).filter((_, j) => j !== i))}
+                                onClick={() => setForm(f => ({ ...f, fotos_urls: (f.fotos_urls ?? []).filter((_, j) => j !== i) }))}
                                 className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-status-cancelado text-white text-[10px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 ×
                               </button>
@@ -1200,7 +1200,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                                 urls.push(pub.publicUrl)
                               }
                             }
-                            if (urls.length) set('fotos_urls', [...(form.fotos_urls ?? []), ...urls])
+                            if (urls.length) setForm(f => ({ ...f, fotos_urls: [...(f.fotos_urls ?? []), ...urls] }))
                             e.target.value = ''
                           }} />
                       </label>
