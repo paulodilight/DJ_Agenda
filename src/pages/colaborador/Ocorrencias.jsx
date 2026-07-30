@@ -14,10 +14,10 @@ const STATUS_CFG = {
 }
 
 const FILTROS = [
-  { id: 'todas',      label: 'Todas' },
   { id: 'aberta',     label: 'Abertas' },
   { id: 'em_processo',label: 'Em processo' },
   { id: 'fechada',    label: 'Fechadas' },
+  { id: 'todas',      label: 'Todas' },
 ]
 
 export function ColaboradorOcorrencias() {
@@ -25,7 +25,7 @@ export function ColaboradorOcorrencias() {
   const [ocorrencias,   setOcorrencias]  = useState([])
   const [intervIdx,     setIntervIdx]    = useState({})
   const [loading,       setLoading]      = useState(true)
-  const [filtro,        setFiltro]       = useState('todas')
+  const [filtro,        setFiltro]       = useState('aberta')
   const [aberta,        setAberta]       = useState(null)
   const [modalNova,     setModalNova]    = useState(false)
   const [versao,        setVersao]       = useState(0)
