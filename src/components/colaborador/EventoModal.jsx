@@ -1091,6 +1091,21 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 </div>
               )}
 
+              {/* Fotos do evento (anexadas na criação) */}
+              {(evento.fotos_urls ?? []).length > 0 && (
+                <div>
+                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Fotos do Evento</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(evento.fotos_urls ?? []).map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                        className="relative rounded-lg overflow-hidden aspect-square bg-white/5 block">
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Feedback / notas de execução */}
               {isAtribuido && (
                 <div>
