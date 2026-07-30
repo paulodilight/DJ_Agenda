@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera, Printer, CheckCircle2 } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera, ImageIcon, Printer, CheckCircle2 } from 'lucide-react'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
@@ -1134,18 +1134,36 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                         ))}
                       </div>
                     )}
-                    <label className={clsx(
-                      'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors',
-                      fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
-                    )}>
-                      <Camera size={14} className="text-accent-subtle shrink-0" />
-                      <span className="text-accent-subtle" style={{ fontSize: 12 }}>
-                        {fotoUploading ? 'A carregar…' : 'Adicionar foto'}
-                      </span>
-                      <input type="file" accept="image/*" capture="environment" className="hidden"
-                        disabled={fotoUploading}
-                        onChange={e => { const f = e.target.files?.[0]; if (f) adicionarFoto(f); e.target.value = '' }} />
-                    </label>
+                    <div className="flex gap-2">
+                      <label className={clsx(
+                        'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
+                        fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
+                      )}>
+                        <Camera size={14} className="text-accent-subtle shrink-0" />
+                        <span className="text-accent-subtle" style={{ fontSize: 12 }}>
+                          {fotoUploading ? 'A carregar…' : 'Câmara'}
+                        </span>
+                        <input type="file" accept="image/*" capture="environment" className="hidden"
+                          disabled={fotoUploading}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) adicionarFoto(f); e.target.value = '' }} />
+                      </label>
+                      <label className={clsx(
+                        'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
+                        fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
+                      )}>
+                        <ImageIcon size={14} className="text-accent-subtle shrink-0" />
+                        <span className="text-accent-subtle" style={{ fontSize: 12 }}>
+                          {fotoUploading ? 'A carregar…' : 'Galeria'}
+                        </span>
+                        <input type="file" accept="image/*" multiple className="hidden"
+                          disabled={fotoUploading}
+                          onChange={async e => {
+                            const files = Array.from(e.target.files ?? [])
+                            for (const f of files) await adicionarFoto(f)
+                            e.target.value = ''
+                          }} />
+                      </label>
+                    </div>
                   </div>
                   <div className="flex justify-end mt-2">
                     <button onClick={guardarFeedback} disabled={execucaoSaving}
