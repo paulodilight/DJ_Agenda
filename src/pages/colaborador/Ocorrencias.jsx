@@ -14,10 +14,9 @@ const STATUS_CFG = {
 }
 
 const FILTROS = [
-  { id: 'aberta',     label: 'Abertas' },
-  { id: 'em_processo',label: 'Em processo' },
-  { id: 'fechada',    label: 'Fechadas' },
-  { id: 'todas',      label: 'Todas' },
+  { id: 'abertas_em_processo', label: 'Abertas/Em Processo' },
+  { id: 'fechada',             label: 'Fechadas' },
+  { id: 'todas',               label: 'Todas' },
 ]
 
 export function ColaboradorOcorrencias() {
@@ -25,7 +24,7 @@ export function ColaboradorOcorrencias() {
   const [ocorrencias,   setOcorrencias]  = useState([])
   const [intervIdx,     setIntervIdx]    = useState({})
   const [loading,       setLoading]      = useState(true)
-  const [filtro,        setFiltro]       = useState('aberta')
+  const [filtro,        setFiltro]       = useState('abertas_em_processo')
   const [aberta,        setAberta]       = useState(null)
   const [modalNova,     setModalNova]    = useState(false)
   const [versao,        setVersao]       = useState(0)
@@ -72,7 +71,11 @@ export function ColaboradorOcorrencias() {
     }
   }
 
-  const lista = filtro === 'todas' ? ocorrencias : ocorrencias.filter(o => o.status === filtro)
+  const lista = filtro === 'todas'
+    ? ocorrencias
+    : filtro === 'abertas_em_processo'
+      ? ocorrencias.filter(o => o.status === 'aberta' || o.status === 'em_processo')
+      : ocorrencias.filter(o => o.status === filtro)
 
   if (loading) return <LoadingPage />
 
