@@ -57,6 +57,7 @@ const VAZIO = {
   tecnico2_id:       '',
   todos_tecnicos:    false,
   rider_url:         '',
+  fotos_urls:        [],
   data_preparacao:   '',
   hora_preparacao:   '',
   notas_preparacao:  '',
@@ -260,7 +261,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         artista_id:  evento.artista_id  ?? '',
         tecnico_id:      evento.todos_tecnicos ? 'todos' : (evento.tecnico_id ?? ''),
         tecnico2_id:     evento.tecnico2_id ?? '',
-        rider_url:       evento.rider_url   ?? '',
+        rider_url:       evento.rider_url    ?? '',
+        fotos_urls:      evento.fotos_urls   ?? [],
         hora_inicio:     evento.hora_inicio?.slice(0, 5)     ?? '',
         hora_fim:        evento.hora_fim?.slice(0, 5)        ?? '',
         hora_instalacao: evento.hora_instalacao?.slice(0, 5) ?? '',
@@ -1157,6 +1159,48 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                             if (error) { alert('Erro ao carregar ficheiro: ' + error.message); return }
                             const { data: pub } = supabase.storage.from('eventos-riders').getPublicUrl(path)
                             set('rider_url', pub.publicUrl)
+                            e.target.value = ''
+                          }} />
+                      </label>
+                    </div>
+                  </Field>
+
+                  <Field label="Fotos do Evento">
+                    <div className="flex flex-col gap-2">
+                      {(form.fotos_urls ?? []).length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {(form.fotos_urls ?? []).map((url, i) => (
+                            <div key={i} className="relative group">
+                              <img src={url} alt="" className="w-16 h-16 object-cover rounded-lg border border-border" />
+                              <button type="button"
+                                onClick={() => set('fotos_urls', (form.fotos_urls ?? []).filter((_, j) => j !== i))}
+                                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-status-cancelado text-white text-[10px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <span className={`${inputCls} flex items-center gap-2 cursor-pointer text-accent-muted`}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                          Adicionar foto(s)
+                        </span>
+                        <input type="file" accept="image/*" multiple className="hidden"
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files ?? [])
+                            if (!files.length) return
+                            const urls = []
+                            for (const file of files) {
+                              const ext = file.name.split('.').pop()
+                              const path = `${crypto.randomUUID()}.${ext}`
+                              const { error } = await supabase.storage.from('eventos-fotos').upload(path, file)
+                              if (!error) {
+                                const { data: pub } = supabase.storage.from('eventos-fotos').getPublicUrl(path)
+                                urls.push(pub.publicUrl)
+                              }
+                            }
+                            if (urls.length) set('fotos_urls', [...(form.fotos_urls ?? []), ...urls])
                             e.target.value = ''
                           }} />
                       </label>

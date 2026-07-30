@@ -45,7 +45,7 @@ export const supaEventosApi = {
     const COLS = [
       'evento', 'data_evento', 'hora_inicio', 'hora_fim', 'hora_instalacao', 'dia_instalacao',
       'status', 'espaco_id', 'tecnico_id', 'tecnico2_id', 'todos_tecnicos', 'tipo', 'notas_operacionais', 'Equipamentos',
-      'contacto_pelo_evento', 'morada', 'responsavel', 'artista_id', 'xclusive', 'rider_url',
+      'contacto_pelo_evento', 'morada', 'responsavel', 'artista_id', 'xclusive', 'rider_url', 'fotos_urls',
       'valor', 'valor_artistico', 'valor_apoio_tecnico', 'notas_faturacao',
       'margem', 'transporte', 'extras_contas',
       'estado_pagamento', 'forma_pagamento', 'notas_contas',
@@ -59,7 +59,7 @@ export const supaEventosApi = {
     const { data, error } = await supabase
       .from(TABLE)
       .insert(this._payload(dados))
-      .select('id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, espaco_id, tecnico_id, tecnico2_id, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, artista_id, xclusive, rider_url, data_preparacao, notas_preparacao')
+      .select('id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, espaco_id, tecnico_id, tecnico2_id, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, artista_id, xclusive, rider_url, fotos_urls, data_preparacao, notas_preparacao')
       .single()
     if (error) throw error
     await this._syncTecnicos(data.id, data.tecnico_id, data.tecnico2_id)
@@ -72,7 +72,7 @@ export const supaEventosApi = {
       .from(TABLE)
       .update(this._payload(dados))
       .eq('id', id)
-      .select('id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, espaco_id, tecnico_id, tecnico2_id, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, artista_id, xclusive, rider_url, data_preparacao, notas_preparacao')
+      .select('id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, espaco_id, tecnico_id, tecnico2_id, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, artista_id, xclusive, rider_url, fotos_urls, data_preparacao, notas_preparacao')
       .single()
     if (error) throw error
     await this._syncTecnicos(data.id, data.tecnico_id, data.tecnico2_id)
