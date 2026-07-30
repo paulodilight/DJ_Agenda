@@ -17,51 +17,59 @@ const LABELS_ASSIN = {
   out_work:  { label: 'Out Work',  cor: 'text-red-400    border-red-400/30    bg-red-400/[0.07]'    },
 }
 
+const ORDEM_PASSOS = ['in_work', 'in_evento', 'out_work']
+
 function BotaoAssinatura({ proxima, registar, tiposFeitos = [] }) {
   const [loading, setLoading] = useState(false)
 
-  // Badges: tipos já assinados hoje (vêm do DB via hook)
-  const badges = tiposFeitos
-    .filter(tf => LABELS_ASSIN[tf.tipo])
-    .map(tf => ({
-      tipo: tf.tipo,
-      hora: new Date(tf.registado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }),
-    }))
+  const badgeMap = Object.fromEntries(
+    tiposFeitos
+      .filter(tf => LABELS_ASSIN[tf.tipo])
+      .map(tf => [tf.tipo, new Date(tf.registado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })])
+  )
 
-  // Só mostrar botão se o próximo tipo ainda não está assinado hoje
-  const jaFeito     = proxima && badges.some(b => b.tipo === proxima.tipo)
-  const podeAssinar = proxima && LABELS_ASSIN[proxima.tipo] && !jaFeito
+  const temInEvento = 'in_evento' in badgeMap || proxima?.tipo === 'in_evento'
+  const passos = ORDEM_PASSOS.filter(t => t !== 'in_evento' || temInEvento)
 
-  if (!podeAssinar && badges.length === 0) return null
+  const algumVisivel = passos.some(t => t in badgeMap || proxima?.tipo === t)
+  if (!algumVisivel) return null
 
   const onClick = async (e) => {
     e.stopPropagation()
-    if (!podeAssinar || loading) return
+    if (!proxima || loading) return
     setLoading(true)
     await registar(proxima.tipo, { eventoId: proxima.eventoId, agendamentoId: proxima.agendamentoId })
     setLoading(false)
-    // badges actualizados automaticamente pelo hook (versao incrementa após registar)
   }
 
   return (
-    <div className="flex flex-col gap-1.5 items-end">
-      <p className="text-[10px] uppercase tracking-wider text-accent-subtle/50 w-full">Assinatura de hoje</p>
-      {badges.map(({ tipo, hora }) => {
-        const cfg = LABELS_ASSIN[tipo]
-        return (
-          <span key={tipo} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${cfg.cor}`}>
-            <PenLine size={11} />
-            {cfg.label} · {hora}
-          </span>
-        )
-      })}
-      {podeAssinar && (
-        <button onClick={onClick} disabled={loading}
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-opacity disabled:opacity-50 ${LABELS_ASSIN[proxima.tipo].cor}`}>
-          <PenLine size={11} />
-          {loading ? 'A registar…' : LABELS_ASSIN[proxima.tipo].label}
-        </button>
-      )}
+    <div className="flex flex-col gap-2">
+      <p className="text-[10px] uppercase tracking-wider text-accent-subtle/50">Assinatura de hoje</p>
+      <div className="flex items-center gap-2 flex-wrap">
+        {passos.map(tipo => {
+          const cfg = LABELS_ASSIN[tipo]
+          const hora = badgeMap[tipo]
+          const eProximo = proxima?.tipo === tipo
+          if (hora) {
+            return (
+              <span key={tipo} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${cfg.cor}`}>
+                <PenLine size={11} />
+                {cfg.label} · {hora}
+              </span>
+            )
+          }
+          if (eProximo) {
+            return (
+              <button key={tipo} onClick={onClick} disabled={loading}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-opacity disabled:opacity-50 ${cfg.cor}`}>
+                <PenLine size={11} />
+                {loading ? 'A registar…' : cfg.label}
+              </button>
+            )
+          }
+          return null
+        })}
+      </div>
     </div>
   )
 }
