@@ -150,6 +150,17 @@ export function ContasDJs() {
   const [retencaoPct, setRetencaoPct]       = useState(cfgRetencaoPct)
   const [premioOverride, setPremioOverride] = useState(null)
   const [descontoOp, setDescontoOp]         = useState(() => cfgDescontos[0]?.valor ?? 2)
+  const [descontoTipoOp, setDescontoTipoOp] = useState(() => cfgDescontos[0]?.tipo ?? 'fixo')
+
+  // Sync when storeConfig loads async (lazy useState ran before config arrived)
+  useEffect(() => {
+    const match = cfgDescontos.find(d => d.valor === descontoOp)
+    if (!match && cfgDescontos.length > 0) {
+      setDescontoOp(cfgDescontos[0].valor ?? 2)
+      setDescontoTipoOp(cfgDescontos[0].tipo ?? 'fixo')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfgDescontos])
 
   const { dataInicio, dataFim, titulo } = useMemo(() => {
     const [ano, mes] = anoMes.split('-').map(Number)
@@ -272,12 +283,12 @@ export function ContasDJs() {
     const nTransp        = slotsRich.filter(s => s.transporte).length
     const valorTransp    = nTransp * transporteRate
     const valorPremio    = premioAtivo && valorQualidadeRate > 0 ? n * valorQualidadeRate : 0
-    const valorDesconto  = descontoOp * n
+    const valorDesconto  = descontoTipoOp === 'pct' ? valorAtuacoes * descontoOp / 100 : descontoOp * n
     const subtotal       = valorAtuacoes + valorHExt + valorTransp + valorPremio - valorDesconto
     const ajusteIva      = comIva ? subtotal * CFG.ivaRate : 0
     const ajusteRetencao = comRetencao ? -(subtotal * retencaoPct / 100) : 0
     return { n, valorAtuacoes, totalHExt, valorHExt, nTransp, valorTransp, valorPremio, valorDesconto, subtotal, ajusteIva, ajusteRetencao, total: subtotal + ajusteIva + ajusteRetencao }
-  }, [slotsRich, premioAtivo, descontoOp, comIva, comRetencao, retencaoPct, transporteRate, valorQualidadeRate])
+  }, [slotsRich, premioAtivo, descontoOp, descontoTipoOp, comIva, comRetencao, retencaoPct, transporteRate, valorQualidadeRate])
 
   const selecionarDJ = (id) => {
     const next = id === djSel ? '' : id
@@ -290,6 +301,7 @@ export function ContasDJs() {
         setComRetencao(s.comRetencao ?? false)
         setRetencaoPct(s.retencaoPct ?? cfgRetencaoPct)
         setDescontoOp(s.descontoOp   ?? (cfgDescontos[0]?.valor ?? 2))
+        setDescontoTipoOp(s.descontoTipo ?? (cfgDescontos[0]?.tipo ?? 'fixo'))
         setPremioOverride(s.premioOverride ?? null)
       } catch { setPremioOverride(null); setReciboVerde(true); setComIva(false); setComRetencao(false) }
     } else {
@@ -303,7 +315,7 @@ export function ContasDJs() {
   const guardarOpcoes = () => {
     if (!djSel) return
     localStorage.setItem(`dj_contas_${djSel}`, JSON.stringify({
-      reciboVerde, comIva, comRetencao, retencaoPct, descontoOp, premioOverride
+      reciboVerde, comIva, comRetencao, retencaoPct, descontoOp, descontoTipo: descontoTipoOp, premioOverride
     }))
   }
 
@@ -533,14 +545,19 @@ export function ContasDJs() {
                   <div>
                     <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Desconto</p>
                     <select
-                      value={descontoOp}
-                      onChange={e => setDescontoOp(Number(e.target.value))}
+                      value={`${descontoOp}|${descontoTipoOp}`}
+                      onChange={e => {
+                        const [v, t] = e.target.value.split('|')
+                        setDescontoOp(Number(v))
+                        setDescontoTipoOp(t ?? 'fixo')
+                      }}
                       className="w-full appearance-none bg-surface-0 border border-border rounded-lg px-3 py-2 text-xs text-accent focus:outline-none focus:ring-1 focus:ring-accent/30 cursor-pointer"
                     >
-                      {cfgDescontos.map((d, i) => (
-                        <option key={i} value={d.valor}>{d.label || `Desconto ${i + 1}`} — {d.valor}€</option>
-                      ))}
-                      <option value={0}>Sem desconto</option>
+                      {cfgDescontos.map((d, i) => {
+                        const t = d.tipo ?? 'fixo'
+                        return <option key={i} value={`${d.valor}|${t}`}>{d.label || `Desconto ${i + 1}`} — {d.valor}{t === 'pct' ? '%' : '€'}</option>
+                      })}
+                      <option value="0|fixo">Sem desconto</option>
                     </select>
                     {calc && descontoOp > 0 && (
                       <span className="text-xs text-accent-subtle mt-1 block tabular-nums">= −{formatarEuro(calc.valorDesconto)}</span>
@@ -576,7 +593,7 @@ export function ContasDJs() {
                     <BRow label={`Valor Qualidade (${calc.n} × ${valorQualidadeRate}€)`} value={`+${formatarEuro(calc.valorPremio)}`} accent="text-status-proposta" />
                   )}
                   {calc.valorDesconto > 0 && (
-                    <BRow label={`Desconto operação (${descontoOp}€ × ${calc.n})`} value={`−${formatarEuro(calc.valorDesconto)}`} accent="text-status-cancelado" />
+                    <BRow label={descontoTipoOp === 'pct' ? `Desconto (${descontoOp}% de ${formatarEuro(calc.valorAtuacoes)})` : `Desconto operação (${descontoOp}€ × ${calc.n})`} value={`−${formatarEuro(calc.valorDesconto)}`} accent="text-status-cancelado" />
                   )}
                   <BRow label="Subtotal" value={formatarEuro(calc.subtotal)} bold />
                   {calc.ajusteIva !== 0 && (

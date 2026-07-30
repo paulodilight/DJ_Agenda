@@ -59,9 +59,9 @@ const TRANSP_DEFAULTS = [
   { label: '', valor: 60 },
 ]
 const DESC_DEFAULTS = [
-  { label: 'Operação', valor: 2 },
-  { label: '', valor: 5 },
-  { label: '', valor: 10 },
+  { label: 'Operação', valor: 2, tipo: 'fixo' },
+  { label: '', valor: 5, tipo: 'fixo' },
+  { label: '', valor: 10, tipo: 'fixo' },
 ]
 
 function safeParse(str, fallback) {
@@ -530,34 +530,51 @@ export function Configuracoes() {
             Valores de desconto por data disponíveis nas contas. O primeiro é aplicado por defeito.
           </p>
           <div className="flex flex-col divide-y divide-border/40 mb-4">
-            <div className="grid grid-cols-[1fr_100px] gap-3 pb-2 px-1">
+            <div className="grid grid-cols-[1fr_60px_80px] gap-2 pb-2 px-1">
               <span className="text-[10px] font-bold text-accent-muted uppercase tracking-wider">Descrição</span>
-              <span className="text-[10px] font-bold text-accent-muted uppercase tracking-wider text-right">Valor (€)</span>
+              <span className="text-[10px] font-bold text-accent-muted uppercase tracking-wider text-center">Tipo</span>
+              <span className="text-[10px] font-bold text-accent-muted uppercase tracking-wider text-right">Valor</span>
             </div>
-            {descontos.map((d, i) => (
-              <div key={i} className="grid grid-cols-[1fr_100px] gap-3 items-center py-2.5 px-1">
-                <div className="flex items-center gap-2">
-                  {i === 0 && (
-                    <span className="text-[9px] font-bold text-accent bg-accent/10 border border-accent/20 rounded px-1.5 py-0.5 shrink-0 uppercase tracking-wider">default</span>
-                  )}
+            {descontos.map((d, i) => {
+              const tipo = d.tipo ?? 'fixo'
+              return (
+                <div key={i} className="grid grid-cols-[1fr_60px_80px] gap-2 items-center py-2.5 px-1">
+                  <div className="flex items-center gap-2">
+                    {i === 0 && (
+                      <span className="text-[9px] font-bold text-accent bg-accent/10 border border-accent/20 rounded px-1.5 py-0.5 shrink-0 uppercase tracking-wider">default</span>
+                    )}
+                    <input
+                      type="text"
+                      value={d.label}
+                      onChange={e => setDesc(i, 'label', e.target.value)}
+                      placeholder={`Desconto ${i + 1}`}
+                      className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-accent/40"
+                    />
+                  </div>
+                  <div className="flex rounded-md border border-border overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setDesc(i, 'tipo', 'fixo')}
+                      className={`flex-1 py-1.5 text-[11px] font-semibold transition-colors ${tipo === 'fixo' ? 'bg-accent/20 text-accent' : 'bg-surface-2 text-accent-muted hover:text-accent'}`}
+                    >€</button>
+                    <button
+                      type="button"
+                      onClick={() => setDesc(i, 'tipo', 'pct')}
+                      className={`flex-1 py-1.5 text-[11px] font-semibold transition-colors border-l border-border ${tipo === 'pct' ? 'bg-accent/20 text-accent' : 'bg-surface-2 text-accent-muted hover:text-accent'}`}
+                    >%</button>
+                  </div>
                   <input
-                    type="text"
-                    value={d.label}
-                    onChange={e => setDesc(i, 'label', e.target.value)}
-                    placeholder={`Desconto ${i + 1}`}
-                    className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-accent/40"
+                    type="number"
+                    min={0}
+                    step={tipo === 'pct' ? 0.5 : 1}
+                    max={tipo === 'pct' ? 100 : undefined}
+                    value={d.valor}
+                    onChange={e => setDesc(i, 'valor', Number(e.target.value))}
+                    className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-right text-accent tabular-nums focus:outline-none focus:border-accent/40"
                   />
                 </div>
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={d.valor}
-                  onChange={e => setDesc(i, 'valor', Number(e.target.value))}
-                  className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-right text-accent tabular-nums focus:outline-none focus:border-accent/40"
-                />
-              </div>
-            ))}
+              )
+            })}
           </div>
           <div className="flex items-center gap-3 border-t border-border/40 pt-4 px-1">
             <span className="text-xs text-accent flex-1">Retenção padrão (%)</span>

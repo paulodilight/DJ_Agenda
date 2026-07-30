@@ -100,8 +100,8 @@ export function useAssinaturaDia(tecnicoId, eventoIdFixo = null) {
         : []
       setFeitas(assinFeitas.map(a => ({ tipo: a.tipo, registado_em: a.registado_em })))
 
-      // tiposFeitos: in_work / out_work já assinados hoje (para badges no Dashboard)
-      const feitos = (assin ?? []).filter(a => a.tipo === 'in_work' || a.tipo === 'out_work')
+      // tiposFeitos: todos os tipos assinados hoje (para badges no Dashboard)
+      const feitos = (assin ?? []).filter(a => TIPOS_VALIDOS.includes(a.tipo))
       setTiposFeitos(feitos.map(a => ({ tipo: a.tipo, registado_em: a.registado_em })))
 
       if (!temTrabalho) { setProxima(null); return }

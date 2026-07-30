@@ -13,6 +13,8 @@ import { labelEstado } from '@/utils/formatacao'
 import { corTecnico } from '@/utils/tecnicoColor'
 import { hhmm, dataLonga, dataCompleta } from './format'
 
+const hojeISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) }
+
 const STATUS_KNOWN = ['proposta','aceitação','validação','pré-confirmado','confirmado','trocado','cancelado','a_pedido']
 const statusVar = (s) => {
   if (!s) return 'default'
@@ -158,6 +160,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   // Sincroniza assinaturas do hook (home) para supa_eventos quando ainda não estão registadas
   useEffect(() => {
     if (!tiposAssinFeitos?.length || !evento?.id) return
+    if (evento.data_evento !== hojeISO()) return  // só sincroniza para eventos de hoje
     const inWork = tiposAssinFeitos.find(f => f.tipo === 'in_work')
     if (inWork && !assinEvento.assinatura_lmd_at) {
       const ts = inWork.registado_em

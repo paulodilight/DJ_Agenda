@@ -1,7 +1,7 @@
 ﻿import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useSwipeNav } from '@/hooks/useSwipeNav'
 import { supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2, Send, UserCheck, MessageSquare, RefreshCw, Download, Lock, Unlock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Printer, Trophy, Shuffle, SlidersHorizontal, Loader2, Save, History, RotateCcw, Trash2, Send, UserCheck, MessageSquare, RefreshCw, Download, Lock, Unlock, Eye, EyeOff } from 'lucide-react'
 import { startOfWeek, addDays, addWeeks, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import {
@@ -21,7 +21,7 @@ import { useBloqueios } from '@/hooks/useBloqueios'
 import { useConflitos } from '@/hooks/useConflitos'
 import { useSupaEventos } from '@/hooks/useSupaEventos'
 import { useMesStore, useAppStore } from '@/store'
-import { agendaApi, disponibilidadesApi, turnoValoresDiaApi } from '@/lib/api'
+import { agendaApi, disponibilidadesApi, turnoValoresDiaApi, configuracoesApi } from '@/lib/api'
 import { correrDistribuicao, calcularPreAlocacoes } from '@/lib/distribuicao'
 import { gravarSnapshot, listarSnapshots, restaurarSnapshot, apagarSnapshot } from '@/lib/snapshots'
 import { useUndo } from '@/contexts/UndoContext'
@@ -86,6 +86,27 @@ export function Agenda() {
     } finally {
       setTogglingDisp(false)
     }
+  }
+
+  // ── visibilidade mês agenda para DJs ──
+  const [agendaMesMax, setAgendaMesMax] = useState(null)
+  const [togglingMesOculto, setTogglingMesOculto] = useState(false)
+
+  useEffect(() => {
+    supabase.from('configuracoes').select('valor').eq('chave', 'agenda_mes_max').maybeSingle()
+      .then(({ data }) => setAgendaMesMax(data?.valor || null))
+      .catch(() => {})
+  }, [])
+
+  const toggleMesOculto = async () => {
+    const oculto  = agendaMesMax != null && agendaMesMax < proximoMes
+    const novoMax = oculto ? proximoMes : format(referencia, 'yyyy-MM')
+    setTogglingMesOculto(true)
+    try {
+      await configuracoesApi.actualizar('agenda_mes_max', novoMax)
+      setAgendaMesMax(novoMax)
+    } catch (e) { console.error(e) }
+    finally { setTogglingMesOculto(false) }
   }
 
   // Quando o mês global muda (pelo header), actualizar a referência da agenda
@@ -203,6 +224,7 @@ export function Agenda() {
   })()
   const MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']
   const proximoMesNome = MESES_PT[parseInt(proximoMes.split('-')[1]) - 1]
+  const mesProxOculto  = agendaMesMax != null && agendaMesMax < proximoMes
   // Já houve distribuição neste mês/scope? (existe ≥1 slot automático)
   const jaDistribuido = filtroEspaco
     ? agendaMes.some(s => s.espaco_id === filtroEspaco && s.origem === 'automatico')
@@ -911,6 +933,20 @@ export function Agenda() {
             >
               {dispInfo.abertas > 0 ? <Unlock size={13} /> : <Lock size={13} />}
               {dispInfo.abertas > 0 ? `Disp. (${dispInfo.abertas}/${dispInfo.total})` : 'Disp. fechadas'}
+            </button>
+            <button
+              onClick={toggleMesOculto}
+              disabled={togglingMesOculto}
+              title={mesProxOculto ? `Mostrar ${proximoMesNome} para os DJs` : `Ocultar ${proximoMesNome} dos DJs`}
+              className={clsx(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs transition-colors disabled:opacity-50',
+                mesProxOculto
+                  ? 'border-amber-400/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                  : 'border-border bg-surface-2 text-accent-muted hover:text-accent hover:border-white/20'
+              )}
+            >
+              {mesProxOculto ? <EyeOff size={13} /> : <Eye size={13} />}
+              {mesProxOculto ? `Mostrar ${proximoMesNome}` : `Ocultar ${proximoMesNome}`}
             </button>
           </div>
         </div>

@@ -4,7 +4,7 @@ import { pt } from 'date-fns/locale'
 import {
   Save, Search, X, Plus, Trash2, ChevronRight, ChevronsDown,
   MessageSquare, Link2, Check, Calendar, ExternalLink, Printer, AlertTriangle,
-  Eye, EyeOff,
+  Eye, EyeOff, Mail,
 } from 'lucide-react'
 import { useMesStore } from '@/store'
 import { useEspacos } from '@/hooks/useEspacos'
@@ -13,6 +13,7 @@ import { formatarEuro } from '@/utils/formatacao'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { clsx } from 'clsx'
 import { useUndo } from '@/contexts/UndoContext'
+import { EmailAgendaModal } from '@/components/contas/EmailAgendaModal'
 
 const parseNum = (v) => { const n = parseFloat(String(v ?? '').replace(',', '.')); return isNaN(n) ? 0 : n }
 const uid = () => Math.random().toString(36).slice(2)
@@ -916,7 +917,7 @@ function PrintToggle({ k, isPrinted, togglePrint }) {
   )
 }
 
-function SpaceCard({ espaco, slots, slotsExcluidos = [], eventos, cardState, onCardChange, onSave, saving, catTotals, subtiposConfig, turnos, mes, layoutView }) {
+function SpaceCard({ espaco, slots, slotsExcluidos = [], eventos, cardState, onCardChange, onSave, saving, catTotals, subtiposConfig, turnos, mes, layoutView, onEmail }) {
   // DJ hierarchy: tipo_slot → turno → DJ
   const djHier = useMemo(() => {
     return CAT_DEFS.map(cat => {
@@ -1204,6 +1205,10 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/50 text-accent-subtle hover:text-accent hover:border-border transition-colors text-xs">
             <ChevronsDown size={12} className={clsx('transition-transform', artistasAberto && apoioAberto && 'rotate-180')} />
             {artistasAberto && apoioAberto && avencaAberto && extrasAberto && alugadosAberto && compradosAberto ? 'Recolher' : 'Expandir'}
+          </button>
+          <button onClick={onEmail}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/50 text-accent-subtle hover:text-accent hover:border-border transition-colors text-xs">
+            <Mail size={12} /> Email
           </button>
           <button onClick={handlePrint}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/50 text-accent-subtle hover:text-accent hover:border-border transition-colors text-xs">
@@ -1674,6 +1679,7 @@ export function ContasClientes() {
   const [layoutView, setLayoutView]   = useState(() => localStorage.getItem('contasClientes_layout') ?? 'prev')
   const [mostrarPrevisao, setMostrarPrevisao]   = useState({})
   const [verOcorrencias,  setVerOcorrencias]    = useState({})
+  const [emailModal, setEmailModal] = useState(false)
 
   const { dataInicio, dataFim, mes } = useMemo(() => {
     const [ano, mesN] = anoMes.split('-').map(Number)
@@ -1968,10 +1974,24 @@ export function ContasClientes() {
               turnos={turnos.filter(t => t.espaco_id === espacoAtivo)}
               mes={mes}
               layoutView={layoutView}
+              onEmail={() => setEmailModal(true)}
             />
           </div>
         )}
       </div>
+
+      {emailModal && espacoDetalhe && (
+        <EmailAgendaModal
+          espaco={espacoDetalhe}
+          slots={slots.filter(s => s.espaco_id === espacoAtivo)}
+          eventos={eventosEspaco}
+          cards={cards}
+          catTotals={catTotals}
+          subtiposConfig={subtiposConfig}
+          anoMes={anoMes}
+          onClose={() => setEmailModal(false)}
+        />
+      )}
     </div>
   )
 }

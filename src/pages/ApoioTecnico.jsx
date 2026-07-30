@@ -958,9 +958,14 @@ export function ApoioTecnico() {
     return idx
   }, [agendamentos])
 
+
   const evIdx = useMemo(() => {
     const idx = {}
-    eventos.forEach(e => { const k = `${e.data_evento}|${e.espaco_id}`; if (!idx[k]) idx[k] = e })
+    eventos.forEach(e => {
+      const k = `${e.data_evento}|${e.espaco_id}`
+      if (!idx[k]) idx[k] = []
+      idx[k].push(e)
+    })
     return idx
   }, [eventos])
 
@@ -1003,7 +1008,18 @@ export function ApoioTecnico() {
   const tecnicosFixos = useMemo(() => tecnicos.filter(t => t.tipo === 'fixo'), [tecnicos])
   const i4djEspacoId  = useMemo(() => espacos.find(e => e.nome?.trim().toLowerCase() === 'lmd')?.id ?? null, [espacos])
 
-  const handleLmdDrop = useCallback(async (e, dataStr, linhasLmdDia) => {
+  // Agendamentos LMD por data (drag → LMD, como folga mas para o espaço LMD)
+  const lmdAgIdx = useMemo(() => {
+    if (!i4djEspacoId) return {}
+    const idx = {}
+    agendamentos.filter(a => !a.folga && a.espaco_id === i4djEspacoId).forEach(a => {
+      if (!idx[a.data]) idx[a.data] = []
+      idx[a.data].push(a)
+    })
+    return idx
+  }, [agendamentos, i4djEspacoId])
+
+  const handleLmdDrop = useCallback(async (e, dataStr) => {
     e.preventDefault()
     e.stopPropagation()
     setDragOverLmd(null)
@@ -1015,21 +1031,15 @@ export function ApoioTecnico() {
     dragSourceRef.current = null; setDragSource(null)
     try {
       if (srcEvento) await supabase.from('evento_tecnicos').delete().eq('evento_id', srcEvento).eq('tecnico_id', tecId)
-      else if (srcAgId) await supabase.from('agendamentos_tecnicos').update({ tecnico_id: null }).eq('id', srcAgId)
-      const existingEv = linhasLmdDia?.find(l => l.ev)?.ev
-      if (existingEv) {
-        await supabase.from('evento_tecnicos')
-          .upsert({ evento_id: existingEv.id, tecnico_id: tecId }, { onConflict: 'evento_id,tecnico_id' })
-      } else {
-        await supaEventosApi.criar({
-          espaco_id: i4djEspacoId, data_evento: dataStr,
-          evento: 'Trabalho LMD', hora_instalacao: '10:00:00', hora_inicio: '19:00:00',
-          status: 'confirmado', tecnico_id: tecId,
-        })
+      else if (srcAgId) await supabase.from('agendamentos_tecnicos').delete().eq('id', srcAgId)
+      const jaExiste = (lmdAgIdx[dataStr] ?? []).find(a => a.tecnico_id === tecId)
+      if (!jaExiste) {
+        await supabase.from('agendamentos_tecnicos')
+          .insert({ data: dataStr, tecnico_id: tecId, folga: false, espaco_id: i4djEspacoId })
       }
       carregarComScroll()
     } catch (err) { console.error('LMD drop:', err) }
-  }, [i4djEspacoId, carregarComScroll])
+  }, [i4djEspacoId, lmdAgIdx, carregarComScroll])
 
   // Semana view: 7 dias a partir de 2ª feira da semana que contém semanaRef
   const semana7 = useMemo(() => {
@@ -1038,29 +1048,18 @@ export function ApoioTecnico() {
     return Array.from({ length: 7 }, (_, i) => isoData(addDays(lun, i)))
   }, [semanaRef])
 
-  // LMD por dia: data → tecIds (técnicos fixos livres = no LMD)
+  // LMD por dia: data → tecIds (explícitos via agendamento ou evento)
   const lmdPorDia = useMemo(() => {
     const m = {}
     diasExt.forEach(dia => {
-      const dataStr    = isoData(dia)
-      const folgasHoje = new Set(folgasIdx[dataStr] ?? [])
-      // Técnicos já atribuídos a qualquer evento neste dia
-      const atribuidos = new Set(
-        evTecnicos
-          .filter(et => { const ev2 = eventos.find(e => e.id === et.evento_id); return ev2?.data_evento === dataStr })
-          .map(et => et.tecnico_id)
-      )
-      // LMD manual (evento_tecnicos para o espaço LMD)
-      const lmdEv = i4djEspacoId ? evIdx[`${dataStr}|${i4djEspacoId}`] : null
+      const dataStr = isoData(dia)
+      const lmdEv   = i4djEspacoId ? ((evIdx[`${dataStr}|${i4djEspacoId}`] ?? [])[0] ?? null) : null
       const lmdTecs = lmdEv ? (evTecIdx[lmdEv.id] ?? []) : []
-      // Técnicos fixos livres (auto-LMD)
-      const livres = tecnicosFixos
-        .filter(t => !folgasHoje.has(t.id) && !atribuidos.has(t.id))
-        .map(t => t.id)
-      m[dataStr] = [...new Set([...lmdTecs, ...livres])]
+      const lmdAgs  = (lmdAgIdx[dataStr] ?? []).map(a => a.tecnico_id).filter(Boolean)
+      m[dataStr] = [...new Set([...lmdTecs, ...lmdAgs])]
     })
     return m
-  }, [diasExt, folgasIdx, evTecnicos, eventos, evTecIdx, evIdx, tecnicosFixos, i4djEspacoId])
+  }, [diasExt, evTecIdx, evIdx, lmdAgIdx, i4djEspacoId])
 
   const linhasBrutas = useMemo(() => {
     const result = []
@@ -1070,13 +1069,18 @@ export function ApoioTecnico() {
       // LMD é cliente real: entra nas linhas como qualquer outro espaço
       // (continua também a ser mostrado na coluna especial "LMD" à direita)
       espacos.forEach(espaco => {
-        const k      = `${dataStr}|${espaco.id}`
-        const ev     = evIdx[k] ?? null
-        const dj     = djIdx[k]
-        const ag     = agIdx[k] ?? null
-        const tecIds = ev ? (evTecIdx[ev.id] ?? (ag?.tecnico_id ? [ag.tecnico_id] : []))
-                          : (ag?.tecnico_id ? [ag.tecnico_id] : [])
-        linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev, djs: dj ?? [], ag, tecIds })
+        const k    = `${dataStr}|${espaco.id}`
+        const evs  = evIdx[k] ?? []
+        const dj   = djIdx[k]
+        const ag   = agIdx[k] ?? null
+        if (evs.length === 0) {
+          linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev: null, djs: dj ?? [], ag, tecIds: ag?.tecnico_id ? [ag.tecnico_id] : [] })
+        } else {
+          evs.forEach(ev => {
+            const tecIds = evTecIdx[ev.id] ?? (ag?.tecnico_id ? [ag.tecnico_id] : [])
+            linhas.push({ dataStr, dia, espaco_id: espaco.id, espacoNome: espaco.nome.trim(), ev, djs: dj ?? [], ag, tecIds })
+          })
+        }
       })
       result.push({ dataStr, dia, linhas, folgas: folgasIdx[dataStr] ?? [] })
     })
@@ -1163,7 +1167,7 @@ export function ApoioTecnico() {
     e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 12)
     setTimeout(() => document.body.removeChild(ghost), 0)
     const src = {
-      dropKey:   `${linha.dataStr}|${linha.espaco_id}`,
+      dropKey:   linha.ev?.id ? `ev:${linha.ev.id}` : `${linha.dataStr}|${linha.espaco_id}`,
       tecnicoId,
       eventoId:  linha.ev?.id ?? null,
       agId:      linha.ag?.id ?? null,
@@ -1265,7 +1269,7 @@ export function ApoioTecnico() {
     dragSourceRef.current = null
     setDragSource(null)
     if (!src?.tecnicoId) return
-    const dstKey = `${linha.dataStr}|${linha.espaco_id}`
+    const dstKey = linha.ev?.id ? `ev:${linha.ev.id}` : `${linha.dataStr}|${linha.espaco_id}`
     if (src.dropKey === dstKey) return
 
     const dstTecIds = linha.tecIds ?? []
@@ -1294,7 +1298,7 @@ export function ApoioTecnico() {
   // Helper: renderiza a célula de técnico (multi-tech, chips fixed-width, drop zone)
   const renderTecCell = (linha, extraCls = '') => {
     if (!linha) return <td className={clsx('px-2 py-1.5', extraCls)} />
-    const dropKey       = `${linha.dataStr}|${linha.espaco_id}`
+    const dropKey       = linha.ev?.id ? `ev:${linha.ev.id}` : `${linha.dataStr}|${linha.espaco_id}`
     const isDst         = dragOver === dropKey && dragSource && dragSource.dropKey !== dropKey
     const isDraggingAny = !!dragSource
     const tecIds        = linha.tecIds ?? []
@@ -1551,10 +1555,10 @@ export function ApoioTecnico() {
 
                       {/* Eventos normais */}
                       {linhasEv.map(linha => {
-                        const dropKey = `${linha.dataStr}|${linha.espaco_id}`
+                        const dropKey = linha.ev?.id ? `ev:${linha.ev.id}` : `${linha.dataStr}|${linha.espaco_id}`
                         const isDst   = dragOver === dropKey && dragSource && dragSource.dropKey !== dropKey
                         return (
-                          <div key={linha.espaco_id}
+                          <div key={linha.ev?.id ?? linha.espaco_id}
                             onDragOver={e => handleDragOver(e, dropKey)}
                             onDragLeave={handleDragLeave}
                             onDrop={e => handleDrop(e, linha)}
@@ -1649,7 +1653,7 @@ export function ApoioTecnico() {
                         <div
                           onDragOver={e => { e.preventDefault(); setDragOverLmd(dataStr) }}
                           onDragLeave={() => setDragOverLmd(null)}
-                          onDrop={e => handleLmdDrop(e, dataStr, linhasLmd)}
+                          onDrop={e => handleLmdDrop(e, dataStr)}
                           onClick={() => {
                             if (evLmd) setModalEditEvento(evLmd)
                             else setModalEditEvento({ espaco_id: i4djEspacoId, data_evento: dataStr })
@@ -1686,10 +1690,11 @@ export function ApoioTecnico() {
                                     onMouseDown={e => e.stopPropagation()}
                                     onClick={e => {
                                       e.stopPropagation(); e.preventDefault()
-                                      if (linhaLmd) removerTecSlot(linhaLmd, tid)
-                                      else {
-                                        const ag = agendamentos.find(a => a.espaco_id === i4djEspacoId && a.data === dataStr && a.tecnico_id === tid)
-                                        if (ag) supabase.from('agendamentos_tecnicos').update({ tecnico_id: null }).eq('id', ag.id).then(carregarComScroll)
+                                      if (linhaLmd) {
+                                        removerTecSlot(linhaLmd, tid)
+                                      } else {
+                                        const ag = (lmdAgIdx[dataStr] ?? []).find(a => a.tecnico_id === tid)
+                                        if (ag) supabase.from('agendamentos_tecnicos').delete().eq('id', ag.id).then(() => carregarComScroll())
                                       }
                                     }}
                                     className="opacity-0 group-hover/lmdchip:opacity-100 text-[14px] leading-none transition-opacity"
@@ -1762,9 +1767,12 @@ export function ApoioTecnico() {
                       const grupo = linhasBrutas.find(g => g.dataStr === dataStr) ?? { linhas: [], folgas: [] }
                       const linhasDia = grupo.linhas.filter(l => l.ev !== null && (!filtroEspaco || l.espaco_id === filtroEspaco))
                       const folgaIds  = folgasIdx[dataStr] ?? []
-                      const lmdTecsDia = lmdPorDia[dataStr] ?? []
-                      const isHoje    = dataStr === hojeStr
-                      const isNoMes   = dataStr >= dataInicio && dataStr <= dataFim
+                      const lmdTecsDia   = lmdPorDia[dataStr] ?? []
+                      const linhasLmdDia = linhasDia.filter(l => l.espacoNome?.toLowerCase() === 'lmd')
+                      const isDropFolga  = dragOverFolga === dataStr
+                      const isDropLmd    = dragOverLmd   === dataStr
+                      const isHoje       = dataStr === hojeStr
+                      const isNoMes      = dataStr >= dataInicio && dataStr <= dataFim
                       return (
                         <div key={dataStr} onClick={() => setModalDia(dataStr)}
                           className={clsx(
@@ -1772,16 +1780,41 @@ export function ApoioTecnico() {
                             isHoje ? 'border-accent/40 bg-accent/[0.04]' : isNoMes ? 'border-border bg-surface-1 hover:bg-surface-2' : 'border-border/20 bg-transparent opacity-30 pointer-events-none',
                           )}>
                           <p className={clsx('text-[10px] font-bold mb-0.5', isHoje ? 'text-amber-400' : 'text-accent-subtle')}>{parseInt(dataStr.slice(-2))}</p>
-                          {lmdTecsDia.length > 0 && (
-                            <div className="flex gap-0.5 flex-wrap mb-0.5">
-                              {lmdTecsDia.slice(0, 2).map(tid => {
-                                const tec = tecnicos.find(t => t.id === tid)
-                                const cor = tecCorMap[tid]
-                                return tec ? <span key={tid} className={clsx('text-[8px] font-bold px-1 rounded border', cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30')}>{tec.nome.split(' ')[0]}</span> : null
-                              })}
-                              {lmdTecsDia.length > 2 && <span className="text-[8px] text-accent-subtle">+{lmdTecsDia.length - 2}</span>}
-                            </div>
-                          )}
+                          <div
+                            onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverLmd(dataStr) }}
+                            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverLmd(null) }}
+                            onDrop={e => { e.stopPropagation(); handleLmdDrop(e, dataStr) }}
+                            className={clsx(
+                              'flex gap-0.5 flex-wrap mb-0.5 rounded transition-colors',
+                              isDropLmd ? 'bg-red-500/15 px-0.5 py-0.5 min-h-[14px]' : lmdTecsDia.length === 0 ? 'min-h-[4px]' : ''
+                            )}
+                          >
+                            {lmdTecsDia.slice(0, 2).map(tid => {
+                              const tec = tecnicos.find(t => t.id === tid)
+                              const cor = tecCorMap[tid]
+                              if (!tec) return null
+                              const linhaLmd = linhasLmdDia.find(l => (l.tecIds ?? []).includes(tid))
+                              return (
+                                <span key={tid} className={clsx('group/mlmdchip inline-flex items-center gap-0.5 text-[8px] font-bold px-1 rounded border', cor?.chip ?? 'bg-red-400/15 text-red-400 border-red-400/30')}>
+                                  {tec.nome.split(' ')[0]}
+                                  <button
+                                    onMouseDown={e => e.stopPropagation()}
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      if (linhaLmd) {
+                                        removerTecSlot(linhaLmd, tid)
+                                      } else {
+                                        const ag = (lmdAgIdx[dataStr] ?? []).find(a => a.tecnico_id === tid)
+                                        if (ag) supabase.from('agendamentos_tecnicos').delete().eq('id', ag.id).then(() => carregarComScroll())
+                                      }
+                                    }}
+                                    className="opacity-0 group-hover/mlmdchip:opacity-100 text-[10px] leading-none transition-opacity"
+                                  >×</button>
+                                </span>
+                              )
+                            })}
+                            {lmdTecsDia.length > 2 && <span className="text-[8px] text-accent-subtle">+{lmdTecsDia.length - 2}</span>}
+                          </div>
                           {linhasDia.slice(0, 3).map(linha => (
                             <div key={linha.espaco_id} className="px-1 py-0.5 rounded bg-surface-2 border border-border/40">
                               <p className="text-[8px] font-bold text-accent-subtle truncate">{linha.espacoNome}</p>
@@ -1801,14 +1834,31 @@ export function ApoioTecnico() {
                               <span className="text-[8px] font-bold text-purple-400">Preparação</span>
                             </div>
                           )}
-                          {folgaIds.length > 0 && (
-                            <div className="flex gap-0.5 flex-wrap mt-auto">
-                              {folgaIds.slice(0, 2).map(tid => {
-                                const tec = tecnicos.find(t => t.id === tid)
-                                return tec ? <span key={tid} className="text-[8px] px-0.5 rounded bg-orange-400/10 text-orange-400/70">{tec.nome.split(' ')[0]}</span> : null
-                              })}
-                            </div>
-                          )}
+                          <div
+                            onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverFolga(dataStr) }}
+                            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverFolga(null) }}
+                            onDrop={e => { e.stopPropagation(); handleFolgaDrop(e, dataStr) }}
+                            className={clsx(
+                              'flex gap-0.5 flex-wrap mt-auto rounded transition-colors',
+                              isDropFolga ? 'bg-teal-500/15 px-0.5 py-0.5 min-h-[14px]' : folgaIds.length === 0 ? 'min-h-[4px]' : ''
+                            )}
+                          >
+                            {folgaIds.slice(0, 2).map(tid => {
+                              const tec = tecnicos.find(t => t.id === tid)
+                              if (!tec) return null
+                              return (
+                                <span key={tid} className="group/mfchip inline-flex items-center gap-0.5 text-[8px] px-0.5 rounded bg-orange-400/10 text-orange-400/70">
+                                  {tec.nome.split(' ')[0]}
+                                  <button
+                                    onMouseDown={e => e.stopPropagation()}
+                                    onClick={e => { e.stopPropagation(); removerFolga(dataStr, tid) }}
+                                    className="opacity-0 group-hover/mfchip:opacity-100 text-[10px] leading-none transition-opacity"
+                                  >×</button>
+                                </span>
+                              )
+                            })}
+                            {folgaIds.length > 2 && <span className="text-[8px] text-accent-subtle">+{folgaIds.length - 2}</span>}
+                          </div>
                         </div>
                       )
                     })}

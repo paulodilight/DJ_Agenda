@@ -499,6 +499,13 @@ export function ColaboradorAgenda() {
     return { dataInicio: isoData(inicio), dataFim: isoData(fim), dias: eachDayOfInterval({ start: inicio, end: fim }) }
   }, [anoMes])
 
+  // Extend query end to always cover the current selected week (week view can span into next month)
+  const dataFimQuery = useMemo(() => {
+    const fimSemana = endOfWeek(semanaBase, { weekStartsOn: 1 })
+    const fimGrid   = parseISO(dataFim)
+    return isoData(fimSemana > fimGrid ? fimSemana : fimGrid)
+  }, [dataFim, semanaBase])
+
   const nomeMes = cap(format(new Date(dataInicio + 'T00:00:00'), 'MMMM yyyy', { locale: pt }))
 
   const [tecnicos, setTecnicos]   = useState([])
@@ -517,8 +524,8 @@ export function ColaboradorAgenda() {
       supabase.from('espacos').select('id, nome').eq('activo', true).order('nome'),
       supabase.from('supa_eventos')
         .select('id, espaco_id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, tecnico_id, todos_tecnicos, notas_operacionais, Equipamentos, notas_colaborador, contacto_pelo_evento, morada, tipo, rider_url, data_preparacao, notas_preparacao')
-        .gte('data_evento', dataInicio).lte('data_evento', dataFim).neq('status', 'cancelado'),
-      supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicio).lte('data', dataFim),
+        .gte('data_evento', dataInicio).lte('data_evento', dataFimQuery).neq('status', 'cancelado'),
+      supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicio).lte('data', dataFimQuery),
     ]).then(async ([tRes, eRes, evRes, agRes]) => {
       if (!activo) return
       const tecs = tRes.data ?? []
@@ -539,7 +546,7 @@ export function ColaboradorAgenda() {
       }
     }).catch(console.error).finally(() => activo && setLoading(false))
     return () => { activo = false }
-  }, [colaborador, dataInicio, dataFim])
+  }, [colaborador, dataInicio, dataFimQuery])
 
   const tecCorMap = useMemo(() => {
     const m = {}
@@ -556,8 +563,8 @@ export function ColaboradorAgenda() {
     return m
   }, [evTecnicos])
 
-  const espacosIdx  = useMemo(() => Object.fromEntries(espacos.map(e => [e.id, e])), [espacos])
-  const tecFixos    = useMemo(() => tecnicos.filter(t => t.tipo === 'fixo'), [tecnicos])
+  const espacosIdx   = useMemo(() => Object.fromEntries(espacos.map(e => [e.id, e])), [espacos])
+  const i4djEspacoId = useMemo(() => espacos.find(e => e.nome?.trim().toLowerCase() === 'lmd')?.id ?? null, [espacos])
 
   const folgasIdx = useMemo(() => {
     const m = {}
@@ -569,26 +576,22 @@ export function ColaboradorAgenda() {
   }, [agendamentos])
 
   const lmdAgendIdx = useMemo(() => {
+    if (!i4djEspacoId) return {}
     const m = {}
-    agendamentos.filter(a => !a.folga).forEach(a => {
-      if (!m[a.data]) m[a.data] = {}
-      m[a.data][a.tecnico_id] = a
+    agendamentos.filter(a => !a.folga && a.espaco_id === i4djEspacoId).forEach(a => {
+      if (!m[a.data]) m[a.data] = []
+      m[a.data].push(a.tecnico_id)
     })
     return m
-  }, [agendamentos])
+  }, [agendamentos, i4djEspacoId])
 
   const lmdPorDia = useMemo(() => {
     const m = {}
     dias.forEach(dia => {
-      const dataStr    = isoData(dia)
-      const folgasHoje = new Set(folgasIdx[dataStr] ?? [])
-      const atribuidos = new Set(
-        evTecnicos.filter(et => eventos.find(e => e.id === et.evento_id)?.data_evento === dataStr).map(et => et.tecnico_id)
-      )
-      m[dataStr] = tecFixos.filter(t => !folgasHoje.has(t.id) && !atribuidos.has(t.id)).map(t => t.id)
+      m[isoData(dia)] = lmdAgendIdx[isoData(dia)] ?? []
     })
     return m
-  }, [dias, folgasIdx, evTecnicos, eventos, tecFixos])
+  }, [dias, lmdAgendIdx])
 
   const eventosFiltrados = useMemo(() =>
     filtroMeu ? eventos.filter(e => meusIds.has(e.id)) : eventos

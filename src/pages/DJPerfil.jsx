@@ -4,7 +4,7 @@ import {
   ArrowLeft, ArrowUp, ArrowDown, Printer,
   CalendarCheck, CalendarX, Plus, Trash2,
   Camera, Save, Check, Maximize2, Star,
-  Copy, Mail, X, ExternalLink, Lock, Unlock,
+  Copy, Mail, X, ExternalLink, Lock, Unlock, Eye, EyeOff,
 } from 'lucide-react'
 import { useDJ, useDJs } from '@/hooks/useDJs'
 import { useAgenda } from '@/hooks/useAgenda'
@@ -241,6 +241,7 @@ export function DJPerfil() {
   const [filtroMes, setFiltroMes] = useState('todos')
   const [ordemDesc, setOrdemDesc] = useState(true)
   const [actualizando, setActualizando] = useState(null)
+  const [togglingDjMes, setTogglingDjMes] = useState(false)
 
   // ── disponibilidade — dados ──
   const [disponibilidades, setDisponibilidades] = useState([])
@@ -296,7 +297,8 @@ export function DJPerfil() {
   const [comRetencao, setComRetencao]         = useState(false)
   const [retencaoPct, setRetencaoPct]         = useState(25)
   const [premioOverrideC, setPremioOverrideC] = useState(null)
-  const [descontoOpC, setDescontoOpC]         = useState(2)
+  const [descontoOpC, setDescontoOpC]           = useState(2)
+  const [descontoTipoOpC, setDescontoTipoOpC]   = useState('fixo')
   const [contasSucesso, setContasSucesso]     = useState(false)
 
   // ── conflitos ──
@@ -357,6 +359,16 @@ export function DJPerfil() {
   const cfgTransportesCon  = useMemo(() => safeParseC(storeConfig?.contas_transportes, [{ valor: 120 }]), [storeConfig])
   const cfgDescontosCon    = useMemo(() => safeParseC(storeConfig?.contas_descontos,   [{ valor: 2 }]),   [storeConfig])
   const transporteRateCon  = cfgTransportesCon[0]?.valor ?? 120
+
+  // Sync when storeConfig loads async
+  useEffect(() => {
+    const match = cfgDescontosCon.find(d => d.valor === descontoOpC)
+    if (!match && cfgDescontosCon.length > 0) {
+      setDescontoOpC(cfgDescontosCon[0].valor ?? 2)
+      setDescontoTipoOpC(cfgDescontosCon[0].tipo ?? 'fixo')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfgDescontosCon])
   const valorQualidadeRate  = Number(storeConfig?.contas_valor_qualidade ?? 0)
   const valorQualidadeAtivo = storeConfig?.contas_valor_qualidade_ativo !== false
 
@@ -421,12 +433,12 @@ export function DJPerfil() {
     const nTransp       = slotsRichCon.filter(s => s.transporte).length
     const valorTransp   = nTransp * transporteRateCon
     const valorPremio    = premioAtivoC && valorQualidadeRate > 0 ? n * valorQualidadeRate : 0
-    const valorDesconto  = descontoOpC * n
+    const valorDesconto  = descontoTipoOpC === 'pct' ? valorAtuacoes * descontoOpC / 100 : descontoOpC * n
     const subtotal       = valorAtuacoes + valorHExt + valorTransp + valorPremio - valorDesconto
     const ajusteIva      = comIvaC ? subtotal * CFG_C.ivaRate : 0
     const ajusteRetencao = comRetencao ? -(subtotal * retencaoPct / 100) : 0
     return { n, valorAtuacoes, totalHExt, valorHExt, nTransp, valorTransp, valorPremio, valorDesconto, subtotal, ajusteIva, ajusteRetencao, total: subtotal + ajusteIva + ajusteRetencao }
-  }, [slotsRichCon, premioAtivoC, descontoOpC, comIvaC, comRetencao, retencaoPct, transporteRateCon, valorQualidadeRate])
+  }, [slotsRichCon, premioAtivoC, descontoOpC, descontoTipoOpC, comIvaC, comRetencao, retencaoPct, transporteRateCon, valorQualidadeRate])
 
   // reset + carrega opções das contas por DJ (evita que opções de outro DJ persistam)
   useEffect(() => {
@@ -435,7 +447,8 @@ export function DJPerfil() {
     setComIvaC(false)
     setComRetencao(false)
     setRetencaoPct(25)
-    setDescontoOpC(2)
+    setDescontoOpC(cfgDescontosCon[0]?.valor ?? 2)
+    setDescontoTipoOpC(cfgDescontosCon[0]?.tipo ?? 'fixo')
     setPremioOverrideC(null)
     setContasSucesso(false)
     setSlotsContas([])
@@ -448,6 +461,7 @@ export function DJPerfil() {
       if (s.comRetencao    != null) setComRetencao(s.comRetencao)
       if (s.retencaoPct    != null) setRetencaoPct(s.retencaoPct)
       if (s.descontoOp     != null) setDescontoOpC(s.descontoOp)
+      if (s.descontoTipo   != null) setDescontoTipoOpC(s.descontoTipo)
       if (s.premioOverride != null) setPremioOverrideC(s.premioOverride)
     } catch {}
   }, [id])
@@ -577,6 +591,20 @@ export function DJPerfil() {
       setTogglingDisp(false)
     }
   }, [dj, id, recarregarDJ])
+
+  const toggleDjMesOculto = async () => {
+    if (!dj) return
+    const proxMes = format(addMonths(new Date(), 1), 'yyyy-MM')
+    const oculto  = dj.agenda_mes_max != null && dj.agenda_mes_max < proxMes
+    const novoMax = oculto ? proxMes : format(new Date(), 'yyyy-MM')
+    setTogglingDjMes(true)
+    try {
+      const { error } = await supabase.from('djs').update({ agenda_mes_max: novoMax }).eq('id', id)
+      if (error) throw error
+      recarregarDJ()
+    } catch (e) { console.error(e) }
+    finally { setTogglingDjMes(false) }
+  }
 
   // ── guardar disponibilidades ──
   const guardarDisp = async () => {
@@ -831,7 +859,7 @@ export function DJPerfil() {
                     <>
                       <button
                         onClick={() => {
-                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ reciboVerde: reciboVerdeC, comIva: comIvaC, comRetencao, retencaoPct, descontoOp: descontoOpC, premioOverride: premioOverrideC }))
+                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ reciboVerde: reciboVerdeC, comIva: comIvaC, comRetencao, retencaoPct, descontoOp: descontoOpC, descontoTipo: descontoTipoOpC, premioOverride: premioOverrideC }))
                           setContasSucesso(true)
                           setTimeout(() => setContasSucesso(false), 2500)
                         }}
@@ -1757,6 +1785,27 @@ LMD · XclusiveDJ`)
               {ordemDesc ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
               {ordemDesc ? 'Mais recente' : 'Mais antigo'}
             </button>
+            {(() => {
+              const nextMonth = addMonths(new Date(), 1)
+              const proxMes   = format(nextMonth, 'yyyy-MM')
+              const mesesPt   = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+              const proxNome  = mesesPt[nextMonth.getMonth()]
+              const oculto    = dj?.agenda_mes_max != null && dj?.agenda_mes_max < proxMes
+              return (
+                <button onClick={toggleDjMesOculto} disabled={togglingDjMes}
+                  title={oculto ? `Mostrar ${proxNome} para este DJ` : `Ocultar ${proxNome} para este DJ`}
+                  className={clsx(
+                    'flex items-center gap-1.5 border rounded px-2 py-1.5 text-xs transition-colors disabled:opacity-50',
+                    oculto
+                      ? 'border-amber-400/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                      : 'border-border bg-surface-2 text-accent-muted hover:text-accent hover:border-white/20'
+                  )}
+                >
+                  {oculto ? <EyeOff size={12} /> : <Eye size={12} />}
+                  {oculto ? `Mostrar ${proxNome}` : `Ocultar ${proxNome}`}
+                </button>
+              )
+            })()}
             <span className="text-xs text-accent-subtle ml-auto">{slotsFiltrados.length} data{slotsFiltrados.length !== 1 ? 's' : ''}</span>
             <button onClick={() => window.print()}
               className="flex items-center gap-1.5 text-xs text-accent-muted hover:text-accent transition-colors border border-border rounded px-2 py-1.5 bg-surface-2">
@@ -2106,14 +2155,19 @@ LMD · XclusiveDJ`)
                       <div>
                         <p className="text-[10px] font-semibold text-accent-muted uppercase tracking-widest mb-2">Desconto</p>
                         <select
-                          value={descontoOpC}
-                          onChange={e => setDescontoOpC(Number(e.target.value))}
+                          value={`${descontoOpC}|${descontoTipoOpC}`}
+                          onChange={e => {
+                            const [v, t] = e.target.value.split('|')
+                            setDescontoOpC(Number(v))
+                            setDescontoTipoOpC(t ?? 'fixo')
+                          }}
                           className="w-full appearance-none bg-surface-0 border border-border rounded-lg px-3 py-2 text-xs text-accent focus:outline-none cursor-pointer"
                         >
-                          {cfgDescontosCon.map((d, i) => (
-                            <option key={i} value={d.valor}>{d.label || `Desconto ${i + 1}`} — {d.valor}€</option>
-                          ))}
-                          <option value={0}>Sem desconto</option>
+                          {cfgDescontosCon.map((d, i) => {
+                            const t = d.tipo ?? 'fixo'
+                            return <option key={i} value={`${d.valor}|${t}`}>{d.label || `Desconto ${i + 1}`} — {d.valor}{t === 'pct' ? '%' : '€'}</option>
+                          })}
+                          <option value="0|fixo">Sem desconto</option>
                         </select>
                         {calcCon && descontoOpC > 0 && (
                           <span className="text-xs text-accent-subtle mt-1 block tabular-nums">= −{formatarEuro(calcCon.valorDesconto)}</span>
@@ -2130,7 +2184,7 @@ LMD · XclusiveDJ`)
                       )}
                       <button
                         onClick={() => {
-                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ reciboVerde: reciboVerdeC, comIva: comIvaC, comRetencao, retencaoPct, descontoOp: descontoOpC, premioOverride: premioOverrideC }))
+                          localStorage.setItem(`dj_contas_${id}`, JSON.stringify({ reciboVerde: reciboVerdeC, comIva: comIvaC, comRetencao, retencaoPct, descontoOp: descontoOpC, descontoTipo: descontoTipoOpC, premioOverride: premioOverrideC }))
                           setContasSucesso(true)
                           setTimeout(() => setContasSucesso(false), 2500)
                         }}
@@ -2270,7 +2324,7 @@ LMD · XclusiveDJ`)
                         <BRow label={`Valor Qualidade (${calcCon.n} × ${valorQualidadeRate}€)`} value={`+${formatarEuro(calcCon.valorPremio)}`} accent="text-status-proposta" />
                       )}
                       {calcCon.valorDesconto > 0 && (
-                        <BRow label={`Desconto operação (${descontoOpC}€ × ${calcCon.n})`} value={`−${formatarEuro(calcCon.valorDesconto)}`} accent="text-status-cancelado" />
+                        <BRow label={descontoTipoOpC === 'pct' ? `Desconto (${descontoOpC}% de ${formatarEuro(calcCon.valorAtuacoes)})` : `Desconto operação (${descontoOpC}€ × ${calcCon.n})`} value={`−${formatarEuro(calcCon.valorDesconto)}`} accent="text-status-cancelado" />
                       )}
                       <BRow label="Subtotal" value={formatarEuro(calcCon.subtotal)} bold />
                       {calcCon.ajusteIva !== 0 && (
