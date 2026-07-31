@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, useRef } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   startOfWeek, endOfWeek, addDays, addWeeks, subWeeks,
@@ -304,25 +304,14 @@ function PillFolgaCard({ folgaIds, tecnicos, tecCorMap, compact = false }) {
 
 function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, folgasIdx, lmdAgendIdx, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick, onPrepClick }) {
 
-  const detalheRef = useRef(null)
-
-  useEffect(() => {
-    if (paisagem || !detalheRef.current) return
-    const el = detalheRef.current.querySelector(`#semana-dia-${diaSeleccionado}`)
-    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  }, [diaSeleccionado, paisagem])
-
   if (!paisagem) {
-    // Portrait: strip de 7 dias + todos os eventos da semana agrupados por dia
-    const semanaVazia = semana7.every(dataStr =>
-      (eventosPorDia[dataStr] ?? []).length === 0 &&
-      !(lmdPorDia[dataStr] ?? []).includes(colaborador?.id) &&
-      (preparacoesPorDia[dataStr] ?? []).length === 0
-    )
+    // Portrait: strip de 7 dias + detalhe do dia selecionado
+    const evsDia    = eventosPorDia[diaSeleccionado] ?? []
+    const temMeuLmd = (lmdPorDia[diaSeleccionado] ?? []).includes(colaborador?.id)
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Day strip */}
+        {/* Day strip — uma linha por dia: TER 24 • + traços folga */}
         <div className="shrink-0 grid grid-cols-7 px-1 py-1.5 border-b border-border/40 gap-0.5">
           {semana7.map(dataStr => {
             const dt       = parseISO(dataStr)
@@ -355,50 +344,29 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
             )
           })}
         </div>
-        {/* Lista de eventos de toda a semana, agrupada por dia */}
-        <div ref={detalheRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-4">
-          {semanaVazia
-            ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos nesta semana.</p>
-            : semana7.map(dataStr => {
-                const evsDia    = eventosPorDia[dataStr] ?? []
-                const temMeuLmd = (lmdPorDia[dataStr] ?? []).includes(colaborador?.id)
-                const preps     = preparacoesPorDia[dataStr] ?? []
-                if (evsDia.length === 0 && !temMeuLmd && preps.length === 0) return null
-                const dt    = parseISO(dataStr)
-                const isHoje = dataStr === hojeStr
-                const isSel  = dataStr === diaSeleccionado
+        {/* Detalhe do dia selecionado */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-2">
+          {temMeuLmd && <PillLmd onClick={() => onLmdClick(diaSeleccionado)} comBotao={false} />}
+          {(preparacoesPorDia[diaSeleccionado] ?? []).map(ev => (
+            <PillPreparacao key={`prep-${ev.id}`} ev={ev} onClick={() => onPrepClick?.(ev)} />
+          ))}
+          {evsDia.length === 0 && !temMeuLmd && (preparacoesPorDia[diaSeleccionado] ?? []).length === 0
+            ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos.</p>
+            : evsDia.map(ev => {
+                const meu    = meusIds.has(ev.id)
+                const espaco = espacosIdx[ev.espaco_id]?.nome ?? ''
+                const tecIds = evTecIdx[ev.id] ?? (ev.tecnico_id ? [ev.tecnico_id] : [])
+                const tec    = tecnicos.find(t => t.id === tecIds[0])
                 return (
-                  <div key={dataStr} id={`semana-dia-${dataStr}`}>
-                    <p className={clsx(
-                      'text-[11px] font-bold uppercase tracking-wider mb-1.5',
-                      isSel ? 'text-amber-400' : isHoje ? 'text-amber-400/70' : 'text-accent-subtle',
-                    )}>
-                      {cap(format(dt, 'EEE, d MMM', { locale: pt }))}
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {temMeuLmd && <PillLmd onClick={() => onLmdClick(dataStr)} comBotao={false} />}
-                      {preps.map(ev => (
-                        <PillPreparacao key={`prep-${ev.id}`} ev={ev} onClick={() => onPrepClick?.(ev)} />
-                      ))}
-                      {evsDia.map(ev => {
-                        const meu    = meusIds.has(ev.id)
-                        const espaco = espacosIdx[ev.espaco_id]?.nome ?? ''
-                        const tecIds = evTecIdx[ev.id] ?? (ev.tecnico_id ? [ev.tecnico_id] : [])
-                        const tec    = tecnicos.find(t => t.id === tecIds[0])
-                        return (
-                          <PillEvento key={ev.id} ev={ev} espaco={espaco} meu={meu}
-                            tecNome={tec?.nome ?? null} tecCor={tec ? tecCorMap[tec.id] : null}
-                            colaboradorNome={colaborador?.nome}
-                            onClick={() => onEventoClick(ev)} />
-                        )
-                      })}
-                      <PillLmdCard lmdIds={lmdPorDia[dataStr]} lmdAgendDia={lmdAgendIdx?.[dataStr]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
-                      <PillFolgaCard folgaIds={folgasIdx?.[dataStr]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
-                    </div>
-                  </div>
+                  <PillEvento key={ev.id} ev={ev} espaco={espaco} meu={meu}
+                    tecNome={tec?.nome ?? null} tecCor={tec ? tecCorMap[tec.id] : null}
+                    colaboradorNome={colaborador?.nome}
+                    onClick={() => onEventoClick(ev)} />
                 )
               })
           }
+          <PillLmdCard lmdIds={lmdPorDia[diaSeleccionado]} lmdAgendDia={lmdAgendIdx?.[diaSeleccionado]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
+          <PillFolgaCard folgaIds={folgasIdx?.[diaSeleccionado]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
         </div>
       </div>
     )
