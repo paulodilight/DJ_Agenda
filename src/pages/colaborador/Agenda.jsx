@@ -2,7 +2,7 @@
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   startOfWeek, endOfWeek, addDays, addWeeks, subWeeks,
-  isSameMonth, parseISO,
+  isSameMonth, parseISO, differenceInDays,
 } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, List, Star, Wrench, X, PenLine, Package } from 'lucide-react'
@@ -616,7 +616,8 @@ export function ColaboradorAgenda() {
 
   const navSemana = (delta) => {
     const base   = delta > 0 ? addWeeks(semanaBase, 1) : subWeeks(semanaBase, 1)
-    const novaData = isoData(base)
+    const offset = differenceInDays(parseISO(diaSeleccionado), semanaBase)
+    const novaData = isoData(addDays(base, offset))
     setDiaSelec(novaData)
     const novoMes = novaData.slice(0, 7)
     if (novoMes !== anoMes) navegar(delta)
