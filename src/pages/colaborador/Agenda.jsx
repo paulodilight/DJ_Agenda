@@ -464,7 +464,7 @@ function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, preparacoesPorDia
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export function ColaboradorAgenda() {
-  const { anoMes, navegar }   = useMesStore()
+  const { anoMes, navegar, setAnoMes } = useMesStore()
   const { colaborador }       = useColaboradorStore()
 
   const [vista, setVista]             = useState('semana')
@@ -630,7 +630,8 @@ export function ColaboradorAgenda() {
     if (novoMes !== anoMes) navegar(delta)
   }
 
-  const onDiaClick = (dataStr) => { setDiaSelec(dataStr); setVista('dia') }
+  const onDiaClick = (dataStr) => { setDiaSelec(dataStr); setVista('semana') }
+  const irParaHoje = () => { setDiaSelec(hojeStr); setAnoMes(hojeStr.slice(0, 7)); setVista('semana') }
 
   const abrirEvento = (ev) => setAberto({
     ...ev,
@@ -660,7 +661,6 @@ export function ColaboradorAgenda() {
           {[
             { id: 'mes',    label: 'Mês',    Ic: CalendarRange },
             { id: 'semana', label: 'Semana', Ic: CalendarDays },
-            { id: 'dia',    label: 'Dia',    Ic: List },
           ].map(({ id, label, Ic }) => (
             <button key={id} onClick={() => setVista(id)}
               className={clsx(
@@ -673,6 +673,10 @@ export function ColaboradorAgenda() {
               {label}
             </button>
           ))}
+          <button onClick={irParaHoje}
+            className="flex items-center px-2.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors border border-transparent text-accent-muted hover:text-accent">
+            Hoje
+          </button>
           <button onClick={() => setFiltroMeu(v => !v)}
             className={clsx(
               'flex items-center px-2.5 py-1.5 rounded-lg border text-[12px] font-semibold transition-colors',
@@ -685,12 +689,12 @@ export function ColaboradorAgenda() {
           {/* Em landscape a navegação cabe aqui */}
           {paisagem && (
             <div className="ml-auto flex items-center gap-1.5">
-              <button onClick={() => vista === 'mes' ? navegar(-1) : vista === 'semana' ? navSemana(-1) : navDia(-1)}
+              <button onClick={() => vista === 'mes' ? navegar(-1) : navSemana(-1)}
                 className="p-1 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
                 <ChevronLeft size={13} />
               </button>
               <span className="text-[13px] font-bold text-accent capitalize min-w-[80px] text-center">{navLabel}</span>
-              <button onClick={() => vista === 'mes' ? navegar(1) : vista === 'semana' ? navSemana(1) : navDia(1)}
+              <button onClick={() => vista === 'mes' ? navegar(1) : navSemana(1)}
                 className="p-1 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
                 <ChevronRight size={13} />
               </button>
@@ -700,12 +704,12 @@ export function ColaboradorAgenda() {
         {/* Linha 2: navegação — só em portrait */}
         {!paisagem && (
           <div className="flex items-center justify-between px-4 py-1.5">
-            <button onClick={() => vista === 'mes' ? navegar(-1) : vista === 'semana' ? navSemana(-1) : navDia(-1)}
+            <button onClick={() => vista === 'mes' ? navegar(-1) : navSemana(-1)}
               className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
               <ChevronLeft size={14} />
             </button>
             <span className="text-[15px] font-bold text-accent capitalize">{navLabel}</span>
-            <button onClick={() => vista === 'mes' ? navegar(1) : vista === 'semana' ? navSemana(1) : navDia(1)}
+            <button onClick={() => vista === 'mes' ? navegar(1) : navSemana(1)}
               className="p-1.5 rounded bg-surface-2 border border-border hover:bg-surface-3 transition-colors">
               <ChevronRight size={14} />
             </button>
