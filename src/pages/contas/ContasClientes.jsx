@@ -18,6 +18,7 @@ import { EmailAgendaModal } from '@/components/contas/EmailAgendaModal'
 const parseNum = (v) => { const n = parseFloat(String(v ?? '').replace(',', '.')); return isNaN(n) ? 0 : n }
 const uid = () => Math.random().toString(36).slice(2)
 const emptyLinha = () => ({ _key: uid(), id: null, descricao: '', unidades: 1, valor_unitario: '', margem: '', margem_tipo: 'eur', notas: '', evento_id: null, imprimir: false, dirty: false })
+const TIPO_EQUIP_MAP = { proprio: 'equipamento_alugado', alugado: 'equipamento_alugado', comprado: 'equipamento_comprado', extra: 'extra' }
 const itemTotal  = (r) => {
   const sub = parseNum(r.unidades) * parseNum(r.valor_unitario)
   const m = parseNum(r.margem)
@@ -120,6 +121,25 @@ function LinhaManualDoc({ row, onChange, onRemove, eventos, numCols = 6 }) {
   const [notaAberta, setNotaAberta] = useState(false)
   const total = itemTotal(row)
   const temNota = row.notas?.trim() || row.evento_id
+
+  if (row.fromEquip) {
+    return (
+      <tr className="border-b border-border/25 bg-surface-0/10">
+        <td className="py-1.5 pl-4 pr-1 text-[13px] text-accent/70">{row.descricao || '—'}</td>
+        <td className="py-1.5 px-2 w-14 text-center text-[13px] text-accent/70 tabular-nums">{row.unidades}</td>
+        <td className="py-1.5 px-1 w-20 text-right text-[13px] text-accent/70 tabular-nums">{formatarEuro(parseNum(row.valor_unitario))}</td>
+        <td className="py-1.5 px-1 w-20 text-right text-[13px] text-accent/50 tabular-nums">
+          {parseNum(row.margem) > 0 ? `+${formatarEuro(parseNum(row.margem))}` : '—'}
+        </td>
+        <td className="py-1.5 pr-1 w-20 text-right text-[13px] font-bold tabular-nums">
+          {total > 0 ? <span className="text-accent">{formatarEuro(total)}</span> : <span className="text-border/15">—</span>}
+        </td>
+        <td className="py-1.5 pr-3 w-14 text-right">
+          <Link2 size={10} className="inline text-accent-subtle/30" title="Do evento" />
+        </td>
+      </tr>
+    )
+  }
 
   return (
     <>
@@ -864,6 +884,7 @@ function initCard(servicos) {
     notas: s.notas ?? '',
     evento_id: s.evento_id ?? null,
     imprimir: s.imprimir ?? false,
+    fromEquip: s._fromEquip ?? false,
     dirty: false,
   })
   const pad = (arr, tipo, n = 3) => {
@@ -1736,10 +1757,38 @@ export function ContasClientes() {
         total: (s.custo ?? 0) + (s.margem ?? 0) + (s.semTransporte ? 0 : transpDefault),
       })))
     }
+    // Fetch evento_equipamentos para os eventos deste mês (com valor)
+    const eventoIds = (eRes.data ?? []).map(e => e.id)
+    const eeRes = eventoIds.length > 0
+      ? await supabase.from('evento_equipamentos')
+          .select('id, evento_id, descricao_manual, tipo, quantidade, valor_custo, margem, observacoes')
+          .in('evento_id', eventoIds)
+          .gt('valor_custo', 0)
+      : { data: [], error: null }
+
     if (!cRes.error) {
       const data = cRes.data ?? []
+      const equipBilling = (eeRes.data ?? []).map(r => {
+        const ev = (eRes.data ?? []).find(e => e.id === r.evento_id)
+        return {
+          id: `ee_${r.id}`,
+          tipo: TIPO_EQUIP_MAP[r.tipo] ?? 'equipamento_alugado',
+          descricao: r.descricao_manual || '',
+          unidades: r.quantidade ?? 1,
+          valor_unitario: Number(r.valor_custo) ?? 0,
+          margem: r.margem != null ? Number(r.margem) : 0,
+          margem_tipo: 'eur',
+          notas: r.observacoes ?? null,
+          evento_id: r.evento_id,
+          imprimir: false,
+          espaco_id: ev?.espaco_id ?? null,
+          mes,
+          _fromEquip: true,
+        }
+      })
+      const allServicos = [...data, ...equipBilling]
       const newCards = {}
-      espacos.forEach(esp => { newCards[esp.id] = initCard(data.filter(s => s.espaco_id === esp.id)) })
+      espacos.forEach(esp => { newCards[esp.id] = initCard(allServicos.filter(s => s.espaco_id === esp.id)) })
       setCards(newCards)
     }
     setLoading(false)
