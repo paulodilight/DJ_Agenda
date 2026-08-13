@@ -684,7 +684,7 @@ function FolgaChip({ tecnico, cor, dataStr, onDragStart, isDragging, onRemover }
 
 // ── Página principal ──────────────────────────────────────────────────────────
 // ── Modal Dia (vista mês) ─────────────────────────────────────────────────────
-function ModalDia({ dataStr, tecnicos, tecCorMap, lmdPorDia, linhasBrutas, folgasIdx, onFechar, onNavegar, onEditEvento, onAtribuir, onNovoEvento }) {
+function ModalDia({ dataStr, tecnicos, tecCorMap, lmdPorDia, preparacoesPorDia, linhasBrutas, folgasIdx, onFechar, onNavegar, onEditEvento, onAtribuir, onNovoEvento }) {
   if (!dataStr) return null
   const grupo = linhasBrutas.find(g => g.dataStr === dataStr)
   const linhas = (grupo?.linhas ?? []).filter(l => l.ev !== null)
@@ -760,6 +760,27 @@ function ModalDia({ dataStr, tecnicos, tecCorMap, lmdPorDia, linhasBrutas, folga
               <Plus size={12} /> Novo evento
             </button>
           </div>
+          {(preparacoesPorDia?.[dataStr] ?? []).length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-purple-400/70 mb-2">Preparação</p>
+              <div className="flex flex-col gap-2">
+                {(preparacoesPorDia[dataStr] ?? []).map(ev => {
+                  const tec = tecnicos.find(t => t.id === ev.tecnico_id)
+                  const cor = tec ? tecCorMap[tec.id] : null
+                  return (
+                    <div key={`prep-${ev.id}`} className="p-3 rounded-xl border border-purple-500/20 bg-purple-500/[0.07] flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <Wrench size={10} className="text-purple-400 shrink-0" />
+                        <span className="text-[12px] font-bold text-purple-300 truncate">{ev.evento}</span>
+                        {tec && <span className={clsx('ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded border', cor?.chip ?? 'text-purple-400/70 border-purple-500/20')}>{tec.nome.split(' ')[0]}</span>}
+                      </div>
+                      {ev.notas_preparacao && <p className="text-[11px] text-purple-400/60 leading-relaxed">{ev.notas_preparacao}</p>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           {folgaIds.length > 0 && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400/70 mb-2">Folgas</p>
@@ -1986,6 +2007,7 @@ export function ApoioTecnico() {
           tecnicos={tecnicos}
           tecCorMap={tecCorMap}
           lmdPorDia={lmdPorDia}
+          preparacoesPorDia={preparacoesPorDia}
           linhasBrutas={linhasBrutas}
           folgasIdx={folgasIdx}
           onFechar={() => setModalDia(null)}

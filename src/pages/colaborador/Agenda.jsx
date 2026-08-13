@@ -605,7 +605,7 @@ export function ColaboradorAgenda() {
 
   const preparacoesPorDia = useMemo(() => {
     const m = {}
-    eventos.filter(e => e.data_preparacao && meusIds.has(e.id)).forEach(ev => {
+    eventos.filter(e => e.data_preparacao).forEach(ev => {
       if (!m[ev.data_preparacao]) m[ev.data_preparacao] = []
       m[ev.data_preparacao].push(ev)
     })

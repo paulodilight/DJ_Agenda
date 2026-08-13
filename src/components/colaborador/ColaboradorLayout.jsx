@@ -12,10 +12,13 @@ import { registarSW, limparBadge } from '@/lib/push'
 // (landscape pequeno) para não tapar conteúdo. No computador e no telemóvel
 // em pé, ficam sempre visíveis.
 const useMostrarChrome = () => {
-  const calc = () =>
-    typeof window === 'undefined'
-      ? true
-      : !(window.innerWidth > window.innerHeight)
+  const isMobileDevice = () =>
+    typeof window !== 'undefined' && window.innerWidth < 1024
+  const calc = () => {
+    if (typeof window === 'undefined') return true
+    if (!isMobileDevice()) return true // desktop: mostrar sempre
+    return !(window.innerWidth > window.innerHeight) // mobile: esconder em landscape
+  }
   const [mostrar, setMostrar] = useState(calc)
   useEffect(() => {
     const fn = () => setMostrar(calc())
