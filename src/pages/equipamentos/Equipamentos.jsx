@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Package, Plus, Search, X, QrCode, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Package, Plus, Search, X, QrCode, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, LogIn } from 'lucide-react'
 import { clsx } from 'clsx'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -31,6 +31,20 @@ export function Equipamentos() {
   const [a_guardar, setAGuardar] = useState(false)
   const [erro, setErro] = useState(null)
   const [scanner, setScanner] = useState(false)
+  const [entrandoId, setEntrandoId] = useState(null)
+
+  const darEntrada = async (eq) => {
+    if (!eq.movimento_id) return
+    setEntrandoId(eq.id)
+    try {
+      await equipamentosApi.registarEntrada(eq.movimento_id)
+      await carregar()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setEntrandoId(null)
+    }
+  }
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -244,7 +258,7 @@ export function Equipamentos() {
                         <th className={clsx(thCls, 'text-amber-400/60')}>Evento</th>
                         <th className={clsx(thCls, 'text-amber-400/60')}>Saída por</th>
                         <th className={clsx(thCls, 'text-amber-400/60')}>Data saída</th>
-                        <th className="px-3 py-2.5 w-16" />
+                        <th className="px-3 py-2.5 w-28" />
                       </tr>
                     </thead>
                     <tbody>
@@ -261,7 +275,22 @@ export function Equipamentos() {
                               ? format(new Date(eq.saida_at), 'dd/MM HH:mm', { locale: pt })
                               : <span className="text-accent-subtle/30">—</span>}
                           </td>
-                          <td className="px-3 py-2.5">{acoes(eq)}</td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => darEntrada(eq)}
+                                disabled={entrandoId === eq.id}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[10px] font-semibold hover:bg-blue-500/25 disabled:opacity-40 transition-colors"
+                              >
+                                <LogIn size={11} />
+                                {entrandoId === eq.id ? '…' : 'Entrada'}
+                              </button>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => abrirEditar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors"><Pencil size={12} /></button>
+                                <button onClick={() => apagar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
+                              </div>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

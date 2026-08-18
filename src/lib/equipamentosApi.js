@@ -9,14 +9,14 @@ export const equipamentosApi = {
     const [{ data: equip, error }, { data: emUso }] = await Promise.all([
       supabase.from(TABLE).select('*').eq('ativo', true).order('nome'),
       supabase.from('evento_equipamentos')
-        .select('equipamento_id, evento_id, saida_at, registado_por, supa_eventos(evento, data_evento)')
+        .select('id, equipamento_id, evento_id, saida_at, registado_por, supa_eventos(evento, data_evento)')
         .not('saida_at', 'is', null)
         .is('retorno_at', null),
     ])
     if (error) throw error
     const emUsoMap = {}
     ;(emUso ?? []).forEach(r => {
-      emUsoMap[r.equipamento_id] = { ...r.supa_eventos, registado_por: r.registado_por, saida_at: r.saida_at }
+      emUsoMap[r.equipamento_id] = { ...r.supa_eventos, registado_por: r.registado_por, saida_at: r.saida_at, movimento_id: r.id }
     })
     return (equip ?? []).map(e => ({
       ...e,
@@ -24,6 +24,7 @@ export const equipamentosApi = {
       evento_atual: emUsoMap[e.id] ?? null,
       registado_por: emUsoMap[e.id]?.registado_por ?? null,
       saida_at: emUsoMap[e.id]?.saida_at ?? null,
+      movimento_id: emUsoMap[e.id]?.movimento_id ?? null,
     }))
   },
 
