@@ -184,7 +184,7 @@ export function ColaboradorLayout() {
       </nav>
 
       {modalPin && <ModalAlterarPin onFechar={() => setModalPin(false)} />}
-      {scanner && <QrScannerModal onClose={() => setScanner(false)} />}
+      {scanner && <QrScannerModal onClose={() => setScanner(false)} nomeOperador={colaborador?.nome ?? null} />}
     </div>
   )
 }

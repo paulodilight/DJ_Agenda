@@ -9,19 +9,20 @@ export const equipamentosApi = {
     const [{ data: equip, error }, { data: emUso }] = await Promise.all([
       supabase.from(TABLE).select('*').eq('ativo', true).order('nome'),
       supabase.from('evento_equipamentos')
-        .select('equipamento_id, evento_id, supa_eventos(evento, data_evento)')
+        .select('equipamento_id, evento_id, registado_por, supa_eventos(evento, data_evento)')
         .not('saida_at', 'is', null)
         .is('retorno_at', null),
     ])
     if (error) throw error
     const emUsoMap = {}
     ;(emUso ?? []).forEach(r => {
-      emUsoMap[r.equipamento_id] = r.supa_eventos
+      emUsoMap[r.equipamento_id] = { ...r.supa_eventos, registado_por: r.registado_por }
     })
     return (equip ?? []).map(e => ({
       ...e,
       em_uso: !!emUsoMap[e.id],
       evento_atual: emUsoMap[e.id] ?? null,
+      registado_por: emUsoMap[e.id]?.registado_por ?? null,
     }))
   },
 
@@ -71,7 +72,7 @@ export const equipamentosApi = {
     if (error || !equip) return null
     const { data: mov } = await supabase
       .from('evento_equipamentos')
-      .select('id, saida_at, evento_id, supa_eventos(evento, data_evento)')
+      .select('id, saida_at, evento_id, registado_por, supa_eventos(evento, data_evento)')
       .eq('equipamento_id', equip.id)
       .not('saida_at', 'is', null)
       .is('retorno_at', null)
@@ -81,10 +82,10 @@ export const equipamentosApi = {
     return { ...equip, movimentoAberto: mov ?? null }
   },
 
-  async registarSaida(equipamentoId) {
+  async registarSaida(equipamentoId, nomeOperador = null) {
     const { data, error } = await supabase
       .from('evento_equipamentos')
-      .insert({ equipamento_id: equipamentoId, tipo: 'proprio', saida_at: new Date().toISOString() })
+      .insert({ equipamento_id: equipamentoId, tipo: 'proprio', saida_at: new Date().toISOString(), registado_por: nomeOperador })
       .select()
       .single()
     if (error) throw error

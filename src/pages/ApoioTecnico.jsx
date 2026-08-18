@@ -2095,7 +2095,7 @@ export function ApoioTecnico() {
         />
       )}
 
-      {scanner && <QrScannerModal onClose={() => setScanner(false)} />}
+      {scanner && <QrScannerModal onClose={() => setScanner(false)} nomeOperador="Admin" />}
     </div>
   )
 }

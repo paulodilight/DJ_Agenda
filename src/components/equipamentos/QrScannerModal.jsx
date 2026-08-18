@@ -4,7 +4,7 @@ import { equipamentosApi } from '@/lib/equipamentosApi'
 import { X, Package, LogOut, LogIn, CheckCircle, AlertCircle, QrCode } from 'lucide-react'
 import { clsx } from 'clsx'
 
-export function QrScannerModal({ onClose }) {
+export function QrScannerModal({ onClose, nomeOperador = null }) {
   const videoRef   = useRef(null)
   const canvasRef  = useRef(null)
   const animRef    = useRef(null)
@@ -91,7 +91,7 @@ export function QrScannerModal({ onClose }) {
   const registarSaida = async () => {
     setARegistar(true)
     try {
-      await equipamentosApi.registarSaida(equipamento.id)
+      await equipamentosApi.registarSaida(equipamento.id, nomeOperador)
       setMensagem('Saída registada com sucesso')
       setEstado('success')
     } catch (e) { setMensagem(e.message ?? 'Erro ao registar') }

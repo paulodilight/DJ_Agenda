@@ -195,7 +195,7 @@ export function Equipamentos() {
         </button>
       </div>
 
-      {/* ── Grelha ── */}
+      {/* ── Lista ── */}
       {loading ? (
         <div className="text-center py-16 text-accent-subtle text-sm">A carregar…</div>
       ) : filtrados.length === 0 ? (
@@ -207,81 +207,75 @@ export function Equipamentos() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-          {filtrados.map(eq => (
-            <div
-              key={eq.id}
-              className="bg-surface-1 border border-border rounded-xl overflow-hidden hover:border-white/15 transition-colors group"
-            >
-              {/* ícone / foto */}
-              <div className="bg-surface-2 h-20 flex items-center justify-center relative border-b border-border">
-                <Package size={28} className="text-accent-subtle" />
-                <div className="absolute top-2 right-2">
-                  <span className={clsx(
-                    'text-[10px] font-semibold px-2 py-0.5 rounded-full border',
-                    eq.em_uso
-                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/25'
-                      : 'bg-status-confirmado/12 text-status-confirmado border-status-confirmado/25'
-                  )}>
-                    {eq.em_uso ? 'Em uso' : 'Disponível'}
-                  </span>
-                </div>
-                {/* ações hover */}
-                <div className="absolute top-2 left-2 hidden group-hover:flex gap-1">
-                  <button
-                    onClick={() => abrirEditar(eq)}
-                    className="p-1 rounded bg-surface-1/80 text-accent-muted hover:text-accent transition-colors"
-                  >
-                    <Pencil size={11} />
-                  </button>
-                  <button
-                    onClick={() => apagar(eq)}
-                    className="p-1 rounded bg-surface-1/80 text-accent-muted hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 size={11} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-3">
-                <p className="text-xs font-semibold text-accent leading-tight mb-1 truncate" title={eq.nome}>
-                  {eq.nome}
-                </p>
-                {eq.categoria && (
-                  <span className={clsx('text-[10px] px-1.5 py-0.5 rounded border font-medium', badgeCategoria(eq.categoria))}>
-                    {eq.categoria}
-                  </span>
-                )}
-                {eq.em_uso && eq.evento_atual && (
-                  <p className="text-[10px] text-amber-400 mt-1.5 truncate" title={eq.evento_atual.evento}>
-                    → {eq.evento_atual.evento}
-                  </p>
-                )}
-                {eq.qr_code ? (
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <QrCode size={10} className="text-accent-subtle shrink-0" />
-                    <span className="text-[10px] font-mono text-accent-subtle truncate">{eq.qr_code}</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => abrirEditar(eq)}
-                    className="mt-2 text-[10px] text-accent-subtle hover:text-status-confirmado transition-colors flex items-center gap-1"
-                  >
-                    <QrCode size={10} /> Gerar QR code
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {/* card "novo" */}
-          <button
-            onClick={abrirCriar}
-            className="border-2 border-dashed border-border rounded-xl h-36 flex flex-col items-center justify-center gap-2 text-accent-subtle hover:text-accent hover:border-white/20 transition-colors"
-          >
-            <Plus size={20} />
-            <span className="text-xs">Novo equipamento</span>
-          </button>
+        <div className="bg-surface-1 border border-border rounded-xl overflow-hidden mb-8">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse min-w-[640px]">
+              <thead>
+                <tr className="border-b border-border bg-surface-0">
+                  <th className="text-left px-4 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">Nome</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">Categoria</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">Estado</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">Evento</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">Saída por</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">QR</th>
+                  <th className="px-3 py-2.5 w-16" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.map(eq => (
+                  <tr key={eq.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors group">
+                    <td className="px-4 py-2.5 font-semibold text-accent">{eq.nome}</td>
+                    <td className="px-3 py-2.5">
+                      {eq.categoria ? (
+                        <span className={clsx('px-1.5 py-0.5 rounded border font-medium text-[10px]', badgeCategoria(eq.categoria))}>
+                          {eq.categoria}
+                        </span>
+                      ) : <span className="text-accent-subtle">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className={clsx(
+                        'px-2 py-0.5 rounded-full border text-[10px] font-semibold',
+                        eq.em_uso
+                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/25'
+                          : 'bg-status-confirmado/12 text-status-confirmado border-status-confirmado/25'
+                      )}>
+                        {eq.em_uso ? 'Em uso' : 'Disponível'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-accent-muted max-w-[180px] truncate">
+                      {eq.em_uso && eq.evento_atual?.evento
+                        ? <span className="text-amber-400/80" title={eq.evento_atual.evento}>{eq.evento_atual.evento}</span>
+                        : <span className="text-accent-subtle/30">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-accent-muted">
+                      {eq.em_uso && eq.registado_por
+                        ? eq.registado_por
+                        : <span className="text-accent-subtle/30">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {eq.qr_code ? (
+                        <span className="font-mono text-[10px] text-accent-subtle">{eq.qr_code}</span>
+                      ) : (
+                        <button onClick={() => abrirEditar(eq)} className="text-[10px] text-accent-subtle hover:text-status-confirmado transition-colors flex items-center gap-1">
+                          <QrCode size={10} /> Gerar
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => abrirEditar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors">
+                          <Pencil size={12} />
+                        </button>
+                        <button onClick={() => apagar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-red-400 transition-colors">
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
