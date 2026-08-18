@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera, ImageIcon, Printer, CheckCircle2 } from 'lucide-react'
+import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera, ImageIcon, Printer, CheckCircle2, QrCode } from 'lucide-react'
+import { QrScannerModal } from '@/components/equipamentos/QrScannerModal'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
@@ -85,6 +86,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const [fotoUploading,  setFotoUploading]  = useState(false)
   const [faseLocal,      setFaseLocal]      = useState(evento.fase || 'criacao')
   const [printEvento,    setPrintEvento]    = useState(false)
+  const [scanner,        setScanner]        = useState(false)
   const [assinEvento,    setAssinEvento]    = useState({
     assinatura_lmd_at: evento.assinatura_lmd_at ?? null,
     assinatura_in_at:  evento.assinatura_in_at  ?? null,
@@ -1337,11 +1339,18 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
               ) : null}
             </div>
           </div>
-          <button onClick={() => setPrintEvento(true)}
-            title="Folha de Evento"
-            className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
-            <Printer size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setScanner(true)}
+              title="Scan QR equipamento"
+              className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-amber-400/60 hover:text-amber-400 hover:bg-surface-3 active:scale-95 transition-all">
+              <QrCode size={18} />
+            </button>
+            <button onClick={() => setPrintEvento(true)}
+              title="Folha de Evento"
+              className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
+              <Printer size={18} />
+            </button>
+          </div>
           <button onClick={onFechar}
             className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
             <X size={22} />
@@ -1350,6 +1359,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
       </div>
     </div>
 
+    {scanner && <QrScannerModal onClose={() => setScanner(false)} nomeOperador={colaborador?.nome ?? null} />}
     <PrintModal aberto={printEvento} onFechar={() => setPrintEvento(false)} titulo={evento.evento || "Evento"}>
       <FolhaEvento dados={dadosEvento} />
     </PrintModal>
