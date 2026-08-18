@@ -61,6 +61,47 @@ export const equipamentosApi = {
     return data ?? []
   },
 
+  async porQrCode(qrCode) {
+    const { data: equip, error } = await supabase
+      .from('equipamentos')
+      .select('*')
+      .eq('qr_code', qrCode)
+      .eq('ativo', true)
+      .maybeSingle()
+    if (error || !equip) return null
+    const { data: mov } = await supabase
+      .from('evento_equipamentos')
+      .select('id, saida_at, evento_id, supa_eventos(evento, data_evento)')
+      .eq('equipamento_id', equip.id)
+      .not('saida_at', 'is', null)
+      .is('retorno_at', null)
+      .order('saida_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    return { ...equip, movimentoAberto: mov ?? null }
+  },
+
+  async registarSaida(equipamentoId) {
+    const { data, error } = await supabase
+      .from('evento_equipamentos')
+      .insert({ equipamento_id: equipamentoId, tipo: 'proprio', saida_at: new Date().toISOString() })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async registarEntrada(movimentoId) {
+    const { data, error } = await supabase
+      .from('evento_equipamentos')
+      .update({ retorno_at: new Date().toISOString() })
+      .eq('id', movimentoId)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   gerarQrCode(nome) {
     const slug = nome.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)
     const rand = Math.random().toString(36).slice(2, 6).toUpperCase()

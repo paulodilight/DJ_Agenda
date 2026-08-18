@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addDays, parseISO, isSameMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { X, Search, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Plus, Wrench, CalendarRange, Clock, ArrowLeftRight, ListChecks } from 'lucide-react'
+import { X, Search, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Plus, Wrench, CalendarRange, Clock, ArrowLeftRight, ListChecks, QrCode } from 'lucide-react'
+import { QrScannerModal } from '@/components/equipamentos/QrScannerModal'
 import { useMesStore } from '@/store'
 import { supabase } from '@/lib/supabase'
 import { supaEventosApi } from '@/lib/supaEventosApi'
@@ -817,6 +818,7 @@ export function ApoioTecnico() {
   const [pesquisa, setPesquisa]           = useState('')
   const [vista, setVista]                 = useState('semana') // semana | mes | stats
   const [semanaRef, setSemanaRef]         = useState(hojeStr)
+  const [scanner, setScanner]             = useState(false)
   const [modalDia, setModalDia]           = useState(null)
   const [modalPrep, setModalPrep]         = useState(null) // evento com data_preparacao
   const [modalChecklist, setModalChecklist] = useState(null) // { eventoId, eventoNome, tecIds }
@@ -1539,6 +1541,13 @@ export function ApoioTecnico() {
                 </button>
               )}
             </div>
+            <button
+              onClick={() => setScanner(true)}
+              title="Scan QR equipamento"
+              className="p-1.5 rounded hover:bg-surface-2 text-amber-400/70 hover:text-amber-400 transition-colors"
+            >
+              <QrCode size={14} />
+            </button>
           </div>
         </div>
       </div>
@@ -2085,6 +2094,8 @@ export function ApoioTecnico() {
           onFechar={() => setModalChecklist(null)}
         />
       )}
+
+      {scanner && <QrScannerModal onClose={() => setScanner(false)} />}
     </div>
   )
 }

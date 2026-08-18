@@ -66,7 +66,7 @@ function PillEvento({ ev, espaco, meu, tecNome, tecCor, colaboradorNome, compact
 }
 
 // ── Pill Preparação ──────────────────────────────────────────────────────────
-function PillPreparacao({ ev, compact = false, onClick }) {
+function PillPreparacao({ ev, tecNome, compact = false, onClick }) {
   return (
     <button onClick={onClick}
       className={clsx(
@@ -74,11 +74,16 @@ function PillPreparacao({ ev, compact = false, onClick }) {
         'bg-purple-500/[0.07] border-purple-500/20 hover:border-purple-500/35',
         compact ? 'px-2 py-1.5' : 'px-3 py-2',
       )}>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 min-w-0">
         <Wrench size={compact ? 9 : 11} className="text-purple-400 shrink-0" />
         <span className={clsx('font-bold text-purple-300 truncate', compact ? 'text-[12px]' : 'text-[13px]')}>
           Preparação
         </span>
+        {tecNome && (
+          <span className={clsx('ml-auto shrink-0 font-semibold text-purple-400/70 bg-purple-500/10 border border-purple-500/20 rounded px-1.5 py-0.5', compact ? 'text-[9px]' : 'text-[10px]')}>
+            {tecNome.split(' ')[0]}
+          </span>
+        )}
       </div>
       <p className={clsx('truncate mt-0.5 text-purple-400/70', compact ? 'text-[10px]' : 'text-[11px]')}>{ev.evento}</p>
       {!compact && ev.notas_preparacao && (
@@ -348,7 +353,9 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-2">
           {temMeuLmd && <PillLmd onClick={() => onLmdClick(diaSeleccionado)} comBotao={false} />}
           {(preparacoesPorDia[diaSeleccionado] ?? []).map(ev => (
-            <PillPreparacao key={`prep-${ev.id}`} ev={ev} onClick={() => onPrepClick?.(ev)} />
+            <PillPreparacao key={`prep-${ev.id}`} ev={ev}
+              tecNome={tecnicos.find(t => t.id === ev.tecnico_id)?.nome}
+              onClick={() => onPrepClick?.(ev)} />
           ))}
           {evsDia.length === 0 && !temMeuLmd && (preparacoesPorDia[diaSeleccionado] ?? []).length === 0
             ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos.</p>
@@ -406,7 +413,9 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
             <div className="flex-1 flex flex-col gap-1 p-1 overflow-y-auto">
               {temMeuLmd && <PillLmd onClick={() => onLmdClick(dataStr)} />}
               {(preparacoesPorDia[dataStr] ?? []).map(ev => (
-                <PillPreparacao key={`prep-${ev.id}`} ev={ev} compact onClick={() => onPrepClick?.(ev)} />
+                <PillPreparacao key={`prep-${ev.id}`} ev={ev} compact
+                  tecNome={tecnicos.find(t => t.id === ev.tecnico_id)?.nome}
+                  onClick={() => onPrepClick?.(ev)} />
               ))}
               {evs.map(ev => {
                 const meu    = meusIds.has(ev.id)
@@ -441,7 +450,9 @@ function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, preparacoesPorDia
       <p className="text-[12px] font-bold uppercase tracking-widest text-accent-subtle capitalize mb-1">{nomeDia}</p>
       {temMeuLmd && <PillLmd onClick={() => onLmdClick(diaSeleccionado)} comBotao />}
       {prepsDia.map(ev => (
-        <PillPreparacao key={`prep-${ev.id}`} ev={ev} onClick={() => onPrepClick?.(ev)} />
+        <PillPreparacao key={`prep-${ev.id}`} ev={ev}
+          tecNome={tecnicos.find(t => t.id === ev.tecnico_id)?.nome}
+          onClick={() => onPrepClick?.(ev)} />
       ))}
       {evsDia.length === 0 && !temMeuLmd && prepsDia.length === 0
         ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos neste dia.</p>

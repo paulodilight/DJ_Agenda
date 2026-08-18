@@ -4,6 +4,7 @@ import { clsx } from 'clsx'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { equipamentosApi } from '@/lib/equipamentosApi'
+import { QrScannerModal } from '@/components/equipamentos/QrScannerModal'
 
 const VAZIO = { nome: '', categoria: '', qr_code: '', valor_custo: '', valor_aluguer_dia: '', notas: '' }
 
@@ -29,6 +30,7 @@ export function Equipamentos() {
   const [form, setForm] = useState(VAZIO)
   const [a_guardar, setAGuardar] = useState(false)
   const [erro, setErro] = useState(null)
+  const [scanner, setScanner] = useState(false)
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -124,13 +126,22 @@ export function Equipamentos() {
           </h2>
           <p className="text-xs text-accent-subtle mt-0.5">Catálogo com QR codes · Histórico de movimentações</p>
         </div>
-        <button
-          onClick={abrirCriar}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-status-confirmado/15 border border-status-confirmado/30 text-status-confirmado text-xs font-semibold hover:bg-status-confirmado/25 transition-colors"
-        >
-          <Plus size={14} />
-          Novo Equipamento
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setScanner(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold hover:bg-amber-500/25 transition-colors"
+          >
+            <QrCode size={14} />
+            Scan QR
+          </button>
+          <button
+            onClick={abrirCriar}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-status-confirmado/15 border border-status-confirmado/30 text-status-confirmado text-xs font-semibold hover:bg-status-confirmado/25 transition-colors"
+          >
+            <Plus size={14} />
+            Novo Equipamento
+          </button>
+        </div>
       </div>
 
       {/* ── Stats ── */}
@@ -456,6 +467,8 @@ export function Equipamentos() {
           </div>
         </div>
       )}
+
+      {scanner && <QrScannerModal onClose={() => { setScanner(false); carregar() }} />}
     </div>
   )
 }
