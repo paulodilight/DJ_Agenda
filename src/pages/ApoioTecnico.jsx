@@ -922,6 +922,22 @@ export function ApoioTecnico() {
     })
   }, [loading])
 
+  const syncTecToSupa = useCallback(async (...eventoIds) => {
+    for (const eventoId of eventoIds.filter(Boolean)) {
+      const [{ data: ev }, { data: etRows }] = await Promise.all([
+        supabase.from('supa_eventos').select('tecnico_id, tecnico2_id').eq('id', eventoId).single(),
+        supabase.from('evento_tecnicos').select('tecnico_id').eq('evento_id', eventoId),
+      ])
+      const newSet = new Set((etRows ?? []).map(r => r.tecnico_id))
+      const t1 = newSet.has(ev?.tecnico_id)  ? ev.tecnico_id  : null
+      const t2 = newSet.has(ev?.tecnico2_id) ? ev.tecnico2_id : null
+      const remaining = [...newSet].filter(id => id !== t1 && id !== t2)
+      const final1 = t1 ?? remaining.shift() ?? null
+      const final2 = t2 ?? remaining.shift() ?? null
+      await supabase.from('supa_eventos').update({ tecnico_id: final1, tecnico2_id: final2 }).eq('id', eventoId)
+    }
+  }, [])
+
   // ── Handlers folga drag ──────────────────────────────────────────────────────
   const handleFolgaDragStart = useCallback((e, data, tecnicoId) => {
     e.stopPropagation()
@@ -1218,22 +1234,6 @@ export function ApoioTecnico() {
       carregarComScroll()
     } catch (err) { console.error(err) }
   }, [agendamentos, carregarComScroll])
-
-  const syncTecToSupa = useCallback(async (...eventoIds) => {
-    for (const eventoId of eventoIds.filter(Boolean)) {
-      const [{ data: ev }, { data: etRows }] = await Promise.all([
-        supabase.from('supa_eventos').select('tecnico_id, tecnico2_id').eq('id', eventoId).single(),
-        supabase.from('evento_tecnicos').select('tecnico_id').eq('evento_id', eventoId),
-      ])
-      const newSet = new Set((etRows ?? []).map(r => r.tecnico_id))
-      const t1 = newSet.has(ev?.tecnico_id)  ? ev.tecnico_id  : null
-      const t2 = newSet.has(ev?.tecnico2_id) ? ev.tecnico2_id : null
-      const remaining = [...newSet].filter(id => id !== t1 && id !== t2)
-      const final1 = t1 ?? remaining.shift() ?? null
-      const final2 = t2 ?? remaining.shift() ?? null
-      await supabase.from('supa_eventos').update({ tecnico_id: final1, tecnico2_id: final2 }).eq('id', eventoId)
-    }
-  }, [])
 
   const removerTecSlot = useCallback(async (linha, tecnicoId) => {
     try {
