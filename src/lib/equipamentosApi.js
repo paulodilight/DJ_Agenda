@@ -10,13 +10,17 @@ export const equipamentosApi = {
       supabase.from(TABLE).select('*').eq('ativo', true).order('nome'),
       supabase.from('evento_equipamentos')
         .select('id, equipamento_id, evento_id, saida_at, registado_por, supa_eventos(evento, data_evento)')
-        .not('saida_at', 'is', null)
+        .or('saida_at.not.is.null,evento_id.not.is.null')
+        .not('equipamento_id', 'is', null)
         .is('retorno_at', null),
     ])
     if (error) throw error
     const emUsoMap = {}
     ;(emUso ?? []).forEach(r => {
-      emUsoMap[r.equipamento_id] = { ...r.supa_eventos, registado_por: r.registado_por, saida_at: r.saida_at, movimento_id: r.id }
+      // saida_at scan tem precedência sobre registo via FormEvento
+      if (!emUsoMap[r.equipamento_id] || r.saida_at) {
+        emUsoMap[r.equipamento_id] = { ...r.supa_eventos, registado_por: r.registado_por, saida_at: r.saida_at, movimento_id: r.id }
+      }
     })
     return (equip ?? []).map(e => ({
       ...e,

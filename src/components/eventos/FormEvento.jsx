@@ -1028,8 +1028,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             const emptyEquipRow = () => ({ _key: uidF(), id: null, equipamento_id: null, descricao: '', valor_custo: '', margem: '', unidades: 1, observacoes: '' })
             const SECOES = [
               { key: 'proprio',  label: 'Equipamentos para o evento', hasDbPicker: true },
-              { key: 'alugado',  label: 'Equipamentos Alugados',       hasDbPicker: false },
-              { key: 'comprado', label: 'Equipamentos Comprados',      hasDbPicker: false },
+              { key: 'alugado',  label: 'Equipamentos Alugados',       hasDbPicker: true },
+              { key: 'comprado', label: 'Equipamentos Comprados',      hasDbPicker: true },
               { key: 'extra',    label: 'Extras',                       hasDbPicker: false },
             ]
             const updRow = (secKey, rowKey, field, val) => setEquipRows(prev => ({
