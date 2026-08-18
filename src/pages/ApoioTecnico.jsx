@@ -861,7 +861,7 @@ export function ApoioTecnico() {
       supabase.from('espacos').select('id, nome').eq('activo', true).order('nome'),
       supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicioExt).lte('data', dataFimExt),
       supabase.from('supa_eventos')
-        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, tecnico_id, tecnico2_id, todos_tecnicos, valor_apoio_tecnico, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, rider_url, data_preparacao')
+        .select('id, espaco_id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, tecnico_id, tecnico2_id, todos_tecnicos, valor_apoio_tecnico, tipo, notas_operacionais, Equipamentos, contacto_pelo_evento, morada, rider_url, data_preparacao, hora_preparacao, notas_preparacao')
         .gte('data_evento', dataInicioExt).lte('data_evento', dataFimExt).neq('status', 'cancelado'),
       supabase.from('agenda')
         .select('id, espaco_id, data, dj_nome, dj_id, tipo_slot, estado, djs(nome, nome_artistico)')
