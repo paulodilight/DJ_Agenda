@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LogOut, Home, CalendarDays, ClipboardList, LayoutList, KeyRound, Sun, Moon, AlertTriangle, ListChecks } from 'lucide-react'
+import { LogOut, Home, CalendarDays, ClipboardList, LayoutList, KeyRound, Sun, Moon, AlertTriangle, ListChecks, QrCode } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
 import { useColaboradorStore } from '@/store'
@@ -7,6 +7,7 @@ import { Avatar } from './Avatar'
 import { ModalAlterarPin } from './ModalAlterarPin'
 import { BotaoNotificacoes } from './BotaoNotificacoes'
 import { registarSW, limparBadge } from '@/lib/push'
+import { QrScannerModal } from '@/components/equipamentos/QrScannerModal'
 
 // Mostra o header (logo) e a navegação. Só os esconde em telemóvel DEITADO
 // (landscape pequeno) para não tapar conteúdo. No computador e no telemóvel
@@ -50,6 +51,7 @@ export function ColaboradorLayout() {
   const navigate  = useNavigate()
   const mostrarChrome = useMostrarChrome()
   const [modalPin, setModalPin] = useState(false)
+  const [scanner, setScanner]   = useState(false)
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('collab-theme') === 'light')
 
   const toggleTheme = () => {
@@ -126,6 +128,11 @@ export function ColaboradorLayout() {
               <Avatar nome={colaborador?.nome} foto={colaborador?.foto_url} tamanho="sm" />
               <span className="text-xs text-accent-muted">{colaborador?.nome}</span>
             </div>
+            <button onClick={() => setScanner(true)} title="Scan QR equipamento"
+              className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-400/70 hover:text-amber-400 hover:border-amber-400/40 transition-colors">
+              <QrCode size={13} />
+              <span>QR</span>
+            </button>
             <button onClick={toggleTheme} title={lightMode ? 'Modo escuro' : 'Modo claro'}
               className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent-subtle hover:text-amber-400 hover:border-amber-400/40 transition-colors">
               {lightMode ? <Moon size={13} /> : <Sun size={13} />}
@@ -177,6 +184,7 @@ export function ColaboradorLayout() {
       </nav>
 
       {modalPin && <ModalAlterarPin onFechar={() => setModalPin(false)} />}
+      {scanner && <QrScannerModal onClose={() => setScanner(false)} />}
     </div>
   )
 }
