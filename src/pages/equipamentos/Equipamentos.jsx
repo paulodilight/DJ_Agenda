@@ -195,7 +195,7 @@ export function Equipamentos() {
         </button>
       </div>
 
-      {/* ── Lista ── */}
+      {/* ── Listas ── */}
       {loading ? (
         <div className="text-center py-16 text-accent-subtle text-sm">A carregar…</div>
       ) : filtrados.length === 0 ? (
@@ -206,78 +206,114 @@ export function Equipamentos() {
             + Criar primeiro equipamento
           </button>
         </div>
-      ) : (
-        <div className="bg-surface-1 border border-border rounded-xl overflow-hidden mb-8">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse min-w-[640px]">
-              <thead>
-                <tr className="border-b border-border bg-surface-0">
-                  <th className="text-left px-4 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">Nome</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">Categoria</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">Estado</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">Evento</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">Saída por</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-accent-subtle uppercase tracking-wider text-[10px]">QR</th>
-                  <th className="px-3 py-2.5 w-16" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtrados.map(eq => (
-                  <tr key={eq.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors group">
-                    <td className="px-4 py-2.5 font-semibold text-accent">{eq.nome}</td>
-                    <td className="px-3 py-2.5">
-                      {eq.categoria ? (
-                        <span className={clsx('px-1.5 py-0.5 rounded border font-medium text-[10px]', badgeCategoria(eq.categoria))}>
-                          {eq.categoria}
-                        </span>
-                      ) : <span className="text-accent-subtle">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className={clsx(
-                        'px-2 py-0.5 rounded-full border text-[10px] font-semibold',
-                        eq.em_uso
-                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/25'
-                          : 'bg-status-confirmado/12 text-status-confirmado border-status-confirmado/25'
-                      )}>
-                        {eq.em_uso ? 'Em uso' : 'Disponível'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-accent-muted max-w-[180px] truncate">
-                      {eq.em_uso && eq.evento_atual?.evento
-                        ? <span className="text-amber-400/80" title={eq.evento_atual.evento}>{eq.evento_atual.evento}</span>
-                        : <span className="text-accent-subtle/30">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-accent-muted">
-                      {eq.em_uso && eq.registado_por
-                        ? eq.registado_por
-                        : <span className="text-accent-subtle/30">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {eq.qr_code ? (
-                        <span className="font-mono text-[10px] text-accent-subtle">{eq.qr_code}</span>
-                      ) : (
-                        <button onClick={() => abrirEditar(eq)} className="text-[10px] text-accent-subtle hover:text-status-confirmado transition-colors flex items-center gap-1">
-                          <QrCode size={10} /> Gerar
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => abrirEditar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors">
-                          <Pencil size={12} />
-                        </button>
-                        <button onClick={() => apagar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-red-400 transition-colors">
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      ) : (() => {
+        const fora    = filtrados.filter(e => e.em_uso)
+        const dentro  = filtrados.filter(e => !e.em_uso)
+        const thCls   = 'text-left px-4 py-2.5 font-semibold uppercase tracking-wider text-[10px]'
+        const acoes   = (eq) => (
+          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={() => abrirEditar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors"><Pencil size={12} /></button>
+            <button onClick={() => apagar(eq)}      className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
           </div>
-        </div>
-      )}
+        )
+        const qrCell  = (eq) => eq.qr_code
+          ? <span className="font-mono text-[10px] text-accent-subtle">{eq.qr_code}</span>
+          : <button onClick={() => abrirEditar(eq)} className="text-[10px] text-accent-subtle hover:text-status-confirmado transition-colors flex items-center gap-1"><QrCode size={10} />Gerar</button>
+
+        return (
+          <div className="flex flex-col gap-6 mb-8">
+
+            {/* ── FORA ── */}
+            <div className="rounded-xl overflow-hidden border border-amber-500/25">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/20">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                  Fora — Em uso
+                  <span className="ml-2 font-normal text-amber-400/60">({fora.length})</span>
+                </p>
+              </div>
+              {fora.length === 0 ? (
+                <p className="text-center py-6 text-xs text-accent-subtle/40 italic">Nenhum equipamento fora.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse min-w-[580px]">
+                    <thead>
+                      <tr className="border-b border-border bg-surface-0">
+                        <th className={clsx(thCls, 'text-amber-400/60')}>Nome</th>
+                        <th className={clsx(thCls, 'text-amber-400/60')}>QR</th>
+                        <th className={clsx(thCls, 'text-amber-400/60')}>Evento</th>
+                        <th className={clsx(thCls, 'text-amber-400/60')}>Saída por</th>
+                        <th className={clsx(thCls, 'text-amber-400/60')}>Data saída</th>
+                        <th className="px-3 py-2.5 w-16" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fora.map(eq => (
+                        <tr key={eq.id} className="border-b border-border/40 hover:bg-amber-500/5 transition-colors group">
+                          <td className="px-4 py-2.5 font-semibold text-accent">{eq.nome}</td>
+                          <td className="px-4 py-2.5">{qrCell(eq)}</td>
+                          <td className="px-4 py-2.5 text-amber-400/80 max-w-[180px] truncate" title={eq.evento_atual?.evento}>
+                            {eq.evento_atual?.evento ?? <span className="text-accent-subtle/30">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-accent-muted">{eq.registado_por ?? <span className="text-accent-subtle/30">—</span>}</td>
+                          <td className="px-4 py-2.5 text-accent-muted tabular-nums">
+                            {eq.saida_at
+                              ? format(new Date(eq.saida_at), 'dd/MM HH:mm', { locale: pt })
+                              : <span className="text-accent-subtle/30">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5">{acoes(eq)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* ── DENTRO ── */}
+            <div className="rounded-xl overflow-hidden border border-status-confirmado/20">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-status-confirmado/8 border-b border-status-confirmado/15">
+                <span className="w-2 h-2 rounded-full bg-status-confirmado shrink-0" />
+                <p className="text-[11px] font-bold uppercase tracking-wider text-status-confirmado">
+                  Dentro — Disponível
+                  <span className="ml-2 font-normal text-status-confirmado/50">({dentro.length})</span>
+                </p>
+              </div>
+              {dentro.length === 0 ? (
+                <p className="text-center py-6 text-xs text-accent-subtle/40 italic">Nenhum equipamento disponível.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse min-w-[400px]">
+                    <thead>
+                      <tr className="border-b border-border bg-surface-0">
+                        <th className={clsx(thCls, 'text-accent-subtle')}>Nome</th>
+                        <th className={clsx(thCls, 'text-accent-subtle')}>Categoria</th>
+                        <th className={clsx(thCls, 'text-accent-subtle')}>QR</th>
+                        <th className="px-3 py-2.5 w-16" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dentro.map(eq => (
+                        <tr key={eq.id} className="border-b border-border/40 hover:bg-surface-2 transition-colors group">
+                          <td className="px-4 py-2.5 font-semibold text-accent">{eq.nome}</td>
+                          <td className="px-4 py-2.5">
+                            {eq.categoria
+                              ? <span className={clsx('px-1.5 py-0.5 rounded border font-medium text-[10px]', badgeCategoria(eq.categoria))}>{eq.categoria}</span>
+                              : <span className="text-accent-subtle/30">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5">{qrCell(eq)}</td>
+                          <td className="px-3 py-2.5">{acoes(eq)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )
+      })()}
 
       {/* ── Movimentações ── */}
       <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
