@@ -945,8 +945,10 @@ export function ApoioTecnico() {
           .select('id').eq('data', targetData).eq('tecnico_id', tecId).eq('folga', true).maybeSingle()
         if (!existe) await supabase.from('agendamentos_tecnicos')
           .insert({ data: targetData, tecnico_id: tecId, folga: true })
-        if (srcEvento && srcDropKey) await supabase.from('evento_tecnicos')
-          .delete().eq('evento_id', srcEvento).eq('tecnico_id', tecId)
+        if (srcEvento && srcDropKey) {
+          await supabase.from('evento_tecnicos').delete().eq('evento_id', srcEvento).eq('tecnico_id', tecId)
+          await syncTecToSupa(srcEvento)
+        }
         carregarComScroll()
       } catch (err) { console.error('Folga drop (tech):', err) }
       return
@@ -962,7 +964,7 @@ export function ApoioTecnico() {
       carregarComScroll()
     } catch (err) { console.error('Folga drop (move):', err) }
     finally { setDragFolga(null); setDragOverFolga(null) }
-  }, [dragFolga, agendamentos, carregarComScroll])
+  }, [dragFolga, agendamentos, syncTecToSupa, carregarComScroll])
 
   const agIdx = useMemo(() => {
     const idx = {}
@@ -1051,8 +1053,10 @@ export function ApoioTecnico() {
     const srcAgId   = dragSourceRef.current?.agId || null
     dragSourceRef.current = null; setDragSource(null)
     try {
-      if (srcEvento) await supabase.from('evento_tecnicos').delete().eq('evento_id', srcEvento).eq('tecnico_id', tecId)
-      else if (srcAgId) await supabase.from('agendamentos_tecnicos').delete().eq('id', srcAgId)
+      if (srcEvento) {
+        await supabase.from('evento_tecnicos').delete().eq('evento_id', srcEvento).eq('tecnico_id', tecId)
+        await syncTecToSupa(srcEvento)
+      } else if (srcAgId) await supabase.from('agendamentos_tecnicos').delete().eq('id', srcAgId)
       const jaExiste = (lmdAgIdx[dataStr] ?? []).find(a => a.tecnico_id === tecId)
       if (!jaExiste) {
         await supabase.from('agendamentos_tecnicos')
@@ -1060,7 +1064,7 @@ export function ApoioTecnico() {
       }
       carregarComScroll()
     } catch (err) { console.error('LMD drop:', err) }
-  }, [i4djEspacoId, lmdAgIdx, carregarComScroll])
+  }, [i4djEspacoId, lmdAgIdx, syncTecToSupa, carregarComScroll])
 
   // Semana view: 7 dias a partir de 2ª feira da semana que contém semanaRef
   const semana7 = useMemo(() => {
@@ -1215,16 +1219,33 @@ export function ApoioTecnico() {
     } catch (err) { console.error(err) }
   }, [agendamentos, carregarComScroll])
 
+  const syncTecToSupa = useCallback(async (...eventoIds) => {
+    for (const eventoId of eventoIds.filter(Boolean)) {
+      const [{ data: ev }, { data: etRows }] = await Promise.all([
+        supabase.from('supa_eventos').select('tecnico_id, tecnico2_id').eq('id', eventoId).single(),
+        supabase.from('evento_tecnicos').select('tecnico_id').eq('evento_id', eventoId),
+      ])
+      const newSet = new Set((etRows ?? []).map(r => r.tecnico_id))
+      const t1 = newSet.has(ev?.tecnico_id)  ? ev.tecnico_id  : null
+      const t2 = newSet.has(ev?.tecnico2_id) ? ev.tecnico2_id : null
+      const remaining = [...newSet].filter(id => id !== t1 && id !== t2)
+      const final1 = t1 ?? remaining.shift() ?? null
+      const final2 = t2 ?? remaining.shift() ?? null
+      await supabase.from('supa_eventos').update({ tecnico_id: final1, tecnico2_id: final2 }).eq('id', eventoId)
+    }
+  }, [])
+
   const removerTecSlot = useCallback(async (linha, tecnicoId) => {
     try {
       if (linha.ev?.id) {
         await supabase.from('evento_tecnicos').delete().eq('evento_id', linha.ev.id).eq('tecnico_id', tecnicoId)
+        await syncTecToSupa(linha.ev.id)
       } else if (linha.ag?.id) {
         await supabase.from('agendamentos_tecnicos').update({ tecnico_id: null }).eq('id', linha.ag.id)
       }
       carregarComScroll()
     } catch (err) { console.error(err) }
-  }, [carregarComScroll])
+  }, [syncTecToSupa, carregarComScroll])
 
   const handleDragOver = useCallback((e, key) => {
     e.preventDefault()
@@ -1255,6 +1276,7 @@ export function ApoioTecnico() {
           supabase.from('evento_tecnicos').upsert({ evento_id: linha.ev.id,  tecnico_id: src.tecnicoId }, { onConflict: 'evento_id,tecnico_id' }),
           supabase.from('evento_tecnicos').upsert({ evento_id: src.eventoId, tecnico_id: dstTecId      }, { onConflict: 'evento_id,tecnico_id' }),
         ])
+        await syncTecToSupa(linha.ev.id, src.eventoId)
       } else if (modo === 'substituir') {
         const dstTecId = dstTecIds.find(tid => tid !== src.tecnicoId)
         if (dstTecId && linha.ev?.id)
@@ -1263,6 +1285,7 @@ export function ApoioTecnico() {
           await supabase.from('evento_tecnicos').upsert({ evento_id: linha.ev.id, tecnico_id: src.tecnicoId }, { onConflict: 'evento_id,tecnico_id' })
         if (vemDeEvento)
           await supabase.from('evento_tecnicos').delete().eq('evento_id', src.eventoId).eq('tecnico_id', src.tecnicoId)
+        await syncTecToSupa(linha.ev?.id, vemDeEvento ? src.eventoId : null)
       } else {
         // ── MOVER / ADICIONAR ───────────────────────────────────────────────
         if (linha.ev?.id) {
@@ -1278,10 +1301,11 @@ export function ApoioTecnico() {
         } else if (src.agId && src.dropKey !== null) {
           await supabase.from('agendamentos_tecnicos').delete().eq('id', src.agId)
         }
+        await syncTecToSupa(linha.ev?.id, vemDeEvento ? src.eventoId : null)
       }
       carregarComScroll()
     } catch (err) { console.error(err) }
-  }, [carregarComScroll])
+  }, [syncTecToSupa, carregarComScroll])
 
   const handleDrop = useCallback((e, linha) => {
     e.preventDefault()
