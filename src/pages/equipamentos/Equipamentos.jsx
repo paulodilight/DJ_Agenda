@@ -34,6 +34,7 @@ export function Equipamentos() {
   const [filtroCategoria, setFiltroCategoria] = useState('Todos')
   const [busca, setBusca]                 = useState('')
   const [mostrarMovs, setMostrarMovs]     = useState(false)
+  const [mostrarDentro, setMostrarDentro] = useState(false)
   const [modal, setModal]                 = useState(null)
   const [form, setForm]                   = useState(VAZIO)
   const [a_guardar, setAGuardar]          = useState(false)
@@ -395,111 +396,117 @@ export function Equipamentos() {
               )}
             </div>
 
-            {/* ── DENTRO ── */}
-            <div className="rounded-xl overflow-hidden border border-status-confirmado/20">
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-status-confirmado/8 border-b border-status-confirmado/15">
-                <span className="w-2 h-2 rounded-full bg-status-confirmado shrink-0" />
-                <p className="text-[11px] font-bold uppercase tracking-wider text-status-confirmado">
-                  Dentro — Disponível
-                  <span className="ml-2 font-normal text-status-confirmado/50">({dentro.length})</span>
-                </p>
-              </div>
-              {dentro.length === 0 ? (
-                <p className="text-center py-6 text-xs text-accent-subtle/40 italic">Nenhum equipamento disponível.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse min-w-[400px]">
-                    <thead>
-                      <tr className="border-b border-border bg-surface-0">
-                        <th className={clsx(thCls, 'text-accent-subtle')}>Nome</th>
-                        <th className={clsx(thCls, 'text-accent-subtle')}>Categoria</th>
-                        <th className={clsx(thCls, 'text-accent-subtle')}>QR</th>
-                        <th className="px-3 py-2.5 w-20" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dentro.map(eq => (
-                        <Fragment key={eq.id}>
-                          <tr className="border-b border-border/40 hover:bg-surface-2 transition-colors group">
-                            <td className="px-4 py-2.5 font-semibold text-accent">{eq.nome}</td>
-                            <td className="px-4 py-2.5">
-                              {eq.categoria
-                                ? <span className={clsx('px-1.5 py-0.5 rounded border font-medium text-[10px]', badgeCategoria(eq.categoria))}>{eq.categoria}</span>
-                                : <span className="text-accent-subtle/30">—</span>}
-                            </td>
-                            <td className="px-4 py-2.5">{qrCell(eq)}</td>
+            {/* ── MOVIMENTAÇÕES ── */}
+            <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
+              <button onClick={() => setMostrarMovs(m => !m)}
+                className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-surface-2 transition-colors">
+                <span className="text-xs font-semibold text-accent uppercase tracking-widest">Últimas movimentações</span>
+                {mostrarMovs ? <ChevronUp size={14} className="text-accent-subtle" /> : <ChevronDown size={14} className="text-accent-subtle" />}
+              </button>
+              {mostrarMovs && (
+                movimentacoes.length === 0 ? (
+                  <p className="text-center py-8 text-xs text-accent-subtle">Nenhuma movimentação registada.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse min-w-[640px]">
+                      <thead>
+                        <tr className="border-t border-b border-border bg-surface-0">
+                          <th className="text-left px-4 py-2.5 font-medium text-accent-muted">Equipamento</th>
+                          <th className="text-left px-3 py-2.5 font-medium text-accent-muted">Evento</th>
+                          <th className="text-left px-3 py-2.5 font-medium text-accent-muted">Cliente</th>
+                          <th className="text-left px-3 py-2.5 font-medium text-accent-muted">Tipo</th>
+                          <th className="text-center px-3 py-2.5 font-medium text-accent-muted">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {movimentacoes.map(m => (
+                          <tr key={m.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
+                            <td className="px-4 py-2.5 font-medium">{m.equipamentos?.nome ?? '—'}</td>
+                            <td className="px-3 py-2.5 text-accent-muted">{m.supa_eventos?.evento ?? '—'}</td>
+                            <td className="px-3 py-2.5 text-accent-muted">{m.supa_eventos?.espacos?.nome ?? '—'}</td>
                             <td className="px-3 py-2.5">
-                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {histBtn(eq, 'text-accent-muted')}
-                                <button onClick={() => abrirEditar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors"><Pencil size={12} /></button>
-                                <button onClick={() => apagar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
-                              </div>
+                              <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-medium border',
+                                m.tipo === 'proprio' ? 'bg-surface-3 text-accent-muted border-border' :
+                                m.tipo === 'alugado' ? 'bg-blue-500/10 text-blue-300 border-blue-500/20' :
+                                'bg-orange-500/10 text-orange-300 border-orange-500/20')}>
+                                {m.tipo === 'proprio' ? 'Próprio' : m.tipo === 'alugado' ? 'Alugado' : 'Comprado'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              {m.retorno_at
+                                ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-status-confirmado/10 text-status-confirmado border-status-confirmado/20">Devolvido</span>
+                                : m.saida_at
+                                ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20">Em uso</span>
+                                : <span className="text-accent-subtle">—</span>}
                             </td>
                           </tr>
-                          {histRow(eq, 4)}
-                        </Fragment>
-                      ))}
-                    </tbody>
-                  </table>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* ── DENTRO ── */}
+            <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
+              <button onClick={() => setMostrarDentro(m => !m)}
+                className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-surface-2 transition-colors">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-status-confirmado shrink-0" />
+                  <span className="text-xs font-semibold text-accent uppercase tracking-widest">
+                    Dentro — Disponível
+                    <span className="ml-2 font-normal normal-case text-accent-subtle text-[11px]">({dentro.length})</span>
+                  </span>
                 </div>
+                {mostrarDentro ? <ChevronUp size={14} className="text-accent-subtle" /> : <ChevronDown size={14} className="text-accent-subtle" />}
+              </button>
+              {mostrarDentro && (
+                dentro.length === 0 ? (
+                  <p className="text-center py-6 text-xs text-accent-subtle/40 italic">Nenhum equipamento disponível.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse min-w-[400px]">
+                      <thead>
+                        <tr className="border-b border-border bg-surface-0">
+                          <th className={clsx(thCls, 'text-accent-subtle')}>Nome</th>
+                          <th className={clsx(thCls, 'text-accent-subtle')}>Categoria</th>
+                          <th className={clsx(thCls, 'text-accent-subtle')}>QR</th>
+                          <th className="px-3 py-2.5 w-20" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dentro.map(eq => (
+                          <Fragment key={eq.id}>
+                            <tr className="border-b border-border/40 hover:bg-surface-2 transition-colors group">
+                              <td className="px-4 py-2.5 font-semibold text-accent">{eq.nome}</td>
+                              <td className="px-4 py-2.5">
+                                {eq.categoria
+                                  ? <span className={clsx('px-1.5 py-0.5 rounded border font-medium text-[10px]', badgeCategoria(eq.categoria))}>{eq.categoria}</span>
+                                  : <span className="text-accent-subtle/30">—</span>}
+                              </td>
+                              <td className="px-4 py-2.5">{qrCell(eq)}</td>
+                              <td className="px-3 py-2.5">
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {histBtn(eq, 'text-accent-muted')}
+                                  <button onClick={() => abrirEditar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors"><Pencil size={12} /></button>
+                                  <button onClick={() => apagar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                            {histRow(eq, 4)}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
               )}
             </div>
 
           </div>
         )
       })()}
-
-      {/* ── Movimentações ── */}
-      <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
-        <button onClick={() => setMostrarMovs(m => !m)}
-          className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-surface-2 transition-colors">
-          <span className="text-xs font-semibold text-accent uppercase tracking-widest">Últimas movimentações</span>
-          {mostrarMovs ? <ChevronUp size={14} className="text-accent-subtle" /> : <ChevronDown size={14} className="text-accent-subtle" />}
-        </button>
-        {mostrarMovs && (
-          movimentacoes.length === 0 ? (
-            <p className="text-center py-8 text-xs text-accent-subtle">Nenhuma movimentação registada.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse min-w-[640px]">
-                <thead>
-                  <tr className="border-t border-b border-border bg-surface-0">
-                    <th className="text-left px-4 py-2.5 font-medium text-accent-muted">Equipamento</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-accent-muted">Evento</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-accent-muted">Cliente</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-accent-muted">Tipo</th>
-                    <th className="text-center px-3 py-2.5 font-medium text-accent-muted">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movimentacoes.map(m => (
-                    <tr key={m.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
-                      <td className="px-4 py-2.5 font-medium">{m.equipamentos?.nome ?? '—'}</td>
-                      <td className="px-3 py-2.5 text-accent-muted">{m.supa_eventos?.evento ?? '—'}</td>
-                      <td className="px-3 py-2.5 text-accent-muted">{m.supa_eventos?.espacos?.nome ?? '—'}</td>
-                      <td className="px-3 py-2.5">
-                        <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-medium border',
-                          m.tipo === 'proprio' ? 'bg-surface-3 text-accent-muted border-border' :
-                          m.tipo === 'alugado' ? 'bg-blue-500/10 text-blue-300 border-blue-500/20' :
-                          'bg-orange-500/10 text-orange-300 border-orange-500/20')}>
-                          {m.tipo === 'proprio' ? 'Próprio' : m.tipo === 'alugado' ? 'Alugado' : 'Comprado'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        {m.retorno_at
-                          ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-status-confirmado/10 text-status-confirmado border-status-confirmado/20">Devolvido</span>
-                          : m.saida_at
-                          ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20">Em uso</span>
-                          : <span className="text-accent-subtle">—</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
-        )}
-      </div>
 
       {/* ── Modal criar/editar ── */}
       {modal && (
