@@ -88,25 +88,35 @@ export const equipamentosApi = {
     return { ...equip, movimentoAberto: mov ?? null }
   },
 
-  async registarSaida(equipamentoId, nomeOperador = null) {
+  async registarSaida(equipamentoId, nomeOperador = null, { quantidade = 1, notas = null } = {}) {
     const { data, error } = await supabase
       .from('evento_equipamentos')
-      .insert({ equipamento_id: equipamentoId, tipo: 'proprio', saida_at: new Date().toISOString(), registado_por: nomeOperador })
-      .select()
-      .single()
+      .insert({ equipamento_id: equipamentoId, tipo: 'proprio', saida_at: new Date().toISOString(), registado_por: nomeOperador, quantidade: Number(quantidade) || 1, observacoes: notas || null })
+      .select().single()
     if (error) throw error
     return data
   },
 
-  async registarEntrada(movimentoId) {
+  async registarEntrada(movimentoId, retornoPor = null, notasRetorno = null) {
     const { data, error } = await supabase
       .from('evento_equipamentos')
-      .update({ retorno_at: new Date().toISOString() })
+      .update({ retorno_at: new Date().toISOString(), retorno_por: retornoPor || null, notas_retorno: notasRetorno || null })
       .eq('id', movimentoId)
-      .select()
-      .single()
+      .select().single()
     if (error) throw error
     return data
+  },
+
+  async historico(equipamentoId) {
+    const { data, error } = await supabase
+      .from('evento_equipamentos')
+      .select('id, saida_at, retorno_at, registado_por, retorno_por, observacoes, notas_retorno, quantidade, supa_eventos(evento)')
+      .eq('equipamento_id', equipamentoId)
+      .not('saida_at', 'is', null)
+      .order('saida_at', { ascending: false })
+      .limit(30)
+    if (error) throw error
+    return data ?? []
   },
 
   gerarQrCode(nome) {
