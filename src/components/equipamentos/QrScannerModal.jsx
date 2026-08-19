@@ -22,6 +22,7 @@ export function QrScannerModal({ onClose, nomeOperador = null }) {
 
   // Saída
   const [quantidade, setQuantidade]   = useState('1')
+  const [operador, setOperador]       = useState(nomeOperador ?? '')
   const [notasSaida, setNotasSaida]   = useState('')
   // Entrada
   const [retornoPor, setRetornoPor]   = useState('')
@@ -80,14 +81,15 @@ export function QrScannerModal({ onClose, nomeOperador = null }) {
 
   const retry = () => {
     setEstado('scanning'); setMensagem(null); setEquip(null)
-    setQuantidade('1'); setNotasSaida(''); setRetornoPor(''); setNotasRetorno('')
+    setQuantidade('1'); setOperador(nomeOperador ?? ''); setNotasSaida('')
+    setRetornoPor(''); setNotasRetorno('')
     setScanKey(k => k + 1)
   }
 
   const registarSaida = async () => {
     setARegistar(true)
     try {
-      await equipamentosApi.registarSaida(equipamento.id, nomeOperador, { quantidade, notas: notasSaida })
+      await equipamentosApi.registarSaida(equipamento.id, operador || null, { quantidade, notas: notasSaida })
       setMensagem('Saída registada com sucesso')
       setEstado('success')
     } catch (e) { setMensagem(e.message ?? 'Erro ao registar') }
@@ -165,8 +167,11 @@ export function QrScannerModal({ onClose, nomeOperador = null }) {
                 </div>
                 <div>
                   <label className={labelCls}>Operador</label>
-                  <input value={nomeOperador ?? '—'} readOnly
-                    className={inputCls + ' opacity-50 cursor-default'} />
+                  <input value={operador}
+                    onChange={e => setOperador(e.target.value)}
+                    readOnly={!!nomeOperador}
+                    placeholder="Nome do operador…"
+                    className={inputCls + (nomeOperador ? ' opacity-50 cursor-default' : '')} />
                 </div>
               </div>
               <div>
