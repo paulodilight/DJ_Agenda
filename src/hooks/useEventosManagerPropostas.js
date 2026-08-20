@@ -102,6 +102,11 @@ export function useEventosManagerPropostas() {
         supaPayload[campoSupa] = fonte[campoManager]
       }
     }
+    // Mapear estado → status
+    if ('estado' in fonte) {
+      const e = fonte.estado
+      supaPayload.status = e === 'Confirmado' ? 'confirmado' : e === 'Cancelado' ? 'cancelado' : 'proposta'
+    }
 
     if (proposta.supa_evento_id) {
       // Alteração a evento existente — update normal
