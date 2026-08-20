@@ -130,6 +130,19 @@ export function useEventosManagerPropostas() {
         .from('eventos_manager')
         .update({ supa_evento_id: novo.id })
         .eq('id', proposta.evento_id)
+    } else if (proposta.tipo === 'alteracao') {
+      // Alteração criada antes da criação ser aprovada — buscar supa_evento_id do eventos_manager
+      const { data: em } = await supabase
+        .from('eventos_manager')
+        .select('supa_evento_id')
+        .eq('id', proposta.evento_id)
+        .maybeSingle()
+      if (!em?.supa_evento_id) return false
+      const { error } = await supabase
+        .from('supa_eventos')
+        .update(supaPayload)
+        .eq('id', em.supa_evento_id)
+      if (error) return false
     } else {
       return false
     }
