@@ -101,8 +101,8 @@ function PropostaCard({ proposta, onAprovar, onRejeitar }) {
       {expanded && <CamposDisplay proposta={proposta} />}
 
       {semSupaEvento && (
-        <p className="mt-2 text-[10px] text-yellow-500/70 italic">
-          Sem supa_evento ligado — aprovação não aplica alterações automáticas.
+        <p className="mt-2 text-[10px] text-blue-400/70 italic">
+          Novo evento — aprovação cria na tua agenda automaticamente.
         </p>
       )}
 
