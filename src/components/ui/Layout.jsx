@@ -9,6 +9,7 @@ import {
 import { useAuthStore, useMesStore, useAppStore } from '@/store'
 import { configuracoesApi } from '@/lib/api'
 import { UndoToast } from '@/components/ui/UndoToast'
+import { PropostasManagerPopup } from '@/components/agenda/PropostasManagerPopup'
 import { useUndo } from '@/contexts/UndoContext'
 import { clsx } from 'clsx'
 import { format, addMonths } from 'date-fns'
@@ -430,6 +431,7 @@ export function Layout() {
 
       {/* Undo global — visível em todas as páginas e modais */}
       <UndoToast />
+      <PropostasManagerPopup />
     </div>
   )
 }
