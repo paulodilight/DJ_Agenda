@@ -92,9 +92,6 @@ export function useEventosManagerPropostas() {
   }, [loading, propostas.length])
 
   const aprovar = useCallback(async (proposta) => {
-    if (!proposta.supa_evento_id) return false
-
-    // Construir payload para supa_eventos a partir do payload da proposta
     const fonte = proposta.tipo === 'alteracao'
       ? proposta.campos?.payload ?? {}
       : proposta.campos ?? {}
@@ -106,12 +103,36 @@ export function useEventosManagerPropostas() {
       }
     }
 
-    const { error } = await supabase
-      .from('supa_eventos')
-      .update(supaPayload)
-      .eq('id', proposta.supa_evento_id)
+    if (proposta.supa_evento_id) {
+      // Alteração a evento existente — update normal
+      const { error } = await supabase
+        .from('supa_eventos')
+        .update(supaPayload)
+        .eq('id', proposta.supa_evento_id)
+      if (error) return false
+    } else if (proposta.tipo === 'criacao') {
+      // Evento novo criado pelo manager — INSERT em supa_eventos
+      const estadoManager = fonte.estado ?? 'Aberto'
+      const statusSupa =
+        estadoManager === 'Confirmado' ? 'confirmado'
+        : estadoManager === 'Cancelado' ? 'cancelado'
+        : 'proposta'
 
-    if (error) return false
+      const { data: novo, error } = await supabase
+        .from('supa_eventos')
+        .insert({ ...supaPayload, espaco_id: proposta.espaco_id, status: statusSupa })
+        .select('id')
+        .single()
+      if (error) return false
+
+      // Ligar eventos_manager ao novo supa_evento
+      await supabase
+        .from('eventos_manager')
+        .update({ supa_evento_id: novo.id })
+        .eq('id', proposta.evento_id)
+    } else {
+      return false
+    }
 
     await supabase
       .from('eventos_manager_propostas')
