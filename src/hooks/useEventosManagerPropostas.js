@@ -157,6 +157,7 @@ export function useEventosManagerPropostas() {
       .update({ estado: 'aprovado', processado_em: new Date().toISOString() })
       .eq('id', proposta.id)
 
+    setPropostas((prev) => prev.filter((p) => p.id !== proposta.id))
     return true
   }, [])
 
@@ -165,6 +166,7 @@ export function useEventosManagerPropostas() {
       .from('eventos_manager_propostas')
       .update({ estado: 'rejeitado', processado_em: new Date().toISOString() })
       .eq('id', propostaId)
+    setPropostas((prev) => prev.filter((p) => p.id !== propostaId))
   }, [])
 
   return { propostas, loading, aprovar, rejeitar }
