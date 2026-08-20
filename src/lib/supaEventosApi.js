@@ -81,8 +81,9 @@ export const supaEventosApi = {
 
   // ── Apagar ────────────────────────────────────────────────────────────────
   async apagar(id) {
-    // Limpar referências em eventos_manager antes de apagar
+    // Limpar referências em eventos_manager e propostas antes de apagar
     await supabase.from('eventos_manager').update({ supa_evento_id: null }).eq('supa_evento_id', id)
+    await supabase.from('eventos_manager_propostas').update({ supa_evento_id: null }).eq('supa_evento_id', id)
     const { error } = await supabase.from(TABLE).delete().eq('id', id)
     if (error) throw error
   },
