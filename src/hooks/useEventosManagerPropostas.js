@@ -103,7 +103,10 @@ export function useEventosManagerPropostas() {
       }
     }
     // Mapear estado → status
-    if ('estado' in fonte) {
+    // Para alterações: só sincronizar se o estado realmente mudou (está no diff)
+    const estadoMudou = proposta.tipo !== 'alteracao' ||
+      (proposta.campos?.diff ?? []).some((d) => d.campo === 'Estado')
+    if (estadoMudou && 'estado' in fonte) {
       const e = fonte.estado
       supaPayload.status = e === 'Confirmado' ? 'confirmado' : e === 'Cancelado' ? 'cancelado' : 'proposta'
     }
