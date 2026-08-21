@@ -1,6 +1,28 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
+/** Mapeamento label do diff → campo em eventos_manager (para alterações) */
+const LABEL_TO_CAMPO = {
+  'Nome': 'nome',
+  'Data': 'data',
+  'Hora início': 'hora_inicio',
+  'Hora fim': 'hora_fim',
+  'Data instalação': 'data_instalacao',
+  'Hora instalação': 'hora_instalacao',
+  'Tipo': 'tipo',
+  'Descrição': 'descricao',
+  'Micros mão': 'req_micros_mao',
+  'Qtd micros mão': 'req_micros_mao_qtd',
+  'Headset': 'req_micros_headset',
+  'Qtd headset': 'req_micros_headset_qtd',
+  'TV 65"': 'req_tv65',
+  'Led Wall': 'req_led_wall',
+  'Apresentação media': 'req_apresentacao_media',
+  'Formato media': 'req_media_formato',
+  'Notas técnicas': 'req_extras',
+  'Técnico': 'tecnico_id',
+}
+
 /** Mapeamento campos eventos_manager → supa_eventos */
 const MAPA_SUPA = {
   nome: 'evento',
@@ -97,13 +119,24 @@ export function useEventosManagerPropostas() {
       : proposta.campos ?? {}
 
     const supaPayload = {}
-    for (const [campoManager, campoSupa] of Object.entries(MAPA_SUPA)) {
-      if (campoManager in fonte) {
-        supaPayload[campoSupa] = fonte[campoManager]
+    if (proposta.tipo === 'alteracao') {
+      // Para alterações: só sincronizar campos que realmente mudaram (estão no diff)
+      // Isso evita que campos como tecnico_id (null no manager) apaguem dados do DJ Schedule
+      const diff = proposta.campos?.diff ?? []
+      const camposMudaram = new Set(diff.map((d) => LABEL_TO_CAMPO[d.campo]).filter(Boolean))
+      for (const [campoManager, campoSupa] of Object.entries(MAPA_SUPA)) {
+        if (camposMudaram.has(campoManager) && campoManager in fonte) {
+          supaPayload[campoSupa] = fonte[campoManager]
+        }
+      }
+    } else {
+      for (const [campoManager, campoSupa] of Object.entries(MAPA_SUPA)) {
+        if (campoManager in fonte) {
+          supaPayload[campoSupa] = fonte[campoManager]
+        }
       }
     }
-    // Mapear estado → status
-    // Para alterações: só sincronizar se o estado realmente mudou (está no diff)
+    // Mapear estado → status (só quando o estado realmente mudou na alteração)
     const estadoMudou = proposta.tipo !== 'alteracao' ||
       (proposta.campos?.diff ?? []).some((d) => d.campo === 'Estado')
     if (estadoMudou && 'estado' in fonte) {
