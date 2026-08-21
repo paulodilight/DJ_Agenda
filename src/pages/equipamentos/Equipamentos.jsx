@@ -420,30 +420,38 @@ export function Equipamentos() {
                         </tr>
                       </thead>
                       <tbody>
-                        {movimentacoes.map(m => (
-                          <tr key={m.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
-                            <td className="px-3 py-2.5 text-center text-accent-subtle/30"><Clock size={12} /></td>
-                            <td className="px-4 py-2.5 font-medium text-accent">{m.equipamentos?.nome ?? '—'}</td>
-                            <td className="px-3 py-2.5 text-accent-muted max-w-[180px] truncate" title={m.supa_eventos?.evento}>
-                              {m.supa_eventos?.evento ?? <span className="text-accent-subtle/40">—</span>}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <span className="block text-accent-muted">{m.registado_por ?? <span className="text-accent-subtle/40">—</span>}</span>
-                              {m.saida_at && <span className="block text-[10px] tabular-nums text-accent-subtle/60 mt-0.5">{fmtData(m.saida_at)}</span>}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <span className="block text-accent-muted">{m.retorno_por ?? <span className="text-accent-subtle/40">—</span>}</span>
-                              {m.retorno_at && <span className="block text-[10px] tabular-nums text-accent-subtle/60 mt-0.5">{fmtData(m.retorno_at)}</span>}
-                            </td>
-                            <td className="px-3 py-2.5 text-center">
-                              {m.retorno_at
-                                ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-status-confirmado/10 text-status-confirmado border-status-confirmado/20">Devolvido</span>
-                                : m.saida_at
-                                ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20">Em uso</span>
-                                : <span className="text-accent-subtle">—</span>}
-                            </td>
-                          </tr>
-                        ))}
+                        {movimentacoes.map(m => {
+                          const eqMov = { id: m.equipamento_id, nome: m.equipamentos?.nome }
+                          return (
+                            <Fragment key={m.id}>
+                              <tr className="border-b border-border/50 hover:bg-surface-2 transition-colors group">
+                                <td className="px-3 py-2.5 text-center">
+                                  {histBtn(eqMov, 'text-accent-subtle/40')}
+                                </td>
+                                <td className="px-4 py-2.5 font-medium text-accent">{m.equipamentos?.nome ?? '—'}</td>
+                                <td className="px-3 py-2.5 text-accent-muted max-w-[180px] truncate" title={m.supa_eventos?.evento}>
+                                  {m.supa_eventos?.evento ?? <span className="text-accent-subtle/40">—</span>}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <span className="block text-accent-muted">{m.registado_por ?? <span className="text-accent-subtle/40">—</span>}</span>
+                                  {m.saida_at && <span className="block text-[10px] tabular-nums text-accent-subtle/60 mt-0.5">{fmtData(m.saida_at)}</span>}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <span className="block text-accent-muted">{m.retorno_por ?? <span className="text-accent-subtle/40">—</span>}</span>
+                                  {m.retorno_at && <span className="block text-[10px] tabular-nums text-accent-subtle/60 mt-0.5">{fmtData(m.retorno_at)}</span>}
+                                </td>
+                                <td className="px-3 py-2.5 text-center">
+                                  {m.retorno_at
+                                    ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-status-confirmado/10 text-status-confirmado border-status-confirmado/20">Devolvido</span>
+                                    : m.saida_at
+                                    ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20">Em uso</span>
+                                    : <span className="text-accent-subtle">—</span>}
+                                </td>
+                              </tr>
+                              {histRow(eqMov, 6)}
+                            </Fragment>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
