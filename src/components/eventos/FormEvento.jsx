@@ -1,5 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
-import { X, Database, Star, Plus, Check, Trash2, ListChecks, Send, Printer, FileSpreadsheet } from 'lucide-react'
+import { X, Database, Star, Plus, Check, Trash2, ListChecks, Send, Printer, FileSpreadsheet, ArrowRight } from 'lucide-react'
+import { format } from 'date-fns'
+import { pt } from 'date-fns/locale'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Alerta } from '@/components/ui/Alerta'
@@ -209,6 +211,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   const [checkSubs, setCheckSubs] = useState({})
   const [tecnicosNotas, setTecnicosNotas] = useState([])
   const [feedbackTecnico, setFeedbackTecnico] = useState([])
+  const [historico, setHistorico] = useState([])
+  const [loadingHistorico, setLoadingHistorico] = useState(false)
 
   useEffect(() => {
     supabase.from('tipo_eventos').select('id, nome, tem_artista').order('nome')
@@ -241,6 +245,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
     setCheckSubs({})
     setTecnicosNotas([])
     setFeedbackTecnico([])
+    setHistorico([])
     if (evento?.id) {
       setForm({
         ...VAZIO,
@@ -359,6 +364,30 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
       setEventoChecklists([])
     }
   }, [aberto, evento, dataInicial])
+
+  useEffect(() => {
+    if (abaActiva !== 'historico' || !evento?.id) return
+    let vivo = true
+    setLoadingHistorico(true)
+    ;(async () => {
+      const { data: ems } = await supabase
+        .from('eventos_manager')
+        .select('id')
+        .eq('supa_evento_id', evento.id)
+      const ids = (ems ?? []).map((e) => e.id)
+      if (ids.length === 0) {
+        if (vivo) { setHistorico([]); setLoadingHistorico(false) }
+        return
+      }
+      const { data } = await supabase
+        .from('eventos_manager_log')
+        .select('id, user_name, campos, criado_em')
+        .in('evento_id', ids)
+        .order('criado_em', { ascending: false })
+      if (vivo) { setHistorico(data ?? []); setLoadingHistorico(false) }
+    })()
+    return () => { vivo = false }
+  }, [abaActiva, evento?.id])
 
   const [notifState, setNotifState] = useState({}) // { 1: 'loading'|'ok', 2: 'loading'|'ok' }
 
@@ -694,6 +723,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             { id: 'preparacao',   label: 'Preparação' },
             { id: 'execucao',     label: 'Execução' },
             { id: 'financeiro',   label: 'Financeiro' },
+            ...(evento?.id ? [{ id: 'historico', label: 'Histórico' }] : []),
           ].map((aba) => (
             <button
               key={aba.id}
@@ -1773,6 +1803,41 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               </div>
             )
           })()}
+
+          {/* ── Aba Histórico ── */}
+          {abaActiva === 'historico' && (
+            <div className="flex flex-col gap-2">
+              {loadingHistorico ? (
+                <p className="text-xs text-accent-muted py-4 text-center">A carregar…</p>
+              ) : historico.length === 0 ? (
+                <p className="text-xs text-accent-subtle/40 italic py-4 text-center">Sem histórico de alterações do Manager.</p>
+              ) : (
+                historico.map((entrada) => (
+                  <div key={entrada.id} className="flex flex-col gap-1.5 p-3 rounded-lg border border-border bg-surface-2/40">
+                    <div className="flex items-center gap-2 text-[11px] flex-wrap">
+                      <span className="font-semibold text-accent">{entrada.user_name}</span>
+                      <span className="text-accent-muted">·</span>
+                      <span className="text-accent-muted">{format(new Date(entrada.criado_em), "d MMM yyyy · HH:mm", { locale: pt })}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5 mt-0.5">
+                      {(entrada.campos ?? []).map((c, i) => (
+                        <div key={i} className="flex items-baseline gap-1.5 text-xs">
+                          <span className="font-medium text-gray-400 shrink-0">{c.campo}:</span>
+                          {c.antes !== null && (
+                            <>
+                              <span className="line-through text-gray-500">{c.antes}</span>
+                              <ArrowRight size={10} className="shrink-0 text-gray-500" />
+                            </>
+                          )}
+                          <span className="font-semibold text-amber-400">{c.depois ?? '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
