@@ -1050,6 +1050,53 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     placeholder="O que é para preparar…" />
                 </Field>
               </div>
+
+              {/* Requisitos técnicos definidos pelo manager (leitura) */}
+              {(form.descricao || form.req_micros_mao || form.req_micros_headset || form.req_tv65 || form.req_led_wall || form.req_apresentacao_media || form.req_extras) && (
+                <div className="border-t border-border/40 pt-4 flex flex-col gap-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Requisitos técnicos (manager)</p>
+                  {form.descricao && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle/50">Descrição</span>
+                      <p className="text-sm text-accent-subtle/80 bg-surface-2/40 rounded px-3 py-2 whitespace-pre-line">{form.descricao}</p>
+                    </div>
+                  )}
+                  {(form.req_micros_mao || form.req_micros_headset || form.req_tv65 || form.req_led_wall || form.req_apresentacao_media) && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle/50">Equipamentos</span>
+                      <div className="flex flex-wrap gap-2">
+                        {form.req_micros_mao && (
+                          <span className="inline-flex items-center rounded-md bg-surface-2/60 border border-border/40 px-2 py-1 text-xs text-accent-subtle/80">
+                            Micros mão{form.req_micros_mao_qtd ? ` × ${form.req_micros_mao_qtd}` : ''}
+                          </span>
+                        )}
+                        {form.req_micros_headset && (
+                          <span className="inline-flex items-center rounded-md bg-surface-2/60 border border-border/40 px-2 py-1 text-xs text-accent-subtle/80">
+                            Headset{form.req_micros_headset_qtd ? ` × ${form.req_micros_headset_qtd}` : ''}
+                          </span>
+                        )}
+                        {form.req_tv65 && (
+                          <span className="inline-flex items-center rounded-md bg-surface-2/60 border border-border/40 px-2 py-1 text-xs text-accent-subtle/80">TV 65"</span>
+                        )}
+                        {form.req_led_wall && (
+                          <span className="inline-flex items-center rounded-md bg-surface-2/60 border border-border/40 px-2 py-1 text-xs text-accent-subtle/80">Led Wall</span>
+                        )}
+                        {form.req_apresentacao_media && (
+                          <span className="inline-flex items-center rounded-md bg-surface-2/60 border border-border/40 px-2 py-1 text-xs text-accent-subtle/80">
+                            Media{form.req_media_formato ? ` (${form.req_media_formato})` : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {form.req_extras && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle/50">Notas / equipamentos extras</span>
+                      <p className="text-sm text-accent-subtle/80 bg-surface-2/40 rounded px-3 py-2 whitespace-pre-line">{form.req_extras}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 
