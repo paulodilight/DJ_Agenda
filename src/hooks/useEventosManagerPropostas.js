@@ -178,12 +178,26 @@ export function useEventosManagerPropostas() {
         .select('supa_evento_id')
         .eq('id', proposta.evento_id)
         .maybeSingle()
-      if (!em?.supa_evento_id) return false
-      const { error } = await supabase
-        .from('supa_eventos')
-        .update(supaPayload)
-        .eq('id', em.supa_evento_id)
-      if (error) return false
+      if (em?.supa_evento_id) {
+        const { error } = await supabase
+          .from('supa_eventos')
+          .update(supaPayload)
+          .eq('id', em.supa_evento_id)
+        if (error) return false
+      } else if (fonte.estado === 'Confirmado') {
+        // Evento órfão a ser confirmado → criar supa_evento e ligar
+        const { data: novo, error } = await supabase
+          .from('supa_eventos')
+          .insert({ ...supaPayload, espaco_id: proposta.espaco_id, status: 'confirmado' })
+          .select('id')
+          .single()
+        if (error) return false
+        await supabase
+          .from('eventos_manager')
+          .update({ supa_evento_id: novo.id })
+          .eq('id', proposta.evento_id)
+      }
+      // Orphan sem confirmação → aprovar sem sync (só limpa a proposta pendente)
     } else {
       return false
     }
