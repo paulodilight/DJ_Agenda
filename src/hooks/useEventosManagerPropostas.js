@@ -42,7 +42,7 @@ const MAPA_SUPA = {
   req_apresentacao_media: 'req_apresentacao_media',
   req_media_formato: 'req_media_formato',
   req_extras: 'req_extras',
-  tecnico_id: 'tecnico_id',
+  // tecnico_id não sincroniza: o manager não gere técnicos
 }
 
 function tocarSom() {
