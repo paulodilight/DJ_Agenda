@@ -23,12 +23,20 @@ function linhaVazia() {
   return { descricao: '', observacoes: '', qtd: 1, unidade: 'Uni.', preco: '' }
 }
 
-export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [] }) {
+export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [], notasTecnicasInicial = '', notasPropostaInicial = '', onNotasChange }) {
   const [linhas, setLinhas] = useState([linhaVazia()])
-  const [notasTecnicas, setNotasTecnicas] = useState('')
-  const [notasProposta, setNotasProposta] = useState('')
+  const [notasTecnicas, setNotasTecnicas] = useState(notasTecnicasInicial)
+  const [notasProposta, setNotasProposta] = useState(notasPropostaInicial)
   const [comIva, setComIva] = useState(true)
   const hasInit = useRef(false)
+
+  // Reset quando o evento muda
+  useEffect(() => {
+    setNotasTecnicas(notasTecnicasInicial || '')
+    setNotasProposta(notasPropostaInicial || '')
+    hasInit.current = false
+    setLinhas([linhaVazia()])
+  }, [evento?.id])
 
   // Pré-popular quando os equipamentos chegam (podem chegar após a montagem)
   useEffect(() => {
@@ -214,7 +222,7 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
           className={clsx(inputCls, 'resize-none')}
           rows={3}
           value={notasTecnicas}
-          onChange={e => setNotasTecnicas(e.target.value)}
+          onChange={e => { setNotasTecnicas(e.target.value); onNotasChange?.({ notasTecnicas: e.target.value, notasProposta }) }}
           placeholder="Rider, requisitos técnicos, configurações…"
         />
       </div>
@@ -228,7 +236,7 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
           className={clsx(inputCls, 'resize-none')}
           rows={2}
           value={notasProposta}
-          onChange={e => setNotasProposta(e.target.value)}
+          onChange={e => { setNotasProposta(e.target.value); onNotasChange?.({ notasTecnicas, notasProposta: e.target.value }) }}
           placeholder="Condições, validade, forma de pagamento…"
         />
       </div>

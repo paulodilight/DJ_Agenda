@@ -65,6 +65,8 @@ const VAZIO = {
   hora_preparacao:   '',
   notas_preparacao:  '',
   fase:              '',
+  proposta_notas_tecnicas: '',
+  proposta_notas_proposta: '',
 }
 
 const ESTADO_PAG_OPCOES = [
@@ -467,6 +469,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         data_preparacao:  form.data_preparacao  || null,
         hora_preparacao:  form.hora_preparacao  || null,
         notas_preparacao: form.notas_preparacao?.trim() || null,
+        proposta_notas_tecnicas: form.proposta_notas_tecnicas?.trim() || null,
+        proposta_notas_proposta: form.proposta_notas_proposta?.trim() || null,
       }
       let savedId = evento?.id
       if (evento?.id) {
@@ -1861,6 +1865,12 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 espacos={espacos}
                 equipRows={equipRows}
                 equipamentosList={equipamentosList}
+                notasTecnicasInicial={form.proposta_notas_tecnicas || ''}
+                notasPropostaInicial={form.proposta_notas_proposta || ''}
+                onNotasChange={({ notasTecnicas, notasProposta }) => {
+                  set('proposta_notas_tecnicas', notasTecnicas)
+                  set('proposta_notas_proposta', notasProposta)
+                }}
               />
             </div>
           )}
