@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, Printer } from 'lucide-react'
 import { gerarHTMLProposta } from './propostaHtml'
 import { clsx } from 'clsx'
@@ -24,15 +24,18 @@ function linhaVazia() {
 }
 
 export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [] }) {
-  const [linhas, setLinhas] = useState([])
+  const [linhas, setLinhas] = useState([linhaVazia()])
   const [notasTecnicas, setNotasTecnicas] = useState('')
   const [notasProposta, setNotasProposta] = useState('')
   const [comIva, setComIva] = useState(true)
+  const hasInit = useRef(false)
 
-  // Pré-popular com os equipamentos próprios do evento (já carregados no FormEvento)
+  // Pré-popular quando os equipamentos chegam (podem chegar após a montagem)
   useEffect(() => {
+    if (hasInit.current) return
     const proprios = equipRows.proprio ?? []
     if (proprios.length > 0) {
+      hasInit.current = true
       setLinhas(proprios.map(r => ({
         descricao: equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao || '',
         observacoes: r.observacoes || '',
@@ -40,10 +43,8 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
         unidade: 'Uni.',
         preco: r.valor_custo !== '' && r.valor_custo != null ? String(r.valor_custo) : '',
       })))
-    } else {
-      setLinhas([linhaVazia()])
     }
-  }, []) // só na montagem
+  }, [equipRows.proprio?.length])
 
   function adicionarLinha() {
     setLinhas(l => [...l, linhaVazia()])
