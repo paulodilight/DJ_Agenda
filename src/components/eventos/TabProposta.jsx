@@ -30,28 +30,35 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
   const [comIva, setComIva] = useState(true)
   const hasInit = useRef(false)
 
-  // Reset quando o evento muda
+  // Reset quando o evento muda — define linhas base (técnico + transporte)
   useEffect(() => {
     setNotasTecnicas(notasTecnicasInicial || '')
     setNotasProposta(notasPropostaInicial || '')
     setClienteEditado(espaco?.nome || '')
     hasInit.current = false
-    setLinhas([linhaVazia()])
+
+    const techTotal = (Number(evento?.valor_apoio_tecnico) || 0) + (Number(evento?.valor_apoio_tecnico_2) || 0)
+    const transporteVal = Number(evento?.transporte) || 0
+    const extras = []
+    if (techTotal > 0) extras.push({ descricao: 'Instalação e Apoio Técnico', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(techTotal) })
+    if (transporteVal > 0) extras.push({ descricao: 'Transporte', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(transporteVal) })
+    setLinhas(extras.length > 0 ? extras : [linhaVazia()])
   }, [evento?.id])
 
-  // Pré-popular quando os equipamentos chegam (podem chegar após a montagem)
+  // Pré-popular com equipamentos quando chegam — adicionados antes das linhas base
   useEffect(() => {
     if (hasInit.current) return
     const proprios = equipRows.proprio ?? []
     if (proprios.length > 0) {
       hasInit.current = true
-      setLinhas(proprios.map(r => ({
+      const linhasEquip = proprios.map(r => ({
         descricao: equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao || '',
         observacoes: r.observacoes || '',
         qtd: r.unidades || 1,
         unidade: 'Uni.',
         preco: r.valor_custo !== '' && r.valor_custo != null ? String(r.valor_custo) : '',
-      })))
+      }))
+      setLinhas(prev => [...linhasEquip, ...prev])
     }
   }, [equipRows.proprio?.length])
 
