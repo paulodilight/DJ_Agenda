@@ -1853,14 +1853,16 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             )
           })()}
 
-          {/* ── Aba Proposta ── */}
-          {abaActiva === 'proposta' && (
-            <TabProposta
-              evento={evento}
-              espacos={espacos}
-              equipRows={equipRows}
-              equipamentosList={equipamentosList}
-            />
+          {/* ── Aba Proposta ── mantida montada para preservar estado */}
+          {evento?.id && (
+            <div className={abaActiva === 'proposta' ? '' : 'hidden'}>
+              <TabProposta
+                evento={evento}
+                espacos={espacos}
+                equipRows={equipRows}
+                equipamentosList={equipamentosList}
+              />
+            </div>
           )}
 
           {/* ── Aba Histórico ── */}

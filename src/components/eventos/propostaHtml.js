@@ -167,7 +167,7 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
 
   <!-- Nota legal -->
   <div style="margin-top:16px;font-size:9px;color:#666;border-top:1px solid #eee;padding-top:8px;">
-    Este documento não serve de fatura e foi criado a ${dataEmissao}.
+    Este documento não serve de fatura e foi criado a ${dataEmissao}.${!comIva ? ' Esta proposta acresce IVA à taxa legal em vigor.' : ''}
   </div>
 
   ${notasProposta ? `
