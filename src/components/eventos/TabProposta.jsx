@@ -66,8 +66,11 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
     setLinhas(l => l.map((linha, idx) => idx === i ? { ...linha, [campo]: valor } : linha))
   }
 
+  const nomeEvento = evento?.evento || ''
+  const espaco = espacos.find(e => String(e.id) === String(evento?.espaco_id)) || null
+  const nomeCliente = espaco?.nome || ''
+
   function imprimir() {
-    const espaco = espacos.find(e => String(e.id) === String(evento?.espaco_id)) || null
     const logoUrl = window.location.origin + '/logo-x.png'
     const html = gerarHTMLProposta({
       linhas,
@@ -78,6 +81,8 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       numeroProposta: gerarNumeroProposta(),
       logoUrl,
       comIva,
+      nomeEvento,
+      nomeCliente,
     })
     const win = window.open('', '_blank', 'width=900,height=700')
     win.document.write(html)
@@ -124,6 +129,24 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
           Imprimir Proposta
         </button>
       </div>
+
+      {/* Evento + Cliente */}
+      {(nomeEvento || nomeCliente) && (
+        <div className="flex gap-6 px-1">
+          {nomeEvento && (
+            <div>
+              <div className="text-[10px] font-medium text-accent-subtle uppercase tracking-wider mb-0.5">Evento</div>
+              <div className="text-xs text-accent">{nomeEvento}</div>
+            </div>
+          )}
+          {nomeCliente && (
+            <div>
+              <div className="text-[10px] font-medium text-accent-subtle uppercase tracking-wider mb-0.5">Cliente</div>
+              <div className="text-xs text-accent">{nomeCliente}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tabela de linhas */}
       <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">

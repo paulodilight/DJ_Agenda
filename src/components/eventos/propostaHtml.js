@@ -19,7 +19,7 @@ function hoje() {
   return new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento, espaco, numeroProposta, logoUrl, comIva = true }) {
+export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento, espaco, numeroProposta, logoUrl, comIva = true, nomeEvento = '', nomeCliente = '' }) {
   const subtotal = linhas.reduce((s, l) => s + (Number(l.preco) || 0) * (Number(l.qtd) || 1), 0)
   const iva = comIva ? subtotal * 0.23 : 0
   const total = subtotal + iva
@@ -94,6 +94,8 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
       <div style="color:#888;font-size:10px;margin-bottom:2px;">Original</div>
       <div style="font-size:16px;font-weight:bold;">Proposta N.º ${numeroProposta}</div>
       <div style="font-size:11px;margin-top:4px;"><strong>Data de Emissão:</strong> ${dataEmissao}</div>
+      ${nomeEvento ? `<div style="font-size:11px;margin-top:6px;"><strong>Evento:</strong> ${nomeEvento}</div>` : ''}
+      ${nomeCliente ? `<div style="font-size:11px;"><strong>Cliente:</strong> ${nomeCliente}</div>` : ''}
     </div>
   </div>
 
