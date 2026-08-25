@@ -78,6 +78,17 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
   return (
     <div className="flex flex-col gap-4">
 
+      {/* Botão imprimir — sempre visível no topo */}
+      <div className="flex justify-end">
+        <button
+          onClick={imprimir}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 border border-accent/20 text-accent text-xs font-semibold hover:bg-accent/20 transition-colors"
+        >
+          <Printer size={14} />
+          Imprimir Proposta
+        </button>
+      </div>
+
       {/* Tabela de linhas */}
       <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -180,16 +191,8 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
         />
       </div>
 
-      {/* Totais + botão imprimir */}
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <button
-          onClick={imprimir}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent/10 border border-accent/20 text-accent text-xs font-semibold hover:bg-accent/20 transition-colors"
-        >
-          <Printer size={14} />
-          Imprimir Proposta
-        </button>
-
+      {/* Totais */}
+      <div className="flex justify-end">
         <div className="bg-surface-1 border border-border rounded-xl px-5 py-3 min-w-[220px]">
           <div className="flex justify-between text-xs text-accent-muted mb-1.5">
             <span>Total Ilíq.</span>
@@ -209,3 +212,4 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
     </div>
   )
 }
+
