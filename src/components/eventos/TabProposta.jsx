@@ -26,6 +26,7 @@ function linhaVazia() {
 export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [] }) {
   const [linhas, setLinhas] = useState([])
   const [notas, setNotas] = useState('')
+  const [comIva, setComIva] = useState(true)
 
   // Pré-popular com os equipamentos próprios do evento (já carregados no FormEvento)
   useEffect(() => {
@@ -65,6 +66,7 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       espaco,
       numeroProposta: gerarNumeroProposta(),
       logoUrl,
+      comIva,
     })
     const win = window.open('', '_blank', 'width=900,height=700')
     win.document.write(html)
@@ -72,14 +74,37 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
   }
 
   const subtotal = linhas.reduce((s, l) => s + (Number(l.preco) || 0) * (Number(l.qtd) || 1), 0)
-  const iva = subtotal * 0.23
+  const iva = comIva ? subtotal * 0.23 : 0
   const total = subtotal + iva
 
   return (
     <div className="flex flex-col gap-4">
 
-      {/* Botão imprimir — sempre visível no topo */}
-      <div className="flex justify-end">
+      {/* Controlos topo */}
+      <div className="flex items-center justify-between gap-3">
+        {/* Toggle IVA */}
+        <div className="flex items-center gap-1 p-0.5 bg-surface-2 border border-border rounded-lg">
+          <button
+            onClick={() => setComIva(true)}
+            className={clsx(
+              'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+              comIva ? 'bg-surface-3 text-accent' : 'text-accent-muted hover:text-accent'
+            )}
+          >
+            Com IVA
+          </button>
+          <button
+            onClick={() => setComIva(false)}
+            className={clsx(
+              'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+              !comIva ? 'bg-surface-3 text-accent' : 'text-accent-muted hover:text-accent'
+            )}
+          >
+            Sem IVA
+          </button>
+        </div>
+
+        {/* Botão imprimir */}
         <button
           onClick={imprimir}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 border border-accent/20 text-accent text-xs font-semibold hover:bg-accent/20 transition-colors"
@@ -194,14 +219,18 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       {/* Totais */}
       <div className="flex justify-end">
         <div className="bg-surface-1 border border-border rounded-xl px-5 py-3 min-w-[220px]">
-          <div className="flex justify-between text-xs text-accent-muted mb-1.5">
-            <span>Total Ilíq.</span>
-            <span className="tabular-nums">{fmtEuro(subtotal)}</span>
-          </div>
-          <div className="flex justify-between text-xs text-accent-muted mb-2">
-            <span>IVA 23%</span>
-            <span className="tabular-nums">{fmtEuro(iva)}</span>
-          </div>
+          {comIva && (
+            <>
+              <div className="flex justify-between text-xs text-accent-muted mb-1.5">
+                <span>Total Ilíq.</span>
+                <span className="tabular-nums">{fmtEuro(subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-accent-muted mb-2">
+                <span>IVA 23%</span>
+                <span className="tabular-nums">{fmtEuro(iva)}</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between text-sm font-bold text-accent border-t border-border pt-2">
             <span>Total a pagar</span>
             <span className="tabular-nums">{fmtEuro(total)}</span>

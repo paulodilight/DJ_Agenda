@@ -19,9 +19,9 @@ function hoje() {
   return new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export function gerarHTMLProposta({ linhas, notas, evento, espaco, numeroProposta, logoUrl }) {
+export function gerarHTMLProposta({ linhas, notas, evento, espaco, numeroProposta, logoUrl, comIva = true }) {
   const subtotal = linhas.reduce((s, l) => s + (Number(l.preco) || 0) * (Number(l.qtd) || 1), 0)
-  const iva = subtotal * 0.23
+  const iva = comIva ? subtotal * 0.23 : 0
   const total = subtotal + iva
   const dataEmissao = hoje()
 
@@ -37,7 +37,7 @@ export function gerarHTMLProposta({ linhas, notas, evento, espaco, numeroPropost
         <td style="padding:6px 4px;text-align:center;color:#0070c0;">${l.qtd || 1}</td>
         <td style="padding:6px 4px;text-align:center;">${l.unidade || 'Uni.'}</td>
         <td style="padding:6px 4px;text-align:right;">${euro(l.preco)}</td>
-        <td style="padding:6px 4px;text-align:center;">23%</td>
+        ${comIva ? `<td style="padding:6px 4px;text-align:center;">23%</td>` : ''}
         <td style="padding:6px 4px;text-align:right;">${euro(tot)}</td>
       </tr>`
   }).join('')
@@ -110,8 +110,8 @@ export function gerarHTMLProposta({ linhas, notas, evento, espaco, numeroPropost
         <th style="text-align:center;padding:6px 4px;font-size:10px;">Qtd.</th>
         <th style="text-align:center;padding:6px 4px;font-size:10px;">Uni.</th>
         <th style="text-align:right;padding:6px 4px;font-size:10px;">Preço</th>
-        <th style="text-align:center;padding:6px 4px;font-size:10px;">Imposto</th>
-        <th style="text-align:right;padding:6px 4px;font-size:10px;">Total s/ imp.</th>
+        ${comIva ? '<th style="text-align:center;padding:6px 4px;font-size:10px;">Imposto</th>' : ''}
+        <th style="text-align:right;padding:6px 4px;font-size:10px;">${comIva ? 'Total s/ imp.' : 'Total'}</th>
       </tr>
     </thead>
     <tbody>
@@ -125,7 +125,7 @@ export function gerarHTMLProposta({ linhas, notas, evento, espaco, numeroPropost
 
   <!-- Totais + Resumo de Impostos -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-    <div style="flex:1;">
+    ${comIva ? `<div style="flex:1;">
       <div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Resumo de Impostos</div>
       <table style="min-width:260px;">
         <thead>
@@ -145,14 +145,14 @@ export function gerarHTMLProposta({ linhas, notas, evento, espaco, numeroPropost
           </tr>
         </tbody>
       </table>
-    </div>
+    </div>` : '<div></div>'}
     <div style="text-align:right;min-width:200px;">
-      <div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:4px;">
+      ${comIva ? `<div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:4px;">
         <span>Total Ilíq.</span><span>${euro(subtotal)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:4px;">
         <span>IVA Normal</span><span>${euro(iva)}</span>
-      </div>
+      </div>` : ''}
       <div style="display:flex;justify-content:space-between;gap:24px;font-weight:bold;font-size:13px;border-top:1.5px solid #111;padding-top:6px;margin-top:4px;">
         <span>Total a pagar</span><span>${euro(total)}</span>
       </div>
