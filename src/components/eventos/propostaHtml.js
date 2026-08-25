@@ -78,7 +78,7 @@ export function gerarHTMLProposta({ linhas, notas, evento, espaco, numeroPropost
   <!-- Cabeçalho -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
     <div>
-      ${logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:60px;margin-bottom:8px;display:block;">` : ''}
+      ${logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:38px;margin-bottom:6px;display:block;">` : ''}
       <div style="font-weight:bold;font-size:12px;margin-bottom:4px;">${EMPRESA.nome}</div>
       <div style="color:#0070c0;line-height:1.7;">
         <div>${EMPRESA.morada}</div>
