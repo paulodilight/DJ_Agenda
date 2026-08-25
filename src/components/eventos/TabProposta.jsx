@@ -25,7 +25,8 @@ function linhaVazia() {
 
 export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [] }) {
   const [linhas, setLinhas] = useState([])
-  const [notas, setNotas] = useState('')
+  const [notasTecnicas, setNotasTecnicas] = useState('')
+  const [notasProposta, setNotasProposta] = useState('')
   const [comIva, setComIva] = useState(true)
 
   // Pré-popular com os equipamentos próprios do evento (já carregados no FormEvento)
@@ -61,7 +62,8 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
     const logoUrl = window.location.origin + '/logo-x.png'
     const html = gerarHTMLProposta({
       linhas,
-      notas,
+      notasTecnicas,
+      notasProposta,
       evento,
       espaco,
       numeroProposta: gerarNumeroProposta(),
@@ -202,17 +204,31 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
         </div>
       </div>
 
-      {/* Notas da proposta */}
+      {/* Notas Técnicas */}
+      <div>
+        <label className="text-[11px] font-medium text-accent-subtle uppercase tracking-wider block mb-1">
+          Notas Técnicas
+        </label>
+        <textarea
+          className={clsx(inputCls, 'resize-none')}
+          rows={3}
+          value={notasTecnicas}
+          onChange={e => setNotasTecnicas(e.target.value)}
+          placeholder="Rider, requisitos técnicos, configurações…"
+        />
+      </div>
+
+      {/* Notas da Proposta */}
       <div>
         <label className="text-[11px] font-medium text-accent-subtle uppercase tracking-wider block mb-1">
           Notas da Proposta
         </label>
         <textarea
           className={clsx(inputCls, 'resize-none')}
-          rows={3}
-          value={notas}
-          onChange={e => setNotas(e.target.value)}
-          placeholder="Condições, validade da proposta, observações gerais…"
+          rows={2}
+          value={notasProposta}
+          onChange={e => setNotasProposta(e.target.value)}
+          placeholder="Condições, validade, forma de pagamento…"
         />
       </div>
 

@@ -19,7 +19,7 @@ function hoje() {
   return new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export function gerarHTMLProposta({ linhas, notas, evento, espaco, numeroProposta, logoUrl, comIva = true }) {
+export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento, espaco, numeroProposta, logoUrl, comIva = true }) {
   const subtotal = linhas.reduce((s, l) => s + (Number(l.preco) || 0) * (Number(l.qtd) || 1), 0)
   const iva = comIva ? subtotal * 0.23 : 0
   const total = subtotal + iva
@@ -42,10 +42,10 @@ export function gerarHTMLProposta({ linhas, notas, evento, espaco, numeroPropost
       </tr>`
   }).join('')
 
-  const notasHTML = notas ? `
+  const notasHTML = notasTecnicas ? `
     <div style="margin-bottom:20px;padding:10px;background:#f9f9f9;border:1px solid #eee;border-radius:4px;font-size:10px;">
-      <div style="font-weight:bold;margin-bottom:4px;">Notas da Proposta</div>
-      <div style="white-space:pre-wrap;">${notas}</div>
+      <div style="font-weight:bold;margin-bottom:4px;">Notas Técnicas</div>
+      <div style="white-space:pre-wrap;">${notasTecnicas}</div>
     </div>` : ''
 
   const clienteHTML = espaco ? `
@@ -169,6 +169,10 @@ export function gerarHTMLProposta({ linhas, notas, evento, espaco, numeroPropost
   <div style="margin-top:16px;font-size:9px;color:#666;border-top:1px solid #eee;padding-top:8px;">
     Este documento não serve de fatura e foi criado a ${dataEmissao}.
   </div>
+
+  ${notasProposta ? `
+  <!-- Notas da Proposta -->
+  <div style="margin-top:10px;font-size:10px;color:#333;white-space:pre-wrap;">${notasProposta}</div>` : ''}
 
   <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; }</script>
 </body>
