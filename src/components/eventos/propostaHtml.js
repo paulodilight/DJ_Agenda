@@ -65,7 +65,7 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
   <title>Proposta ${numeroProposta}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; padding: 28px 36px; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #333; background: #fff; padding: 28px 36px; }
     table { width: 100%; border-collapse: collapse; }
     @media print {
       body { padding: 16px 24px; }
@@ -84,9 +84,9 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
         <div>${EMPRESA.morada}</div>
         <div>${EMPRESA.codigoPostal}</div>
         <div>${EMPRESA.pais}</div>
-        <div><span style="color:#111;font-weight:bold;">Telefone:</span> ${EMPRESA.telefone}</div>
-        <div><span style="color:#111;font-weight:bold;">E-mail:</span> ${EMPRESA.email}</div>
-        <div><span style="color:#111;font-weight:bold;">Site:</span> ${EMPRESA.site}</div>
+        <div><span style="color:#333;font-weight:bold;">Telefone:</span> ${EMPRESA.telefone}</div>
+        <div><span style="color:#333;font-weight:bold;">E-mail:</span> ${EMPRESA.email}</div>
+        <div><span style="color:#333;font-weight:bold;">Site:</span> ${EMPRESA.site}</div>
       </div>
       <div style="margin-top:6px;font-size:10px;color:#555;">Contribuinte: ${EMPRESA.nif}</div>
     </div>
@@ -106,7 +106,7 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
   <!-- Tabela de itens -->
   <table style="margin-bottom:20px;">
     <thead>
-      <tr style="border-bottom:1.5px solid #111;">
+      <tr style="border-bottom:1.5px solid #333;">
         <th style="text-align:left;padding:6px 4px;font-size:10px;">Ref.ª</th>
         <th style="text-align:left;padding:6px 4px;font-size:10px;">Designação</th>
         <th style="text-align:center;padding:6px 4px;font-size:10px;">Qtd.</th>
@@ -155,7 +155,7 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
       <div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:4px;">
         <span>IVA Normal</span><span>${euro(iva)}</span>
       </div>` : ''}
-      <div style="display:flex;justify-content:space-between;gap:24px;font-weight:bold;font-size:13px;border-top:1.5px solid #111;padding-top:6px;margin-top:4px;">
+      <div style="display:flex;justify-content:space-between;gap:24px;font-weight:bold;font-size:13px;border-top:1.5px solid #333;padding-top:6px;margin-top:4px;">
         <span>Total a pagar</span><span>${euro(total)}</span>
       </div>
     </div>
