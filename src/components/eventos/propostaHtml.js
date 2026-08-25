@@ -29,12 +29,12 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
     const tot = (Number(l.preco) || 0) * (Number(l.qtd) || 1)
     return `
       <tr>
-        <td style="padding:6px 4px;color:#0070c0;">${i + 1}</td>
+        <td style="padding:6px 4px;color:#333;">${i + 1}</td>
         <td style="padding:6px 4px;">
           <div>${l.descricao || '—'}</div>
-          ${l.observacoes ? `<div style="color:#0070c0;font-size:10px;">${l.observacoes}</div>` : ''}
+          ${l.observacoes ? `<div style="color:#333;font-size:10px;">${l.observacoes}</div>` : ''}
         </td>
-        <td style="padding:6px 4px;text-align:center;color:#0070c0;">${l.qtd || 1}</td>
+        <td style="padding:6px 4px;text-align:center;color:#333;">${l.qtd || 1}</td>
         <td style="padding:6px 4px;text-align:center;">${l.unidade || 'Uni.'}</td>
         <td style="padding:6px 4px;text-align:right;">${euro(l.preco)}</td>
         ${comIva ? `<td style="padding:6px 4px;text-align:center;">23%</td>` : ''}
@@ -80,7 +80,7 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
     <div>
       ${logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:38px;margin-bottom:6px;display:block;">` : ''}
       <div style="font-weight:bold;font-size:12px;margin-bottom:4px;">${EMPRESA.nome}</div>
-      <div style="color:#0070c0;line-height:1.7;">
+      <div style="color:#333;line-height:1.7;">
         <div>${EMPRESA.morada}</div>
         <div>${EMPRESA.codigoPostal}</div>
         <div>${EMPRESA.pais}</div>
@@ -140,7 +140,7 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
         </thead>
         <tbody>
           <tr>
-            <td style="padding:4px 8px 4px 0;color:#0070c0;">IVA Normal</td>
+            <td style="padding:4px 8px 4px 0;color:#333;">IVA Normal</td>
             <td style="padding:4px 8px;text-align:right;">23%</td>
             <td style="padding:4px 8px;text-align:right;">${euro(subtotal)}</td>
             <td style="padding:4px 0;text-align:right;">${euro(iva)}</td>
