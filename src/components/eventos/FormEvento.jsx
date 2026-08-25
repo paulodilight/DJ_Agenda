@@ -12,6 +12,7 @@ import { useUndo } from '@/contexts/UndoContext'
 import { PrintModal } from '@/components/shared/PrintModal'
 import { FolhaEvento } from '@/components/shared/FolhaEvento'
 import { FolhaContas } from '@/components/shared/FolhaContas'
+import { TabProposta } from '@/components/eventos/TabProposta'
 import { clsx } from 'clsx'
 
 const STATUS_OPTS = [
@@ -678,7 +679,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   return (
     <>
 
-    <Modal aberto={aberto} onFechar={onFechar} largura="max-w-2xl">
+    <Modal aberto={aberto} onFechar={onFechar} largura="max-w-4xl">
       <div className="flex flex-col">
 
         {/* Cabeçalho */}
@@ -723,6 +724,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             { id: 'preparacao',   label: 'Preparação' },
             { id: 'execucao',     label: 'Execução' },
             { id: 'financeiro',   label: 'Financeiro' },
+            ...(evento?.id ? [{ id: 'proposta',  label: 'Proposta' }] : []),
             ...(evento?.id ? [{ id: 'historico', label: 'Histórico' }] : []),
           ].map((aba) => (
             <button
@@ -1850,6 +1852,16 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               </div>
             )
           })()}
+
+          {/* ── Aba Proposta ── */}
+          {abaActiva === 'proposta' && (
+            <TabProposta
+              evento={evento}
+              espacos={espacos}
+              equipRows={equipRows}
+              equipamentosList={equipamentosList}
+            />
+          )}
 
           {/* ── Aba Histórico ── */}
           {abaActiva === 'historico' && (
