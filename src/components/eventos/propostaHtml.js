@@ -125,38 +125,42 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
 
   <hr style="border:none;border-top:1px solid #ccc;margin-bottom:16px;">
 
-  <!-- Totais + Resumo de Impostos -->
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-    ${comIva ? `<div style="flex:1;">
-      <div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Resumo de Impostos</div>
-      <table style="min-width:260px;">
-        <thead>
-          <tr style="border-bottom:1px solid #ccc;">
-            <th style="text-align:left;padding:4px 8px 4px 0;font-size:10px;">Designação</th>
-            <th style="text-align:right;padding:4px 8px;font-size:10px;">Valor</th>
-            <th style="text-align:right;padding:4px 8px;font-size:10px;">Incidência</th>
-            <th style="text-align:right;padding:4px 0;font-size:10px;">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="padding:4px 8px 4px 0;color:#333;">IVA Normal</td>
-            <td style="padding:4px 8px;text-align:right;">23%</td>
-            <td style="padding:4px 8px;text-align:right;">${euro(subtotal)}</td>
-            <td style="padding:4px 0;text-align:right;">${euro(iva)}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>` : '<div></div>'}
-    <div style="text-align:right;min-width:200px;">
-      ${comIva ? `<div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:4px;">
-        <span>Total Ilíq.</span><span>${euro(subtotal)}</span>
+  <!-- Resumo de Impostos -->
+  ${comIva ? `
+  <div style="margin-bottom:12px;">
+    <div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Resumo de Impostos</div>
+    <table style="width:auto;">
+      <thead>
+        <tr style="border-bottom:1px solid #ccc;">
+          <th style="text-align:left;padding:4px 12px 4px 0;font-size:10px;">Designação</th>
+          <th style="text-align:right;padding:4px 12px;font-size:10px;">Taxa</th>
+          <th style="text-align:right;padding:4px 12px;font-size:10px;">Incidência</th>
+          <th style="text-align:right;padding:4px 0;font-size:10px;">Total IVA</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:4px 12px 4px 0;">IVA Normal</td>
+          <td style="padding:4px 12px;text-align:right;">23%</td>
+          <td style="padding:4px 12px;text-align:right;">${euro(subtotal)}</td>
+          <td style="padding:4px 0;text-align:right;">${euro(iva)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>` : ''}
+
+  <!-- Totais -->
+  <div style="display:flex;justify-content:flex-end;">
+    <div style="min-width:220px;">
+      ${comIva ? `
+      <div style="display:flex;justify-content:space-between;gap:32px;margin-bottom:4px;font-size:11px;">
+        <span>Total Ilíq.</span><span style="tabular-nums">${euro(subtotal)}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:4px;">
-        <span>IVA Normal</span><span>${euro(iva)}</span>
+      <div style="display:flex;justify-content:space-between;gap:32px;margin-bottom:6px;font-size:11px;">
+        <span>IVA 23%</span><span style="tabular-nums">${euro(iva)}</span>
       </div>` : ''}
-      <div style="display:flex;justify-content:space-between;gap:24px;font-weight:bold;font-size:13px;border-top:1.5px solid #333;padding-top:6px;margin-top:4px;">
-        <span>Total a pagar</span><span>${euro(total)}</span>
+      <div style="display:flex;justify-content:space-between;gap:32px;font-weight:bold;font-size:14px;border-top:1.5px solid #333;padding-top:6px;">
+        <span>Total a pagar</span><span style="tabular-nums">${euro(total)}</span>
       </div>
     </div>
   </div>
