@@ -69,7 +69,7 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
     table { width: 100%; border-collapse: collapse; }
     @media print {
       body { padding: 16px 24px; }
-      @page { margin: 1.2cm; }
+      @page { margin: 0; }
     }
   </style>
 </head>
