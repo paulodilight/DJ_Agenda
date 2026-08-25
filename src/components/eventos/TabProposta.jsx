@@ -34,6 +34,7 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
   useEffect(() => {
     setNotasTecnicas(notasTecnicasInicial || '')
     setNotasProposta(notasPropostaInicial || '')
+    setClienteEditado(espaco?.nome || '')
     hasInit.current = false
     setLinhas([linhaVazia()])
   }, [evento?.id])
@@ -68,7 +69,7 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
 
   const nomeEvento = evento?.evento || ''
   const espaco = espacos.find(e => String(e.id) === String(evento?.espaco_id)) || null
-  const nomeCliente = espaco?.nome || ''
+  const [clienteEditado, setClienteEditado] = useState(espaco?.nome || '')
 
   function imprimir() {
     const logoUrl = window.location.origin + '/logo-x.png'
@@ -82,7 +83,7 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       logoUrl,
       comIva,
       nomeEvento,
-      nomeCliente,
+      nomeCliente: clienteEditado,
     })
     const win = window.open('', '_blank', 'width=900,height=700')
     win.document.write(html)
@@ -139,12 +140,15 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
               <div className="text-xs text-accent">{nomeEvento}</div>
             </div>
           )}
-          {nomeCliente && (
-            <div>
-              <div className="text-[10px] font-medium text-accent-subtle uppercase tracking-wider mb-0.5">Cliente</div>
-              <div className="text-xs text-accent">{nomeCliente}</div>
-            </div>
-          )}
+          <div>
+            <div className="text-[10px] font-medium text-accent-subtle uppercase tracking-wider mb-0.5">Cliente</div>
+            <input
+              className={inputCls}
+              value={clienteEditado}
+              onChange={e => setClienteEditado(e.target.value)}
+              placeholder="Nome do cliente…"
+            />
+          </div>
         </div>
       )}
 
