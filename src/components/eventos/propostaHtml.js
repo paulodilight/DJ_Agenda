@@ -167,6 +167,15 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
     <div><strong>${EMPRESA.banco}:</strong> ${EMPRESA.iban}</div>
   </div>
 
+  <!-- Detalhes do evento -->
+  ${(evento?.hora_instalacao || evento?.hora_inicio || evento?.hora_fim || evento?.morada) ? `
+  <div style="margin-top:20px;font-size:10px;border-top:1px solid #eee;padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;">
+    ${evento?.hora_instalacao ? `<div><strong>Hora de instalação:</strong> ${evento.hora_instalacao.slice(0,5)}</div>` : ''}
+    ${evento?.hora_inicio     ? `<div><strong>Hora de início:</strong> ${evento.hora_inicio.slice(0,5)}</div>` : ''}
+    ${evento?.hora_fim        ? `<div><strong>Hora de fim:</strong> ${evento.hora_fim.slice(0,5)}</div>` : ''}
+    ${evento?.morada          ? `<div style="grid-column:1/-1;"><strong>Morada do evento:</strong> ${evento.morada}</div>` : ''}
+  </div>` : ''}
+
   <!-- Nota legal -->
   <div style="margin-top:16px;font-size:9px;color:#666;border-top:1px solid #eee;padding-top:8px;">
     Este documento não serve de fatura e foi criado a ${dataEmissao}.${!comIva ? ' Esta proposta acresce IVA à taxa legal em vigor.' : ''}
