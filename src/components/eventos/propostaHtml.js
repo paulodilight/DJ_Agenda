@@ -77,13 +77,24 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
 
   <!-- Cabeçalho -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
-    <div style="display:flex;align-items:center;gap:14px;">
-      ${logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:38px;display:block;flex-shrink:0;">` : ''}
-      <div style="line-height:1.3;">
-        <div style="font-size:24px;font-weight:bold;letter-spacing:0.5px;">X ARTISTAS XCLUSIVOS</div>
-        <div style="font-size:24px;">Para EVENTOS DE LUXO</div>
-        <div style="font-size:18px;color:#555;">Por LMD, Unip. LDA</div>
+    <div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        ${logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:38px;display:block;flex-shrink:0;">` : ''}
+        <div style="line-height:1.35;">
+          <div style="font-size:18px;font-weight:bold;">ARTISTAS XCLUSIVOS</div>
+          <div style="font-size:18px;">Para EVENTOS DE LUXO</div>
+          <div style="font-size:13px;color:#555;">Por LMD, Unip. LDA</div>
+        </div>
       </div>
+      <div style="font-size:11px;color:#333;line-height:1.7;">
+        <div>${EMPRESA.morada}</div>
+        <div>${EMPRESA.codigoPostal}</div>
+        <div>${EMPRESA.pais}</div>
+        <div><strong>Telefone:</strong> ${EMPRESA.telefone}</div>
+        <div><strong>E-mail:</strong> ${EMPRESA.email}</div>
+        <div><strong>Site:</strong> ${EMPRESA.site}</div>
+      </div>
+      <div style="margin-top:4px;font-size:10px;color:#555;">Contribuinte: ${EMPRESA.nif}</div>
     </div>
     <div style="text-align:right;">
       <div style="color:#888;font-size:10px;margin-bottom:2px;">Original</div>
