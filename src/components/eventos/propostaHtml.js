@@ -78,14 +78,14 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
   <!-- Cabeçalho -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
     <div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:4px;">
         ${logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:38px;display:block;flex-shrink:0;">` : ''}
         <div style="line-height:1.35;">
-          <div style="font-size:18px;font-weight:bold;">ARTISTAS XCLUSIVOS</div>
-          <div style="font-size:18px;">Para EVENTOS DE LUXO</div>
-          <div style="font-size:13px;color:#555;">Por LMD, Unip. LDA</div>
+          <div style="font-size:16px;font-weight:bold;">ARTISTAS XCLUSIVOS</div>
+          <div><span style="font-size:12px;">Para </span><span style="font-size:16px;">EVENTOS DE LUXO</span></div>
         </div>
       </div>
+      <div style="font-size:13px;color:#555;margin-bottom:8px;">Por LMD, Unip. LDA</div>
       <div style="font-size:11px;color:#333;line-height:1.7;">
         <div>${EMPRESA.morada}</div>
         <div>${EMPRESA.codigoPostal}</div>
