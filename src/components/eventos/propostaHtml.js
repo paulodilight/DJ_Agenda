@@ -81,8 +81,8 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
       <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:4px;">
         ${logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:38px;display:block;flex-shrink:0;">` : ''}
         <div style="line-height:1.35;">
-          <div style="font-size:16px;font-weight:bold;">ARTISTAS XCLUSIVOS</div>
-          <div><span style="font-size:12px;">Para </span><span style="font-size:16px;">EVENTOS DE LUXO</span></div>
+          <div style="font-size:14px;font-weight:bold;">ARTISTAS XCLUSIVOS</div>
+          <div><span style="font-size:10px;">Para </span><span style="font-size:14px;">EVENTOS DE LUXO</span></div>
         </div>
       </div>
       <div style="font-size:11px;color:#333;line-height:1.7;margin-top:6px;">
