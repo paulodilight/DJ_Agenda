@@ -77,18 +77,13 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
 
   <!-- Cabeçalho -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
-    <div>
-      ${logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:38px;margin-bottom:6px;display:block;">` : ''}
-      <div style="font-weight:bold;font-size:12px;margin-bottom:4px;">${EMPRESA.nome}</div>
-      <div style="color:#333;line-height:1.7;">
-        <div>${EMPRESA.morada}</div>
-        <div>${EMPRESA.codigoPostal}</div>
-        <div>${EMPRESA.pais}</div>
-        <div><span style="color:#333;font-weight:bold;">Telefone:</span> ${EMPRESA.telefone}</div>
-        <div><span style="color:#333;font-weight:bold;">E-mail:</span> ${EMPRESA.email}</div>
-        <div><span style="color:#333;font-weight:bold;">Site:</span> ${EMPRESA.site}</div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      ${logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:38px;display:block;flex-shrink:0;">` : ''}
+      <div style="line-height:1.3;">
+        <div style="font-size:24px;font-weight:bold;letter-spacing:0.5px;">X ARTISTAS XCLUSIVOS</div>
+        <div style="font-size:24px;">Para EVENTOS DE LUXO</div>
+        <div style="font-size:18px;color:#555;">Por LMD, Unip. LDA</div>
       </div>
-      <div style="margin-top:6px;font-size:10px;color:#555;">Contribuinte: ${EMPRESA.nif}</div>
     </div>
     <div style="text-align:right;">
       <div style="color:#888;font-size:10px;margin-bottom:2px;">Original</div>
