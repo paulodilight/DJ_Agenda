@@ -85,16 +85,15 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
           <div><span style="font-size:10px;">Para </span><span style="font-size:14px;">EVENTOS DE LUXO</span></div>
         </div>
       </div>
-      <div style="font-size:11px;color:#333;line-height:1.7;margin-top:6px;">
+      <div style="font-size:11px;color:#333;line-height:1.7;margin-top:14px;">
         <div style="font-weight:bold;">LMD, Unip. LDA</div>
         <div>${EMPRESA.morada}</div>
-        <div>${EMPRESA.codigoPostal}</div>
-        <div>${EMPRESA.pais}</div>
+        <div>${EMPRESA.codigoPostal} - ${EMPRESA.pais}</div>
         <div><strong>Telefone:</strong> ${EMPRESA.telefone}</div>
         <div><strong>E-mail:</strong> ${EMPRESA.email}</div>
         <div><strong>Site:</strong> ${EMPRESA.site}</div>
+        <div>Contribuinte: ${EMPRESA.nif}</div>
       </div>
-      <div style="margin-top:4px;font-size:10px;color:#555;">Contribuinte: ${EMPRESA.nif}</div>
     </div>
     <div style="text-align:right;">
       <div style="color:#888;font-size:10px;margin-bottom:2px;">Original</div>
