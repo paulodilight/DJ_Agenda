@@ -107,7 +107,20 @@ export function TabAtuacoes({ evento, onSlotsChange }) {
       .eq('data', evento.data_evento)
       .is('evento_id', null)
       .order('hora_inicio')
-    setDisponiveis(data ?? [])
+    const resultado = data ?? []
+    if (resultado.length > 0) {
+      const { data: hext } = await supabase
+        .from('agenda_horas_extra')
+        .select('agenda_id, valor_total')
+        .in('agenda_id', resultado.map(s => s.id))
+        .eq('estado', 'validado')
+      const extMap = {}
+      for (const h of hext ?? []) extMap[h.agenda_id] = (extMap[h.agenda_id] ?? 0) + (h.valor_total ?? 0)
+      for (const s of resultado) {
+        s.valor_total_cliente = (Number(s.valor) || 0) + (Number(s.margem) || 0) + (Number(s.transporte) || 0) + (Number(s.extras) || 0) + (extMap[s.id] ?? 0)
+      }
+    }
+    setDisponiveis(resultado)
     setModalDisp(true)
   }
 
@@ -201,7 +214,7 @@ export function TabAtuacoes({ evento, onSlotsChange }) {
                       {s.hora_inicio && (
                         <p className="text-[11px] text-accent-muted">
                           {s.hora_inicio.slice(0, 5)}{s.hora_fim ? `–${s.hora_fim.slice(0, 5)}` : ''}
-                          {s.valor != null ? ` · ${Number(s.valor).toFixed(0)}€` : ''}
+                          {(s.valor_total_cliente ?? s.valor) != null ? ` · ${Number(s.valor_total_cliente ?? s.valor).toFixed(0)}€` : ''}
                         </p>
                       )}
                     </div>

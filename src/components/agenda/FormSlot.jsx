@@ -48,6 +48,8 @@ const TIPO_SLOT_OPCOES = [
   { value: 'convidado int', label: 'Convidado INT' },
   { value: 'convidado ext', label: 'Convidado EXT' },
   { value: 'premium',       label: 'Premium' },
+  { value: 'músico',        label: 'Músico' },
+  { value: 'banda',         label: 'Banda' },
 ]
 
 const KEY_TIPO_MAP = {
@@ -88,7 +90,7 @@ const FORMA_PAG_OPCOES = [
   { value: 'outro',         label: 'Outro' },
 ]
 
-export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = false, conflito = false }) {
+export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = false, conflito = false, eventoId = null, defaultEspacoId = '', defaultData = '', defaultEvento = '' }) {
   const [form, setForm] = useState(vazio)
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState(null)
@@ -214,7 +216,14 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
       setNovaHora({ descricao: '', horas: '', valor_hora: '' })
     }
     if (aberto && !slot) {
-      setForm((f) => ({ ...vazio, ...f, estado: 'proposta' }))
+      setForm(f => ({
+        ...vazio,
+        ...f,
+        estado: 'proposta',
+        ...(defaultEspacoId ? { espaco_id: defaultEspacoId } : {}),
+        ...(defaultData     ? { data: defaultData }           : {}),
+        ...(defaultEvento   ? { evento: defaultEvento }       : {}),
+      }))
       setNovoDJCriado(null)
       setEventoAutoLink(false)
       setAba(0)
@@ -529,10 +538,11 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         notas_contas:     form.notas_contas?.trim() || null,
         estado_pagamento: form.estado_pagamento || null,
         forma_pagamento:  form.forma_pagamento  || null,
-        tipo_slot: isConvidado ? 'convidado' : (form.tipo_slot || 'residente'),
-        evento:    form.evento?.trim() || null,
-        notas:     form.notas?.trim() || null,
-        origem:    'manual',
+        tipo_slot:  isConvidado ? 'convidado' : (form.tipo_slot || 'residente'),
+        evento:     form.evento?.trim() || null,
+        notas:      form.notas?.trim() || null,
+        origem:     'manual',
+        ...(eventoId != null ? { evento_id: eventoId } : !slot?.id ? { evento_id: null } : {}),
         setup_slot_1: form.setup_slot_1 || null,
         setup_slot_2: form.setup_slot_2 || null,
         setup_slot_3: form.setup_slot_3 || null,
