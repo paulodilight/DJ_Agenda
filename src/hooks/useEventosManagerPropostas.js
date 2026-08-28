@@ -20,6 +20,8 @@ const LABEL_TO_CAMPO = {
   'Apresentação media': 'req_apresentacao_media',
   'Formato media': 'req_media_formato',
   'Notas técnicas': 'req_extras',
+  'Apoio DJ': 'req_apoio_dj',
+  'Apoio Banda': 'req_apoio_banda',
   'Técnico': 'tecnico_id',
 }
 
@@ -42,6 +44,8 @@ const MAPA_SUPA = {
   req_apresentacao_media: 'req_apresentacao_media',
   req_media_formato: 'req_media_formato',
   req_extras: 'req_extras',
+  req_apoio_dj: 'req_apoio_dj',
+  req_apoio_banda: 'req_apoio_banda',
   // tecnico_id não sincroniza: o manager não gere técnicos
 }
 

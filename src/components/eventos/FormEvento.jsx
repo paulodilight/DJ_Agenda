@@ -1081,7 +1081,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               </div>
 
               {/* Requisitos técnicos definidos pelo manager (leitura) */}
-              {(form.descricao || form.req_micros_mao || form.req_micros_headset || form.req_tv65 || form.req_led_wall || form.req_apresentacao_media || form.req_extras) && (
+              {(form.descricao || form.req_micros_mao || form.req_micros_headset || form.req_tv65 || form.req_led_wall || form.req_apresentacao_media || form.req_apoio_dj || form.req_apoio_banda || form.req_extras) && (
                 <div className="border-t border-border/40 pt-4 flex flex-col gap-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Requisitos técnicos (manager)</p>
                   {form.descricao && (
@@ -1090,7 +1090,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                       <p className="text-sm text-accent-subtle/80 bg-surface-2/40 rounded px-3 py-2 whitespace-pre-line">{form.descricao}</p>
                     </div>
                   )}
-                  {(form.req_micros_mao || form.req_micros_headset || form.req_tv65 || form.req_led_wall || form.req_apresentacao_media) && (
+                  {(form.req_micros_mao || form.req_micros_headset || form.req_tv65 || form.req_led_wall || form.req_apresentacao_media || form.req_apoio_dj || form.req_apoio_banda) && (
                     <div className="flex flex-col gap-1">
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-accent-subtle/50">Equipamentos</span>
                       <div className="flex flex-wrap gap-2">
@@ -1114,6 +1114,12 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                           <span className="inline-flex items-center rounded-md bg-surface-2/60 border border-border/40 px-2 py-1 text-xs text-accent-subtle/80">
                             Media{form.req_media_formato ? ` (${form.req_media_formato})` : ''}
                           </span>
+                        )}
+                        {form.req_apoio_dj && (
+                          <span className="inline-flex items-center rounded-md bg-surface-2/60 border border-border/40 px-2 py-1 text-xs text-accent-subtle/80">Apoio DJ</span>
+                        )}
+                        {form.req_apoio_banda && (
+                          <span className="inline-flex items-center rounded-md bg-surface-2/60 border border-border/40 px-2 py-1 text-xs text-accent-subtle/80">Apoio Banda</span>
                         )}
                       </div>
                     </div>
