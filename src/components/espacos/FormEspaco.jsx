@@ -15,7 +15,7 @@ const TIPO_OPCOES = [
 const vazio = {
   nome: '', tipo: 'club', budget_max: '', valor_avenca: '',
   dias_sem_repeticao: 14, dias_espacamento: 7, notas: '', activo: true,
-  morada: '', nif: '', nome_empresa: '', email: '',
+  morada: '', nif: '', nome_empresa: '', email: '', instagram: '',
 }
 
 /**
@@ -80,7 +80,10 @@ export function FormEspaco({ aberto, espaco, onFechar, onGuardado }) {
             <Input label="NIF" value={form.nif ?? ''} onChange={set('nif')} placeholder="500000000" />
           </div>
 
-          <Input label="Email" value={form.email ?? ''} onChange={set('email')} placeholder="geral@empresa.pt" type="email" />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Email" value={form.email ?? ''} onChange={set('email')} placeholder="geral@empresa.pt" type="email" />
+            <Input label="Instagram" value={form.instagram ?? ''} onChange={set('instagram')} placeholder="@nome_do_espaco" />
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Input label="Budget máximo por sessão (€)" value={form.budget_max} onChange={set('budget_max')} placeholder="200" type="number" min={0} step={0.01} />
