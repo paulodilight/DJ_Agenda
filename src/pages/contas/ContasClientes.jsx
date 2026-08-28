@@ -36,10 +36,12 @@ const TIPO_SLOT_MAP = {
   'convidado ext': 'convidado_ext',
   'convidado':     'convidado_ext',
   'premium':       'premium',
+  'músico':        'musico',
+  'banda':         'banda',
 }
 const mapTipoSlot = t => t ? (TIPO_SLOT_MAP[t.trim().toLowerCase()] ?? null) : null
 
-const DJ_CAT_KEYS = ['residente_anl', 'residente', 'residente_st', 'convidado_int', 'convidado_ext', 'premium']
+const DJ_CAT_KEYS = ['residente_anl', 'residente', 'residente_st', 'convidado_int', 'convidado_ext', 'premium', 'musico', 'banda']
 const CAT_DEFS = [
   { key: 'residente_anl', label: 'Residente ANL', grupo: 'Residentes', conflito: true },
   { key: 'residente',     label: 'Residente',     grupo: 'Residentes', conflito: true },
@@ -47,6 +49,8 @@ const CAT_DEFS = [
   { key: 'convidado_int', label: 'Convidado INT', grupo: null,          conflito: true },
   { key: 'convidado_ext', label: 'Convidado EXT', grupo: null,          conflito: false },
   { key: 'premium',       label: 'Premium',       grupo: null,          conflito: false },
+  { key: 'musico',        label: 'Músico',        grupo: null,          conflito: false },
+  { key: 'banda',         label: 'Banda',         grupo: null,          conflito: false },
 ]
 
 // ── Helpers visuais do documento ──────────────────────────────────────────────
@@ -917,6 +921,8 @@ const TIPO_LABELS = {
   convidado_int: 'DJ Convidados INT',
   convidado_ext: 'DJ Convidados EXT',
   premium:       'Premium',
+  musico:        'Músicos',
+  banda:         'Bandas',
 }
 const DIAS_ABR = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const PRINT_MAP = {
