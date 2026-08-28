@@ -337,7 +337,7 @@ const SubCard = ({ title, children }) => (
 )
 
 // Fields persisted per space (stable across months)
-const PERSIST_FIELDS = ['contacto','para','cc','assunto','pin','linkApp','txtP1','txtP2','notasG','mencao','txtMen','nResN','nConvN','nExtN','avenca','incApoio','incApoioTec']
+const PERSIST_FIELDS = ['contacto','para','cc','assunto','pin','linkApp','txtP1','txtP2','notasG','mencao','txtMen','nResN','nConvN','nExtN','incApoio','incApoioTec']
 
 function loadCfg(espacoId) {
   try { return JSON.parse(localStorage.getItem(`email_cfg_${espacoId}`)) || {} } catch { return {} }
