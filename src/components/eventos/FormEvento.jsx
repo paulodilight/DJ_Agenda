@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { X, Database, Star, Plus, Check, Trash2, ListChecks, Send, Printer, FileSpreadsheet, ArrowRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -13,6 +13,7 @@ import { PrintModal } from '@/components/shared/PrintModal'
 import { FolhaEvento } from '@/components/shared/FolhaEvento'
 import { FolhaContas } from '@/components/shared/FolhaContas'
 import { TabProposta } from '@/components/eventos/TabProposta'
+import { TabAtuacoes } from '@/components/eventos/TabAtuacoes'
 import { clsx } from 'clsx'
 
 const STATUS_OPTS = [
@@ -215,6 +216,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   const [tecnicosNotas, setTecnicosNotas] = useState([])
   const [feedbackTecnico, setFeedbackTecnico] = useState([])
   const [historico, setHistorico] = useState([])
+  const [atuacoes, setAtuacoes] = useState([])
   const [loadingHistorico, setLoadingHistorico] = useState(false)
 
   useEffect(() => {
@@ -249,6 +251,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
     setTecnicosNotas([])
     setFeedbackTecnico([])
     setHistorico([])
+    setAtuacoes([])
     if (evento?.id) {
       setForm({
         ...VAZIO,
@@ -312,6 +315,13 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
           })
           setEquipRows(byTipo)
         })
+        .catch(console.error)
+      // Carregar atuações ligadas ao evento
+      supabase.from('agenda')
+        .select('*, djs!agenda_dj_id_fkey(nome_artistico, nome)')
+        .eq('evento_id', evento.id)
+        .order('hora_inicio')
+        .then(({ data }) => setAtuacoes(data ?? []))
         .catch(console.error)
       // Carregar evento_carros
       supabase.from('evento_carros').select('carro_id, condutor_id, km_saida, km_chegada')
@@ -395,6 +405,18 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   const [notifState, setNotifState] = useState({}) // { 1: 'loading'|'ok', 2: 'loading'|'ok' }
 
   const set = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }))
+
+  const onAtuacoesChange = useCallback((slots) => {
+    setAtuacoes(slots)
+    const soma = slots.reduce((s, r) => s + (Number(r.valor_total_cliente ?? r.valor) || 0), 0)
+    setForm(f => ({ ...f, valor_artistico: soma ? String(soma) : '' }))
+    if (evento?.id) {
+      supabase.from('supa_eventos')
+        .update({ valor_artistico: soma || null })
+        .eq('id', evento.id)
+        .catch(console.error)
+    }
+  }, [evento?.id])
 
   async function dispararNotificacao(num) {
     const tecId = num === 1
@@ -728,6 +750,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             { id: 'preparacao',   label: 'Preparação' },
             { id: 'execucao',     label: 'Execução' },
             { id: 'financeiro',   label: 'Financeiro' },
+            ...(evento?.id ? [{ id: 'atuacoes',  label: 'Atuações' }] : []),
             ...(evento?.id ? [{ id: 'proposta',  label: 'Proposta' }] : []),
             ...(evento?.id ? [{ id: 'historico', label: 'Histórico' }] : []),
           ].map((aba) => (
@@ -885,7 +908,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 />
               )}
 
-              {/* Valor artístico — só para tipos com artista */}
+              {/* Valor artístico — calculado automaticamente a partir das Atuações */}
               {(() => {
                 const tipoSel    = tipos.find(t => t.nome === form.tipo)
                 const temArtista = tipoSel?.tem_artista ?? false
@@ -895,10 +918,10 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     <Field label={labelArt}>
                       <input
                         type="number" min="0" step="0.01"
-                        className={inputCls}
+                        className={inputCls + ' opacity-60 cursor-not-allowed'}
                         value={form.valor_artistico}
-                        onChange={(e) => set('valor_artistico', e.target.value)}
-                        placeholder="0,00"
+                        readOnly
+                        placeholder="Calculado pelas Atuações"
                       />
                     </Field>
                   </div>
@@ -1857,6 +1880,11 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             )
           })()}
 
+          {/* ── Aba Atuações ── */}
+          {abaActiva === 'atuacoes' && evento?.id && (
+            <TabAtuacoes evento={evento} onSlotsChange={onAtuacoesChange} />
+          )}
+
           {/* ── Aba Proposta ── mantida montada para preservar estado */}
           {evento?.id && (
             <div className={abaActiva === 'proposta' ? '' : 'hidden'}>
@@ -1865,12 +1893,21 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 espacos={espacos}
                 equipRows={equipRows}
                 equipamentosList={equipamentosList}
+                atuacoes={atuacoes}
                 notasTecnicasInicial={form.proposta_notas_tecnicas || ''}
                 notasPropostaInicial={form.proposta_notas_proposta || ''}
                 onNotasChange={({ notasTecnicas, notasProposta }) => {
                   set('proposta_notas_tecnicas', notasTecnicas)
                   set('proposta_notas_proposta', notasProposta)
                 }}
+                onRemoveEquip={equipKey => setEquipRows(prev => ({
+                  ...prev,
+                  proprio: prev.proprio.filter(r => r._key !== equipKey),
+                }))}
+                onUpdateEquip={(equipKey, field, val) => setEquipRows(prev => ({
+                  ...prev,
+                  proprio: prev.proprio.map(r => r._key === equipKey ? { ...r, [field]: val } : r),
+                }))}
               />
             </div>
           )}

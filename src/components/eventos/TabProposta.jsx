@@ -23,14 +23,25 @@ function linhaVazia() {
   return { descricao: '', observacoes: '', qtd: 1, unidade: 'Uni.', preco: '' }
 }
 
-export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [], notasTecnicasInicial = '', notasPropostaInicial = '', onNotasChange }) {
+export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [], atuacoes = [], notasTecnicasInicial = '', notasPropostaInicial = '', onNotasChange, onRemoveEquip, onUpdateEquip }) {
   const [linhas, setLinhas] = useState([linhaVazia()])
   const [notasTecnicas, setNotasTecnicas] = useState(notasTecnicasInicial)
   const [notasProposta, setNotasProposta] = useState(notasPropostaInicial)
   const [comIva, setComIva] = useState(true)
   const hasInit = useRef(false)
 
-  // Reset quando o evento muda — define linhas base (técnico + transporte)
+  function linhasDeAtuacoes(slots) {
+    return slots.map(s => ({
+      _artistaKey: `slot_${s.id}`,
+      descricao: s.djs?.nome_artistico || s.djs?.nome || s.dj_nome || 'Artista',
+      observacoes: '',
+      qtd: 1,
+      unidade: 'Serv.',
+      preco: s.valor_total_cliente != null ? String(s.valor_total_cliente) : (s.valor != null ? String(s.valor) : ''),
+    }))
+  }
+
+  // Reset quando o evento muda — define linhas base (técnico + transporte, sem artista)
   useEffect(() => {
     setNotasTecnicas(notasTecnicasInicial || '')
     setNotasProposta(notasPropostaInicial || '')
@@ -45,33 +56,95 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
     setLinhas(extras.length > 0 ? extras : [linhaVazia()])
   }, [evento?.id])
 
-  // Pré-popular com equipamentos quando chegam — adicionados antes das linhas base
+  // Pré-popular com equipamentos quando chegam — inseridos depois do artista, antes das linhas base
   useEffect(() => {
     if (hasInit.current) return
     const proprios = equipRows.proprio ?? []
     if (proprios.length > 0) {
       hasInit.current = true
       const linhasEquip = proprios.map(r => ({
+        _equipKey: r._key,
         descricao: equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao || '',
         observacoes: r.observacoes || '',
         qtd: r.unidades || 1,
         unidade: 'Uni.',
         preco: r.valor_custo !== '' && r.valor_custo != null ? String(r.valor_custo) : '',
       }))
-      setLinhas(prev => [...linhasEquip, ...prev])
+      setLinhas(prev => {
+        const artLines = prev.filter(l => l._artistaKey)
+        const rest = prev.filter(l => !l._artistaKey)
+        return [...artLines, ...linhasEquip, ...rest]
+      })
     }
   }, [equipRows.proprio?.length])
+
+  // Sincronizar linhas de artista quando atuações mudam
+  const artistaSyncKey = atuacoes.map(s => `${s.id}:${s.valor_total_cliente ?? s.valor}`).join('|')
+  useEffect(() => {
+    setLinhas(prev => {
+      const withoutArtista = prev.filter(l => !l._artistaKey)
+      const artLines = linhasDeAtuacoes(atuacoes)
+      if (artLines.length === 0) return withoutArtista.length > 0 ? withoutArtista : [linhaVazia()]
+      return [...artLines, ...withoutArtista]
+    })
+  }, [artistaSyncKey])
+
+  // Sincronizar linhas de equipamento quando Equipamentos tab muda (após init)
+  const equipSyncKey = (equipRows.proprio ?? [])
+    .map(r => `${r._key}:${r.equipamento_id || ''}:${r.descricao}:${r.unidades}`)
+    .join('|')
+  useEffect(() => {
+    if (!hasInit.current) return
+    const proprios = equipRows.proprio ?? []
+    setLinhas(prev => {
+      const validKeys = new Set(proprios.map(r => r._key))
+      const kept = prev.filter(l => !l._equipKey || validKeys.has(l._equipKey))
+      const updated = kept.map(l => {
+        if (!l._equipKey) return l
+        const equip = proprios.find(r => r._key === l._equipKey)
+        if (!equip) return l
+        const newDesc = equipamentosList.find(e => e.id === equip.equipamento_id)?.nome || equip.descricao || l.descricao
+        const newQtd = equip.unidades || 1
+        if (newDesc === l.descricao && newQtd === l.qtd) return l
+        return { ...l, descricao: newDesc, qtd: newQtd }
+      })
+      const existingKeys = new Set(updated.filter(l => l._equipKey).map(l => l._equipKey))
+      const newLines = proprios
+        .filter(r => !existingKeys.has(r._key))
+        .map(r => ({
+          _equipKey: r._key,
+          descricao: equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao || '',
+          observacoes: r.observacoes || '',
+          qtd: r.unidades || 1,
+          unidade: 'Uni.',
+          preco: r.valor_custo !== '' && r.valor_custo != null ? String(r.valor_custo) : '',
+        }))
+      if (newLines.length === 0) return updated
+      const lastEquipIdx = updated.reduce((last, l, i) => l._equipKey ? i : last, -1)
+      return [
+        ...updated.slice(0, lastEquipIdx + 1),
+        ...newLines,
+        ...updated.slice(lastEquipIdx + 1),
+      ]
+    })
+  }, [equipSyncKey])
 
   function adicionarLinha() {
     setLinhas(l => [...l, linhaVazia()])
   }
 
   function removerLinha(i) {
+    const linha = linhas[i]
+    if (linha?._equipKey) onRemoveEquip?.(linha._equipKey)
     setLinhas(l => l.filter((_, idx) => idx !== i))
   }
 
   function setLinha(i, campo, valor) {
     setLinhas(l => l.map((linha, idx) => idx === i ? { ...linha, [campo]: valor } : linha))
+    const linha = linhas[i]
+    if (linha?._equipKey && (campo === 'descricao' || campo === 'qtd')) {
+      onUpdateEquip?.(linha._equipKey, campo === 'descricao' ? 'descricao' : 'unidades', valor)
+    }
   }
 
   const nomeEvento = evento?.evento || ''
@@ -139,7 +212,7 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       </div>
 
       {/* Evento + Cliente */}
-      {(nomeEvento || nomeCliente) && (
+      {(nomeEvento || clienteEditado) && (
         <div className="flex gap-6 px-1">
           {nomeEvento && (
             <div>
