@@ -137,10 +137,14 @@ export const colaboradorApi = {
   async tarefasDoColaborador(nome) {
     const primeiro = (nome ?? '').trim().split(/\s+/)[0]
     if (!primeiro) return []
+    const semAcento = primeiro.normalize('NFD').replace(/[̀-ͯ]/g, '')
+    const filtroOr = semAcento !== primeiro
+      ? `responsavel.ilike.%${primeiro}%,responsavel.ilike.%${semAcento}%`
+      : `responsavel.ilike.%${primeiro}%`
     const { data, error } = await supaEventos
       .from('supa_tarefas')
       .select('id, tarefa, responsavel, estado, confirmacao, data_conclusao, hora, tipo, notas_operacionais, criado_por, foto_url, concluida_em, recorrencia, motivo_validacao')
-      .ilike('responsavel', `%${primeiro}%`)
+      .or(filtroOr)
       .order('data_conclusao', { ascending: true })
     if (error) throw error
     return data ?? []
