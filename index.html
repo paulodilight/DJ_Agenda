@@ -15,6 +15,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Xclusive" />
     <link rel="apple-touch-icon" href="/logo-x.png" />
+
+    <!-- Manifesto e ícone específicos por área -->
+    <script>
+      if (window.location.pathname.startsWith('/apoiot')) {
+        document.querySelector('link[rel="manifest"]').href = '/manifest-apoiot.json';
+        document.querySelector('meta[name="apple-mobile-web-app-title"]').content = 'XTS';
+        document.querySelector('link[rel="apple-touch-icon"]').href = '/logo-apoiot.png';
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />

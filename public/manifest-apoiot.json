@@ -2,7 +2,7 @@
   "name": "Xclusive TS — Técnicos",
   "short_name": "XTS",
   "description": "Área técnica Xclusive Events",
-  "start_url": "/apoiot",
+  "start_url": "/apoiot/login",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
