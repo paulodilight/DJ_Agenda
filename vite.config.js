@@ -10,4 +10,12 @@ export default defineConfig({
     },
   },
   server: { port: parseInt(process.env.PORT) || 5173, strictPort: false },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        apoiot: path.resolve(__dirname, 'apoiot.html'),
+      },
+    },
+  },
 })

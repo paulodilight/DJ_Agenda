@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/apoiot", "destination": "/apoiot.html" },
+    { "source": "/apoiot/(.*)", "destination": "/apoiot.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
