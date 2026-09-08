@@ -127,9 +127,17 @@ function LinhaManualDoc({ row, onChange, onRemove, eventos, numCols = 6 }) {
   const temNota = row.notas?.trim() || row.evento_id
 
   if (row.fromEquip) {
+    const evento = row.evento_id ? eventos?.find(e => e.id === row.evento_id) : null
     return (
       <tr className="border-b border-border/25 bg-surface-0/10">
-        <td className="py-1.5 pl-4 pr-1 text-[13px] text-accent/70">{row.descricao || '—'}</td>
+        <td className="py-1.5 pl-4 pr-1 text-[13px] text-accent/70">
+          <div className="flex flex-col gap-0.5">
+            <span>{row.descricao || '—'}</span>
+            {evento && (
+              <span className="text-[10px] text-accent-subtle/50">{evLabel(evento)}</span>
+            )}
+          </div>
+        </td>
         <td className="py-1.5 px-2 w-14 text-center text-[13px] text-accent/70 tabular-nums">{row.unidades}</td>
         <td className="py-1.5 px-1 w-20 text-right text-[13px] text-accent/70 tabular-nums">{formatarEuro(parseNum(row.valor_unitario))}</td>
         <td className="py-1.5 px-1 w-20 text-right text-[13px] text-accent/50 tabular-nums">
@@ -1131,7 +1139,14 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
 
     const avencaSec = avenca > 0 ? `<div class="sec"><div class="sec-hdr"><span>Avença</span><span>${fmtE(avenca)}</span></div></div>` : ''
     const extrasSec = totalExtras  > 0 ? `<div class="sec"><div class="sec-hdr"><span>Extras</span><span>${fmtE(totalExtras)}</span></div></div>` : ''
-    const equipSec  = (totalComprado + totalAlugado) > 0 ? `<div class="sec"><div class="sec-hdr"><span>Equipamentos</span><span>${fmtE(totalComprado+totalAlugado)}</span></div>${totalAlugado>0?`<div class="item-row"><span style="padding-left:12px">Alugado</span><span>${fmtE(totalAlugado)}</span></div>`:''}${totalComprado>0?`<div class="item-row"><span style="padding-left:12px">Comprado</span><span>${fmtE(totalComprado)}</span></div>`:''}</div>` : ''
+    const equipRows = (lista) => lista.map(r => {
+      const ev = r.evento_id ? eventos.find(e => e.id === r.evento_id) : null
+      const evInfo = ev ? ` <span style="color:#999;font-size:11px">${evLabel(ev)}</span>` : ''
+      return `<tr><td>${r.descricao || '—'}${evInfo}</td><td class="r">${fmtE(itemTotal(r))}</td></tr>`
+    }).join('')
+    const alugRows = equipRows(cardState.equipamentos_alugado.filter(r => itemTotal(r) > 0))
+    const compRows = equipRows(cardState.equipamentos_comprado.filter(r => itemTotal(r) > 0))
+    const equipSec  = (totalComprado + totalAlugado) > 0 ? `<div class="sec"><div class="sec-hdr"><span>Equipamentos</span><span>${fmtE(totalComprado+totalAlugado)}</span></div>${totalAlugado>0?`<div class="sub-sec"><div class="sub-hdr"><span>Alugado</span><span>${fmtE(totalAlugado)}</span></div>${alugRows?`<table class="items"><tbody>${alugRows}</tbody></table>`:''}</div>`:''}${totalComprado>0?`<div class="sub-sec"><div class="sub-hdr"><span>Comprado</span><span>${fmtE(totalComprado)}</span></div>${compRows?`<table class="items"><tbody>${compRows}</tbody></table>`:''}</div>`:''}</div>` : ''
 
     // Agenda (formato por data com semanas)
     let agendaHtml = ''
