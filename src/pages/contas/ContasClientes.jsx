@@ -1139,10 +1139,16 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
 
     const avencaSec = avenca > 0 ? `<div class="sec"><div class="sec-hdr"><span>Avença</span><span>${fmtE(avenca)}</span></div></div>` : ''
     const extrasSec = totalExtras  > 0 ? `<div class="sec"><div class="sec-hdr"><span>Extras</span><span>${fmtE(totalExtras)}</span></div></div>` : ''
+    const evLabelPrint = (ev) => {
+      const dt = ev.data_evento
+        ? new Date(ev.data_evento + 'T12:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })
+        : null
+      return [ev.evento, dt].filter(Boolean).join(' · ')
+    }
     const equipRows = (lista) => lista.map(r => {
       const ev = r.evento_id ? eventos.find(e => e.id === r.evento_id) : null
-      const evInfo = ev ? ` <span style="color:#999;font-size:11px">${evLabel(ev)}</span>` : ''
-      return `<tr><td>${r.descricao || '—'}${evInfo}</td><td class="r">${fmtE(itemTotal(r))}</td></tr>`
+      const evInfo = ev ? ` <span style="color:#888;font-size:11px;font-weight:normal">${evLabelPrint(ev)}</span>` : ''
+      return `<tr><td><strong>${r.descricao || '—'}</strong>${evInfo}</td><td class="r">${fmtE(itemTotal(r))}</td></tr>`
     }).join('')
     const alugRows = equipRows(cardState.equipamentos_alugado.filter(r => itemTotal(r) > 0))
     const compRows = equipRows(cardState.equipamentos_comprado.filter(r => itemTotal(r) > 0))
@@ -1187,12 +1193,12 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${espaco.nome}</title>
       <style>
         body{font-family:Arial,sans-serif;font-size:13px;color:#111;margin:40px}
-        .sec{margin-bottom:10px}
-        .sec-hdr{display:flex;justify-content:space-between;font-weight:700;font-size:13px;background:#f0f0f0;padding:7px 10px;border-radius:4px}
-        .sub-sec{margin:2px 0}.sub-hdr{display:flex;justify-content:space-between;font-size:12px;font-weight:600;padding:4px 10px;background:#f8f8f8;border-left:3px solid #ddd}
-        table.items{width:100%;border-collapse:collapse}table.items td{padding:3px 10px;border-bottom:1px solid #eee;font-size:12px}
-        .item-row{display:flex;justify-content:space-between;padding:3px 10px;font-size:12px;border-bottom:1px solid #eee}
-        .total{display:flex;justify-content:space-between;font-weight:900;font-size:16px;border-top:2px solid #111;padding-top:10px;margin-top:8px}
+        .sec{margin-bottom:22px}
+        .sec-hdr{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;font-size:14px;padding:8px 0;border-bottom:1.5px solid #e5e7eb}
+        .sub-sec{margin:6px 0 10px}.sub-hdr{display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:5px 0 5px 12px;border-left:3px solid #93c5fd;margin-bottom:2px}
+        table.items{width:100%;border-collapse:collapse}table.items td{padding:4px 12px;border-bottom:1px solid #f3f4f6;font-size:12px}
+        .item-row{display:flex;justify-content:space-between;padding:4px 12px;font-size:12px;border-bottom:1px solid #f3f4f6}
+        .total{display:flex;justify-content:space-between;font-weight:900;font-size:18px;border-top:2px solid #111;padding-top:12px;margin-top:12px}
         .r{text-align:right}
         table.agenda{width:100%;border-collapse:collapse;font-size:12px}
         table.agenda th{background:#f0f0f0;padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #ccc;font-weight:700}
