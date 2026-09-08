@@ -346,10 +346,12 @@ function slotRate(slot, subtiposConfig, catTotals) {
 }
 
 const eventoRate = (ev) =>
-  (Number(ev.valor_apoio_tecnico) || 0)
-  + (Number(ev.margem)            || 0)
-  + (Number(ev.transporte)        || 0)
-  + (Number(ev.extras_contas)     || 0)
+  (Number(ev.valor_apoio_tecnico)   || 0)
+  + (Number(ev.valor_apoio_tecnico_2) || 0)
+  + (Number(ev.valor_alimentacao)   || 0)
+  + (Number(ev.margem)              || 0)
+  + (Number(ev.transporte)          || 0)
+  + (Number(ev.extras_contas)       || 0)
 
 const ADD_BTNS = [
   { label: '+ Aluguer', campo: 'equipamentos_alugado' },
@@ -494,14 +496,14 @@ function SecApoioTecnico({ eventos, annotatedIds, apoioOverride, onOverrideChang
     const grupos = Object.values(map).map(g => ({
       nome: g.nome,
       n: g.items.length,
-      valor: g.items.reduce((a, e) => a + parseNum(e.valor_apoio_tecnico), 0),
+      valor: g.items.reduce((a, e) => a + eventoRate(e), 0),
       items: g.items,
     }))
     return { grupos, anotados }
   }, [eventos, annotatedIds])
 
   const totalN    = eventos.length
-  const totalAuto = [...grupos, ...anotados.map(ev => ({ valor: parseNum(ev.valor_apoio_tecnico) }))]
+  const totalAuto = [...grupos, ...anotados.map(ev => ({ valor: eventoRate(ev) }))]
     .reduce((a, g) => a + g.valor, 0)
   const totalValor = apoioOverride !== null ? parseNum(apoioOverride) : totalAuto
 
@@ -552,8 +554,8 @@ function SecApoioTecnico({ eventos, annotatedIds, apoioOverride, onOverrideChang
                       </td>
                       <td className="py-1.5 px-2 text-center text-xs text-accent-subtle/60 tabular-nums">1</td>
                       <td className="py-1.5 pr-4 text-right text-xs font-medium tabular-nums">
-                        <span className={parseNum(ev.valor_apoio_tecnico) > 0 ? 'text-accent' : 'text-accent-subtle/30'}>
-                          {formatarEuro(parseNum(ev.valor_apoio_tecnico))}
+                        <span className={eventoRate(ev) > 0 ? 'text-accent' : 'text-accent-subtle/30'}>
+                          {formatarEuro(eventoRate(ev))}
                         </span>
                       </td>
                     </tr>
@@ -606,9 +608,9 @@ function SecApoioTecnico({ eventos, annotatedIds, apoioOverride, onOverrideChang
                           <div className="flex items-center gap-3">
                             <span className="w-2.5 h-px bg-border/20 shrink-0" />
                             <span className="text-[11px] text-border/50 shrink-0">{fmtData(ev)}</span>
-                            {parseNum(ev.valor_apoio_tecnico) > 0 && (
+                            {eventoRate(ev) > 0 && (
                               <span className="text-[11px] text-accent-subtle/35 tabular-nums">
-                                {formatarEuro(parseNum(ev.valor_apoio_tecnico))}
+                                {formatarEuro(eventoRate(ev))}
                               </span>
                             )}
                           </div>
@@ -1473,7 +1475,7 @@ const ESTADO_COR = {
 }
 function SpaceResumoAgenda({ espaco, slots, eventos, agendTec, cardState, catTotals, subtiposConfig, mes }) {
   const totalDJs   = slots.filter(s => s.tipo_slot).reduce((a, s) => a + slotRate(s, subtiposConfig, catTotals), 0)
-  const apoioAuto  = eventos.reduce((a, e) => a + parseNum(e.valor_apoio_tecnico), 0)
+  const apoioAuto  = eventos.reduce((a, e) => a + eventoRate(e), 0)
   const apoio      = cardState?.apoioOverride !== null ? parseNum(cardState?.apoioOverride) : apoioAuto
   const comprado   = (cardState?.equipamentos_comprado ?? []).reduce((a, r) => a + itemTotal(r), 0)
   const alugado    = (cardState?.equipamentos_alugado  ?? []).reduce((a, r) => a + itemTotal(r), 0)
@@ -1726,7 +1728,7 @@ export function ContasClientes() {
         .gte('data', dataInicio).lte('data', dataFim)
         .not('estado', 'in', '("cancelado","faltou","sem_efeito")'),
       supabase.from('supa_eventos')
-        .select('id, espaco_id, evento, tipo, data_evento, hora_inicio, hora_fim, valor, valor_artistico, valor_apoio_tecnico, margem, transporte, extras_contas, status, notas_faturacao')
+        .select('id, espaco_id, evento, tipo, data_evento, hora_inicio, hora_fim, valor, valor_artistico, valor_apoio_tecnico, valor_apoio_tecnico_2, valor_alimentacao, margem, transporte, extras_contas, status, notas_faturacao')
         .gte('data_evento', dataInicio).lte('data_evento', dataFim)
         .neq('status', 'cancelado'),
       supabase.from('agendamentos_tecnicos')

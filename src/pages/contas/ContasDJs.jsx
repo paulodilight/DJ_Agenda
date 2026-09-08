@@ -42,7 +42,7 @@ function assStatus(slot) {
   const p = slot.presencas_djs
   if (!p?.signed_at) return 'ausente'
   const inicio = new Date(`${slot.data}T${slot.hora_inicio}`)
-  return new Date(p.signed_at) <= inicio ? 'a_tempo' : 'atrasada'
+  return new Date(p.signed_at) <= new Date(inicio.getTime() + 15 * 60000) ? 'a_tempo' : 'atrasada'
 }
 
 // ─── Estado pagamento ─────────────────────────────────────────────────────────

@@ -74,7 +74,9 @@ export function EspacoPerfil() {
     responsavel_nome: '', responsavel_telefone: '', hora_chegada_offset: '',
     dress_code: '', refeicoes: '', bebidas: '',
     inputs_musicais: '',
+    gestores: [],
   })
+  const [novoGestor, setNovoGestor] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
 
   const [turnos, setTurnos] = useState([novoTurno()])
@@ -155,6 +157,7 @@ export function EspacoPerfil() {
         refeicoes: data.refeicoes ?? '',
         bebidas: data.bebidas ?? '',
         inputs_musicais: data.inputs_musicais ?? '',
+        gestores: data.gestores ?? [],
       })
 
       const turnosCarregados = data.turnos?.length > 0
@@ -1103,6 +1106,61 @@ export function EspacoPerfil() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Gestores — nomes que aparecem no "Alterado por" */}
+            <div className="mb-5">
+              <label className="text-[11px] font-semibold text-accent-muted uppercase tracking-wider">Colaboradores</label>
+              <p className="text-[10px] text-accent-subtle mb-2">Nomes que aparecem no campo "Alterado por" ao editar um evento</p>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {(form.gestores ?? []).map((nome) => (
+                  <span key={nome} className="flex items-center gap-1 rounded border border-border bg-surface-2 px-2 py-1 text-xs text-accent">
+                    {nome}
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, gestores: f.gestores.filter((n) => n !== nome) }))}
+                      className="text-accent-subtle hover:text-status-cancelado transition-colors ml-0.5"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+                {(form.gestores ?? []).length === 0 && (
+                  <span className="text-xs text-accent-subtle italic">Nenhum colaborador adicionado</span>
+                )}
+              </div>
+              <div className="flex gap-2 max-w-sm">
+                <input
+                  type="text"
+                  value={novoGestor}
+                  onChange={(e) => setNovoGestor(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      const nome = novoGestor.trim()
+                      if (nome && !form.gestores.includes(nome)) {
+                        setForm((f) => ({ ...f, gestores: [...f.gestores, nome] }))
+                        setNovoGestor('')
+                      }
+                    }
+                  }}
+                  placeholder="Nome do colaborador"
+                  className="flex-1 rounded border border-border bg-surface-0 px-3 py-2 text-sm text-accent placeholder:text-accent-subtle focus:outline-none focus:border-white/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nome = novoGestor.trim()
+                    if (nome && !form.gestores.includes(nome)) {
+                      setForm((f) => ({ ...f, gestores: [...f.gestores, nome] }))
+                      setNovoGestor('')
+                    }
+                  }}
+                  className="flex items-center gap-1 rounded border border-border bg-surface-2 px-3 py-2 text-xs text-accent hover:text-white hover:border-white/20 transition-colors"
+                >
+                  <Plus size={13} /> Adicionar
+                </button>
               </div>
             </div>
 
