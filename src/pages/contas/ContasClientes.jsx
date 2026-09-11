@@ -1862,8 +1862,9 @@ export function ContasClientes() {
         .select('*').eq('espaco_id', espacoId).eq('mes', mes).is('evento_id', null)
 
       // Apagar apenas itens manuais (sem ligação a evento específico)
-      await supabase.from('contas_clientes').delete()
+      const { error: delErr } = await supabase.from('contas_clientes').delete()
         .eq('espaco_id', espacoId).eq('mes', mes).is('evento_id', null)
+      if (delErr) throw new Error('Delete: ' + delErr.message)
 
       const inserts = []
 
@@ -1910,7 +1911,10 @@ export function ContasClientes() {
         })
       })
 
-      if (inserts.length > 0) await supabase.from('contas_clientes').insert(inserts)
+      if (inserts.length > 0) {
+        const { error: insErr } = await supabase.from('contas_clientes').insert(inserts)
+        if (insErr) throw new Error('Insert: ' + insErr.message)
+      }
       setCards(p => ({ ...p, [espacoId]: { ...p[espacoId], dirty: false } }))
 
       // Registar undo — restaura as linhas anteriores na BD e reinicializa o card
@@ -1920,14 +1924,14 @@ export function ContasClientes() {
         undo: async () => {
           await supabase.from('contas_clientes').delete()
             .eq('espaco_id', espacoId).eq('mes', nomeMes).is('evento_id', null)
-          const toReinsert = (prevRows ?? []).map(({ id, created_at, updated_at, ...r }) => r)
+          const toReinsert = (prevRows ?? []).map(({ id, criado_em, actualizado_em, ...r }) => r)
           if (toReinsert.length > 0) await supabase.from('contas_clientes').insert(toReinsert)
           const { data } = await supabase.from('contas_clientes')
             .select('*').eq('espaco_id', espacoId).eq('mes', nomeMes)
           setCards(p => ({ ...p, [espacoId]: initCard(data ?? []) }))
         },
       })
-    } catch (e) { console.error(e) }
+    } catch (e) { console.error(e); alert('Erro ao guardar: ' + e.message) }
     finally { setSaving(p => ({ ...p, [espacoId]: false })) }
   }, [cards, mes, pushUndo, espacos])
 
