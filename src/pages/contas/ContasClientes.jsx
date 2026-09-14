@@ -1138,7 +1138,16 @@ const [gruposAbertos, setGruposAbertos]   = useState({})
     }).join('')
 
     const avencaSec = avenca > 0 ? `<div class="sec"><div class="sec-hdr"><span>Avença</span><span>${fmtE(avenca)}</span></div></div>` : ''
-    const extrasSec = totalExtras  > 0 ? `<div class="sec"><div class="sec-hdr"><span>Extras</span><span>${fmtE(totalExtras)}</span></div></div>` : ''
+    const extrasRows = cardState.extras
+      .filter(r => itemTotal(r) > 0 || r.descricao?.trim())
+      .map(r => {
+        const ev = r.evento_id ? eventos.find(e => e.id === r.evento_id) : null
+        const evInfo = ev ? ` <span style="color:#888;font-size:11px;font-weight:normal">${evLabelPrint(ev)}</span>` : ''
+        const nota = r.notas?.trim()
+        const notaHtml = nota ? `<div style="color:#999;font-size:10px;margin-top:1px;font-style:italic">${nota}</div>` : ''
+        return `<tr><td style="padding:4px 12px"><div><strong>${r.descricao || '—'}</strong>${evInfo}${notaHtml}</div></td><td class="r" style="vertical-align:top;padding:6px 12px 4px">${fmtE(itemTotal(r))}</td></tr>`
+      }).join('')
+    const extrasSec = totalExtras > 0 ? `<div class="sec"><div class="sec-hdr"><span>Extras</span><span>${fmtE(totalExtras)}</span></div>${extrasRows ? `<table class="items" style="border-collapse:collapse;width:100%"><tbody>${extrasRows}</tbody></table>` : ''}</div>` : ''
     const evLabelPrint = (ev) => {
       const dt = ev.data_evento
         ? new Date(ev.data_evento + 'T12:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })
