@@ -207,6 +207,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   // Equipamentos do evento (evento_equipamentos)
   const [equipRows, setEquipRows] = useState({ proprio: [], alugado: [], comprado: [], extra: [] })
   const [equipamentosList, setEquipamentosList] = useState([])
+  const [searchEquipBusca, setSearchEquipBusca] = useState('')
+  const [searchEquipAberta, setSearchEquipAberta] = useState(false)
   const [carros, setCarros] = useState([])
   const [eventoCarros, setEventoCarros] = useState({ carro_id: '', condutor_id: '', km_saida: '', km_chegada: '' })
   const [printEvento, setPrintEvento] = useState(false)
@@ -635,9 +637,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
 
   // ── Dados normalizados para impressão ─────────────────────────────────────
   const GRUPOS_EQUIP_INFO = [
-    { tipo: 'proprio',  label: 'Equipamentos para o Evento' },
-    { tipo: 'alugado',  label: 'Equipamentos Alugados' },
-    { tipo: 'comprado', label: 'Equipamentos Comprados' },
+    { tipo: 'proprio', label: 'Equipamentos para o Evento' },
     { tipo: 'extra',    label: 'Extras' },
   ]
   const numP = (v) => parseFloat(v) || 0
@@ -1087,10 +1087,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
           {abaActiva === 'equipamentos' && (() => {
             const emptyEquipRow = () => ({ _key: uidF(), id: null, equipamento_id: null, descricao: '', valor_custo: '', margem: '', unidades: 1, observacoes: '' })
             const SECOES = [
-              { key: 'proprio',  label: 'Equipamentos para o evento', hasDbPicker: true },
-              { key: 'alugado',  label: 'Equipamentos Alugados',       hasDbPicker: true },
-              { key: 'comprado', label: 'Equipamentos Comprados',      hasDbPicker: true },
-              { key: 'extra',    label: 'Extras',                       hasDbPicker: false },
+              { key: 'proprio', label: 'Equipamentos para o evento' },
+              { key: 'extra',   label: 'Extras' },
             ]
             const updRow = (secKey, rowKey, field, val) => setEquipRows(prev => ({
               ...prev,
@@ -1163,27 +1161,39 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     )}
                   </div>
                 )}
-                {SECOES.map(({ key, label, hasDbPicker }) => {
+                {SECOES.map(({ key, label }) => {
                   const rows = equipRows[key]
+                  const searchResults = key === 'proprio' && searchEquipAberta && searchEquipBusca.length > 0
+                    ? equipamentosList.filter(e => e.nome.toLowerCase().includes(searchEquipBusca.toLowerCase())).slice(0, 8)
+                    : []
                   return (
                     <div key={key} className="flex flex-col gap-1.5">
                       <div className="flex items-center justify-between min-h-[22px]">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">{label}</p>
                         <div className="flex items-center gap-2">
-                          {hasDbPicker && equipamentosList.length > 0 && (
-                            <select
-                              className={inputCls + ' text-[11px] py-0.5 px-2 w-44 h-7'}
-                              value=""
-                              onChange={e => {
-                                const eq = equipamentosList.find(x => x.id === e.target.value)
-                                if (eq) addRow(key, eq)
-                              }}
-                            >
-                              <option value="">+ Adicionar da BD…</option>
-                              {equipamentosList.map(eq => (
-                                <option key={eq.id} value={eq.id}>{eq.nome}</option>
-                              ))}
-                            </select>
+                          {key === 'proprio' && equipamentosList.length > 0 && (
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={searchEquipBusca}
+                                onChange={e => { setSearchEquipBusca(e.target.value); setSearchEquipAberta(true) }}
+                                onFocus={() => setSearchEquipAberta(true)}
+                                onBlur={() => setTimeout(() => setSearchEquipAberta(false), 150)}
+                                placeholder="Pesquisar equipamento…"
+                                className={inputCls + ' text-[11px] py-0.5 px-2 w-44 h-7'}
+                              />
+                              {searchResults.length > 0 && (
+                                <div className="absolute right-0 top-8 z-20 bg-surface-2 border border-border rounded-lg shadow-lg w-64 max-h-48 overflow-y-auto">
+                                  {searchResults.map(eq => (
+                                    <button key={eq.id} type="button"
+                                      onMouseDown={() => { addRow('proprio', eq); setSearchEquipBusca(''); setSearchEquipAberta(false) }}
+                                      className="w-full text-left px-3 py-1.5 text-[11px] text-accent hover:bg-surface-3 transition-colors border-b border-border/20 last:border-0">
+                                      {eq.nome}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                           <button type="button" onClick={() => addRow(key)}
                             className="flex items-center gap-1 text-[11px] text-accent-subtle/50 hover:text-status-confirmado/70 transition-colors whitespace-nowrap">
@@ -1667,10 +1677,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             const tec2 = tecnicos.find(t => t.id === form.tecnico2_id)?.nome
 
             const GRUPOS_EQUIP = [
-              { tipo: 'proprio',  label: 'Equipamentos para o evento' },
-              { tipo: 'alugado',  label: 'Equipamentos Alugados' },
-              { tipo: 'comprado', label: 'Equipamentos Comprados' },
-              { tipo: 'extra',    label: 'Extras' },
+              { tipo: 'proprio', label: 'Equipamentos para o evento' },
+              { tipo: 'extra',   label: 'Extras' },
             ]
             const gruposComItens = GRUPOS_EQUIP
               .map(g => ({ ...g, rows: equipRows[g.tipo] ?? [] }))

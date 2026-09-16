@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
-import { Package, Plus, Search, X, QrCode, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, LogIn, Clock } from 'lucide-react'
+import { Package, Plus, Search, X, QrCode, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, LogIn, LogOut, Clock } from 'lucide-react'
 import { clsx } from 'clsx'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -40,6 +40,7 @@ export function Equipamentos() {
   const [a_guardar, setAGuardar]          = useState(false)
   const [erro, setErro]                   = useState(null)
   const [scanner, setScanner]             = useState(false)
+  const [a_confirmando, setAConfirmando]  = useState(null)
 
   // Entrada inline
   const [entradaAberta, setEntradaAberta] = useState(null) // eq.id
@@ -136,6 +137,17 @@ export function Equipamentos() {
     await equipamentosApi.apagar(eq.id); carregar()
   }
 
+  const confirmarSaida = async (eq) => {
+    if (!eq.reserva_movimento_id) return
+    setAConfirmando(eq.id)
+    try {
+      await equipamentosApi.confirmarSaida(eq.reserva_movimento_id)
+      await carregar()
+    } finally {
+      setAConfirmando(null)
+    }
+  }
+
   // ── Filtros ─────────────────────────────────────────────────
   const categorias = ['Todos', ...equipamentosApi.categorias]
   const filtrados = equipamentos.filter(e => {
@@ -225,8 +237,9 @@ export function Equipamentos() {
           </button>
         </div>
       ) : (() => {
-        const fora   = filtrados.filter(e => e.em_uso)
-        const dentro = filtrados.filter(e => !e.em_uso)
+        const fora      = filtrados.filter(e => e.em_uso)
+        const reservado = filtrados.filter(e => e.reservado)
+        const dentro    = filtrados.filter(e => !e.em_uso && !e.reservado)
         const thCls  = 'text-left px-4 py-2.5 font-semibold uppercase tracking-wider text-[10px]'
 
         const qrCell = (eq) => eq.qr_code
@@ -342,57 +355,175 @@ export function Equipamentos() {
               {fora.length === 0 ? (
                 <p className="text-center py-6 text-xs text-accent-subtle/40 italic">Nenhum equipamento fora.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse min-w-[640px]">
-                    <thead>
-                      <tr className="border-b border-border bg-surface-0">
-                        <th className={clsx(thCls, 'text-amber-400/60')}>Nome</th>
-                        <th className={clsx(thCls, 'text-amber-400/60')}>QR</th>
-                        <th className={clsx(thCls, 'text-amber-400/60')}>Evento</th>
-                        <th className={clsx(thCls, 'text-amber-400/60')}>Saída por</th>
-                        <th className={clsx(thCls, 'text-amber-400/60')}>Data saída</th>
-                        <th className="px-3 py-2.5 w-36" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fora.map(eq => (
-                        <Fragment key={eq.id}>
-                          <tr className="border-b border-border/40 hover:bg-amber-500/5 transition-colors group">
-                            <td className="px-4 py-2.5 font-semibold text-accent">{eq.nome}</td>
-                            <td className="px-4 py-2.5">{qrCell(eq)}</td>
-                            <td className="px-4 py-2.5 text-amber-400/80 max-w-[180px] truncate" title={eq.evento_atual?.evento}>
-                              {eq.evento_atual?.evento ?? <span className="text-accent-subtle/30">—</span>}
-                            </td>
-                            <td className="px-4 py-2.5 text-accent-muted">{eq.registado_por ?? <span className="text-accent-subtle/30">—</span>}</td>
-                            <td className="px-4 py-2.5 text-accent-muted tabular-nums">{fmtData(eq.saida_at)}</td>
-                            <td className="px-3 py-2.5">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => entradaAberta === eq.id ? fecharEntrada() : abrirEntrada(eq)}
-                                  className={clsx(
-                                    'flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-colors',
-                                    entradaAberta === eq.id
-                                      ? 'bg-blue-500/25 border-blue-500/50 text-blue-300'
-                                      : 'bg-blue-500/15 border-blue-500/30 text-blue-400 hover:bg-blue-500/25'
-                                  )}>
-                                  <LogIn size={11} />
-                                  Entrada
-                                </button>
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  {histBtn(eq, 'text-accent-muted')}
-                                  <button onClick={() => abrirEditar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors"><Pencil size={12} /></button>
-                                  <button onClick={() => apagar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
+                <>
+                  {/* Mobile cards */}
+                  <div className="md:hidden divide-y divide-amber-500/10">
+                    {fora.map(eq => (
+                      <div key={eq.id} className="px-4 py-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-accent text-sm">{eq.nome}</div>
+                            {eq.evento_atual?.evento && <div className="text-xs text-amber-400/80 truncate">{eq.evento_atual.evento}</div>}
+                            <div className="text-xs text-accent-muted mt-0.5">
+                              {eq.registado_por && <span>{eq.registado_por} · </span>}
+                              {fmtData(eq.saida_at)}
+                            </div>
+                          </div>
+                          <button onClick={() => entradaAberta === eq.id ? fecharEntrada() : abrirEntrada(eq)}
+                            className={clsx('flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors shrink-0',
+                              entradaAberta === eq.id
+                                ? 'bg-blue-500/25 border-blue-500/50 text-blue-300'
+                                : 'bg-blue-500/15 border-blue-500/30 text-blue-400')}>
+                            <LogIn size={12}/> Entrada
+                          </button>
+                        </div>
+                        {entradaAberta === eq.id && (
+                          <div className="mt-3 flex flex-col gap-2">
+                            <input value={retornoPor} onChange={e => setRetornoPor(e.target.value)}
+                              placeholder="Devolvido por…" className={inpCls} />
+                            <input value={notasEntrada} onChange={e => setNotasEntrada(e.target.value)}
+                              placeholder="Observações de retorno…" className={inpCls} />
+                            <div className="flex gap-2">
+                              <button onClick={() => submeterEntrada(eq)} disabled={a_entrando}
+                                className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold disabled:opacity-50">
+                                {a_entrando ? 'A registar…' : 'Confirmar Entrada'}
+                              </button>
+                              <button onClick={fecharEntrada} className="p-2 rounded-lg hover:bg-surface-3 text-accent-subtle">
+                                <X size={14}/>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-xs border-collapse min-w-[640px]">
+                      <thead>
+                        <tr className="border-b border-border bg-surface-0">
+                          <th className={clsx(thCls, 'text-amber-400/60')}>Nome</th>
+                          <th className={clsx(thCls, 'text-amber-400/60')}>QR</th>
+                          <th className={clsx(thCls, 'text-amber-400/60')}>Evento</th>
+                          <th className={clsx(thCls, 'text-amber-400/60')}>Saída por</th>
+                          <th className={clsx(thCls, 'text-amber-400/60')}>Data saída</th>
+                          <th className="px-3 py-2.5 w-36" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fora.map(eq => (
+                          <Fragment key={eq.id}>
+                            <tr className="border-b border-border/40 hover:bg-amber-500/5 transition-colors group">
+                              <td className="px-4 py-2.5 font-semibold text-accent">{eq.nome}</td>
+                              <td className="px-4 py-2.5">{qrCell(eq)}</td>
+                              <td className="px-4 py-2.5 text-amber-400/80 max-w-[180px] truncate" title={eq.evento_atual?.evento}>
+                                {eq.evento_atual?.evento ?? <span className="text-accent-subtle/30">—</span>}
+                              </td>
+                              <td className="px-4 py-2.5 text-accent-muted">{eq.registado_por ?? <span className="text-accent-subtle/30">—</span>}</td>
+                              <td className="px-4 py-2.5 text-accent-muted tabular-nums">{fmtData(eq.saida_at)}</td>
+                              <td className="px-3 py-2.5">
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => entradaAberta === eq.id ? fecharEntrada() : abrirEntrada(eq)}
+                                    className={clsx(
+                                      'flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-colors',
+                                      entradaAberta === eq.id
+                                        ? 'bg-blue-500/25 border-blue-500/50 text-blue-300'
+                                        : 'bg-blue-500/15 border-blue-500/30 text-blue-400 hover:bg-blue-500/25'
+                                    )}>
+                                    <LogIn size={11} />
+                                    Entrada
+                                  </button>
+                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {histBtn(eq, 'text-accent-muted')}
+                                    <button onClick={() => abrirEditar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors"><Pencil size={12} /></button>
+                                    <button onClick={() => apagar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
+                                  </div>
                                 </div>
-                              </div>
-                            </td>
-                          </tr>
-                          {entradaRow(eq)}
-                          {histRow(eq, 6)}
-                        </Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                            </tr>
+                            {entradaRow(eq)}
+                            {histRow(eq, 6)}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* ── RESERVADO ── */}
+            <div className="rounded-xl overflow-hidden border border-blue-500/25">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-500/10 border-b border-blue-500/20">
+                <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-300">
+                  Reservado — Ainda dentro
+                  <span className="ml-2 font-normal text-blue-300/60">({reservado.length})</span>
+                </p>
+              </div>
+              {reservado.length === 0 ? (
+                <p className="text-center py-6 text-xs text-accent-subtle/40 italic">Nenhuma reserva em aberto.</p>
+              ) : (
+                <>
+                  {/* Mobile cards */}
+                  <div className="md:hidden divide-y divide-blue-500/10">
+                    {reservado.map(eq => (
+                      <div key={eq.id} className="px-4 py-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-accent text-sm">{eq.nome}</div>
+                            {eq.reserva_atual?.evento && <div className="text-xs text-blue-300/80 truncate">{eq.reserva_atual.evento}</div>}
+                          </div>
+                          <button onClick={() => confirmarSaida(eq)} disabled={a_confirmando === eq.id}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors shrink-0 bg-amber-500/15 border-amber-500/40 text-amber-400 disabled:opacity-40">
+                            <LogOut size={12}/> Confirmar saída
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-xs border-collapse min-w-[560px]">
+                      <thead>
+                        <tr className="border-b border-border bg-surface-0">
+                          <th className={clsx(thCls, 'text-blue-300/60')}>Nome</th>
+                          <th className={clsx(thCls, 'text-blue-300/60')}>QR</th>
+                          <th className={clsx(thCls, 'text-blue-300/60')}>Evento</th>
+                          <th className="px-3 py-2.5 w-40" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reservado.map(eq => (
+                          <Fragment key={eq.id}>
+                            <tr className="border-b border-border/40 hover:bg-blue-500/5 transition-colors group">
+                              <td className="px-4 py-2.5 font-semibold text-accent">{eq.nome}</td>
+                              <td className="px-4 py-2.5">{qrCell(eq)}</td>
+                              <td className="px-4 py-2.5 text-blue-300/80 max-w-[220px] truncate" title={eq.reserva_atual?.evento}>
+                                {eq.reserva_atual?.evento ?? <span className="text-accent-subtle/30">—</span>}
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => confirmarSaida(eq)} disabled={a_confirmando === eq.id}
+                                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-colors bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25 disabled:opacity-40">
+                                    <LogOut size={11} />
+                                    Confirmar saída
+                                  </button>
+                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {histBtn(eq, 'text-accent-muted')}
+                                    <button onClick={() => abrirEditar(eq)} className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors"><Pencil size={12} /></button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                            {histRow(eq, 4)}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
 
@@ -445,7 +576,7 @@ export function Equipamentos() {
                                     ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-status-confirmado/10 text-status-confirmado border-status-confirmado/20">Devolvido</span>
                                     : m.saida_at
                                     ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20">Em uso</span>
-                                    : <span className="text-accent-subtle">—</span>}
+                                    : <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border bg-blue-500/10 text-blue-300 border-blue-500/20">Reservado</span>}
                                 </td>
                               </tr>
                               {histRow(eqMov, 6)}
@@ -476,7 +607,26 @@ export function Equipamentos() {
                 dentro.length === 0 ? (
                   <p className="text-center py-6 text-xs text-accent-subtle/40 italic">Nenhum equipamento disponível.</p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <>
+                    {/* Mobile cards */}
+                    <div className="md:hidden divide-y divide-border/40">
+                      {dentro.map(eq => (
+                        <div key={eq.id} className="px-4 py-3 flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-accent text-sm">{eq.nome}</div>
+                            {eq.categoria
+                              ? <span className={clsx('text-[10px] px-1.5 py-0.5 rounded border font-medium', badgeCategoria(eq.categoria))}>{eq.categoria}</span>
+                              : null}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={() => abrirEditar(eq)} className="p-1.5 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors"><Pencil size={13}/></button>
+                            <button onClick={() => apagar(eq)} className="p-1.5 rounded hover:bg-surface-3 text-accent-muted hover:text-red-400 transition-colors"><Trash2 size={13}/></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Desktop table */}
+                    <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-xs border-collapse min-w-[400px]">
                       <thead>
                         <tr className="border-b border-border bg-surface-0">
@@ -511,6 +661,7 @@ export function Equipamentos() {
                       </tbody>
                     </table>
                   </div>
+                  </>
                 )
               )}
             </div>

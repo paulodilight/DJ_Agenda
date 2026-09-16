@@ -6,7 +6,7 @@ const CATEGORIAS_DEFAULT = ['Som', 'Iluminação', 'DJ', 'Vídeo', 'Estrutura', 
 export const equipamentosApi = {
 
   async listar() {
-    const [{ data: equip, error }, { data: emUso }] = await Promise.all([
+    const [{ data: equip, error }, { data: abertos }] = await Promise.all([
       supabase.from(TABLE).select('*').eq('ativo', true).order('nome'),
       supabase.from('evento_equipamentos')
         .select('id, equipamento_id, evento_id, saida_at, registado_por, supa_eventos(evento, data_evento)')
@@ -16,10 +16,11 @@ export const equipamentosApi = {
     ])
     if (error) throw error
     const emUsoMap = {}
-    ;(emUso ?? []).forEach(r => {
-      // saida_at scan tem precedência sobre registo via FormEvento
-      if (!emUsoMap[r.equipamento_id] || r.saida_at) {
-        emUsoMap[r.equipamento_id] = { ...r.supa_eventos, registado_por: r.registado_por, saida_at: r.saida_at, movimento_id: r.id }
+    const reservadoMap = {}
+    ;(abertos ?? []).forEach(r => {
+      const alvo = r.saida_at ? emUsoMap : reservadoMap
+      if (!alvo[r.equipamento_id]) {
+        alvo[r.equipamento_id] = { ...r.supa_eventos, registado_por: r.registado_por, saida_at: r.saida_at, movimento_id: r.id }
       }
     })
     return (equip ?? []).map(e => ({
@@ -29,6 +30,9 @@ export const equipamentosApi = {
       registado_por: emUsoMap[e.id]?.registado_por ?? null,
       saida_at: emUsoMap[e.id]?.saida_at ?? null,
       movimento_id: emUsoMap[e.id]?.movimento_id ?? null,
+      reservado: !!reservadoMap[e.id],
+      reserva_atual: reservadoMap[e.id] ?? null,
+      reserva_movimento_id: reservadoMap[e.id]?.movimento_id ?? null,
     }))
   },
 
@@ -92,6 +96,16 @@ export const equipamentosApi = {
     const { data, error } = await supabase
       .from('evento_equipamentos')
       .insert({ equipamento_id: equipamentoId, tipo: 'proprio', saida_at: new Date().toISOString(), registado_por: nomeOperador, quantidade: Number(quantidade) || 1, observacoes: notas || null })
+      .select().single()
+    if (error) throw error
+    return data
+  },
+
+  async confirmarSaida(movimentoId, nomeOperador = null) {
+    const { data, error } = await supabase
+      .from('evento_equipamentos')
+      .update({ saida_at: new Date().toISOString(), ...(nomeOperador ? { registado_por: nomeOperador } : {}) })
+      .eq('id', movimentoId)
       .select().single()
     if (error) throw error
     return data
