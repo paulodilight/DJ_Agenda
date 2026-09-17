@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { equipamentosApi } from '@/lib/equipamentosApi'
 import { QrScannerModal } from '@/components/equipamentos/QrScannerModal'
+import { GestaoStocks } from '@/components/equipamentos/GestaoStocks'
 
 const VAZIO = { nome: '', categoria: '', qr_code: '', valor_custo: '', valor_aluguer_dia: '', notas: '' }
 
@@ -199,59 +200,7 @@ export function Equipamentos() {
       </div>
 
       {/* ── Aba Gestão de stocks ── */}
-      {aba === 'stocks' && (() => {
-        const linhas = equipamentosApi.categorias.map(cat => {
-          const unidades = equipamentos.filter(e => e.categoria === cat)
-          const emUsoCat = unidades.filter(u => u.em_uso).length
-          const reservadoCat = unidades.filter(u => u.reservado).length
-          const disponivel = unidades.length - emUsoCat
-          return { cat, total: unidades.length, emUso: emUsoCat, reservado: reservadoCat, disponivel }
-        }).filter(l => l.total > 0)
-
-        return (
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Boxes size={15} className="text-status-confirmado" />
-              <p className="text-xs text-accent-muted">
-                Stock por categoria — equipamento em uso num evento desconta automaticamente da disponibilidade.
-              </p>
-            </div>
-            {loading ? (
-              <div className="text-center py-16 text-accent-subtle text-sm">A carregar…</div>
-            ) : linhas.length === 0 ? (
-              <p className="text-center py-16 text-xs text-accent-subtle italic">Nenhum equipamento registado.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse min-w-[480px]">
-                  <thead>
-                    <tr className="border-b border-border bg-surface-0">
-                      {['Categoria', 'Total', 'Reservado', 'Fora (em uso)', 'Disponível'].map(h => (
-                        <th key={h} className={clsx('py-2.5 font-semibold uppercase tracking-wider text-[10px] text-accent-subtle', h === 'Categoria' ? 'text-left px-4' : 'text-center px-3')}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {linhas.map(l => (
-                      <tr key={l.cat} className="border-b border-border/40 hover:bg-surface-2 transition-colors">
-                        <td className="px-4 py-2.5">
-                          <span className={clsx('px-1.5 py-0.5 rounded border font-medium text-[10px]', badgeCategoria(l.cat))}>{l.cat}</span>
-                        </td>
-                        <td className="px-3 py-2.5 text-center tabular-nums text-accent font-semibold">{l.total}</td>
-                        <td className="px-3 py-2.5 text-center tabular-nums text-blue-400">{l.reservado || <span className="text-accent-subtle/30">—</span>}</td>
-                        <td className="px-3 py-2.5 text-center tabular-nums text-amber-400">{l.emUso || <span className="text-accent-subtle/30">—</span>}</td>
-                        <td className={clsx('px-3 py-2.5 text-center tabular-nums font-bold', l.disponivel > 0 ? 'text-status-confirmado' : 'text-red-400')}>{l.disponivel}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <p className="text-[10px] text-accent-subtle mt-3">
-              Para adicionar, editar ou dar baixa a uma unidade, usa a aba "Saídas e entradas".
-            </p>
-          </div>
-        )
-      })()}
+      {aba === 'stocks' && <GestaoStocks equipamentos={equipamentos} loading={loading} />}
 
       {/* ── Aba Saídas e entradas ── */}
       {aba === 'saidas' && <>
