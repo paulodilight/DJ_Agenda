@@ -188,7 +188,7 @@ export function Equipamentos() {
       <div className="flex gap-1 border-b border-border mb-4">
         {[
           { id: 'saidas', label: 'Saídas e entradas' },
-          { id: 'stocks', label: 'Gestão de stocks' },
+          { id: 'stocks', label: 'Stock Estúdios' },
         ].map(a => (
           <button key={a.id} onClick={() => setAba(a.id)}
             className={clsx('px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px flex items-center gap-1.5',
@@ -199,7 +199,7 @@ export function Equipamentos() {
         ))}
       </div>
 
-      {/* ── Aba Gestão de stocks ── */}
+      {/* ── Aba Stock Estúdios ── */}
       {aba === 'stocks' && <GestaoStocks equipamentos={equipamentos} loading={loading} />}
 
       {/* ── Aba Saídas e entradas ── */}
