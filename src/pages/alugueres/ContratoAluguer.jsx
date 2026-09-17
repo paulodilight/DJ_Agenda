@@ -88,7 +88,8 @@ export function ContratoAluguer({ aluguer, onClose }) {
 
       {/* Preview scrollável */}
       <div className="flex-1 overflow-y-auto bg-surface-0 p-6 flex justify-center">
-        <div ref={printRef} className="bg-white text-black w-full max-w-[780px] p-10 shadow-xl text-[10.5pt] leading-snug font-['Arial',sans-serif]">
+        <div ref={printRef} className="w-full max-w-[780px] p-10 shadow-xl text-[10.5pt] leading-snug font-['Arial',sans-serif]"
+          style={{ background: '#ffffff', color: '#111111', colorScheme: 'light' }}>
 
           {/* Logo */}
           <div className="text-center mb-5">
@@ -147,22 +148,22 @@ export function ContratoAluguer({ aluguer, onClose }) {
             </thead>
             <tbody>
               {itens.map((item, i) => (
-                <tr key={item.id ?? i} className={i % 2 === 1 ? 'bg-gray-50' : ''}>
-                  <td className="border border-gray-300 px-3 py-1.5 text-gray-400 font-mono text-[8.5pt]">{item.equipamentos?.qr_code ?? '—'}</td>
-                  <td className="border border-gray-300 px-3 py-1.5 text-center">{item.quantidade}</td>
-                  <td className="border border-gray-300 px-3 py-1.5 font-medium">{item.equipamentos?.nome ?? '—'}</td>
-                  <td className="border border-gray-300 px-3 py-1.5 text-right tabular-nums">
+                <tr key={item.id ?? i} style={{ background: i % 2 === 1 ? '#f9fafb' : '#ffffff' }}>
+                  <td className="border border-gray-300 px-3 py-1.5 font-mono text-[8.5pt]" style={{ color: '#9ca3af' }}>{item.equipamentos?.qr_code ?? '—'}</td>
+                  <td className="border border-gray-300 px-3 py-1.5 text-center" style={{ color: '#111' }}>{item.quantidade}</td>
+                  <td className="border border-gray-300 px-3 py-1.5 font-medium" style={{ color: '#111' }}>{item.equipamentos?.nome ?? '—'}</td>
+                  <td className="border border-gray-300 px-3 py-1.5 text-right tabular-nums" style={{ color: '#111' }}>
                     {item.preco_aplicado != null ? `${parseFloat(item.preco_aplicado).toFixed(2)} €` : '—'}
                   </td>
                 </tr>
               ))}
               {/* Linhas em branco */}
               {Array.from({ length: Math.max(0, 6 - itens.length) }).map((_, i) => (
-                <tr key={`blank-${i}`} className="h-7">
-                  <td className="border border-gray-300 px-3" />
-                  <td className="border border-gray-300 px-3" />
-                  <td className="border border-gray-300 px-3" />
-                  <td className="border border-gray-300 px-3" />
+                <tr key={`blank-${i}`} className="h-7" style={{ background: '#ffffff' }}>
+                  <td className="border border-gray-300 px-3" style={{ background: '#ffffff' }} />
+                  <td className="border border-gray-300 px-3" style={{ background: '#ffffff' }} />
+                  <td className="border border-gray-300 px-3" style={{ background: '#ffffff' }} />
+                  <td className="border border-gray-300 px-3" style={{ background: '#ffffff' }} />
                 </tr>
               ))}
             </tbody>
