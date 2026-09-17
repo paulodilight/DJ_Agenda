@@ -26,6 +26,7 @@ import { ApoioTecnico } from '@/pages/ApoioTecnico'
 import { DJConvidados } from '@/pages/DJConvidados'
 import { Artistas } from '@/pages/Artistas'
 import { Equipamentos } from '@/pages/equipamentos/Equipamentos'
+import { Alugueres } from '@/pages/alugueres/Alugueres'
 import { ArtistaPerfil } from '@/pages/ArtistaPerfil'
 import { Club } from '@/pages/Club'
 import { Pontualidades } from '@/pages/Pontualidades'
@@ -90,6 +91,7 @@ export default function App() {
           <Route path="apoio-tecnico" element={<ApoioTecnico />} />
           <Route path="artistas" element={<Artistas />} />
           <Route path="equipamentos" element={<Equipamentos />} />
+          <Route path="alugueres" element={<Alugueres />} />
           <Route path="artistas/:id" element={<ArtistaPerfil />} />
           <Route path="comunicacao" element={<Comunicacao />} />
           <Route path="contas" element={<Contas />}>

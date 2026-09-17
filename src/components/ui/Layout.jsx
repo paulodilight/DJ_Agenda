@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, MapPin, CalendarDays,
   Settings, LogOut, Mic2, Bell, Music2, Scale, Send,
   ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw, Building2, ShieldCheck, ClipboardList,
-  UserCheck, GraduationCap, Mic, Gem, Wallet, Package,
+  UserCheck, GraduationCap, Mic, Gem, Wallet, Package, Handshake,
 } from 'lucide-react'
 import { useAuthStore, useMesStore, useAppStore } from '@/store'
 import { configuracoesApi } from '@/lib/api'
@@ -22,6 +22,7 @@ const ROTAS = [
   { path: '/eventos',        label: 'Eventos' },
   { path: '/atuacoes',       label: 'Atuações' },
   { path: '/equipamentos',   label: 'Equipamentos' },
+  { path: '/alugueres',      label: 'Alugueres' },
   { path: '/comunicacao',    label: 'Comunicação' },
   { path: '/contas',         label: 'Contas' },
   { path: '/djs',            label: 'DJs' },
@@ -61,6 +62,7 @@ const navAgenda = [
   { para: '/atuacoes',       icone: Mic2,            label: 'Atuações' },
   { para: '/eventos',        icone: Star,            label: 'Eventos' },
   { para: '/equipamentos',   icone: Package,         label: 'Equipamentos' },
+  { para: '/alugueres',      icone: Handshake,       label: 'Alugueres' },
   { para: '/apoio-tecnico',  icone: Headphones,      label: 'Apoio T.' },
   { para: '/producao',       icone: ClipboardList,   label: 'Produção' },
   { para: '/pontualidades',  icone: UserCheck,       label: 'Presenças' },
