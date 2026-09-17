@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
-import { Package, Plus, Search, X, QrCode, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, LogIn, LogOut, Clock } from 'lucide-react'
+import { Package, Plus, Search, X, QrCode, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, LogIn, LogOut, Clock, Boxes } from 'lucide-react'
 import { clsx } from 'clsx'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -41,6 +41,7 @@ export function Equipamentos() {
   const [erro, setErro]                   = useState(null)
   const [scanner, setScanner]             = useState(false)
   const [a_confirmando, setAConfirmando]  = useState(null)
+  const [aba, setAba]                     = useState('saidas')
 
   // Entrada inline
   const [entradaAberta, setEntradaAberta] = useState(null) // eq.id
@@ -163,25 +164,97 @@ export function Equipamentos() {
     <div className="p-6 max-w-6xl mx-auto">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-lg font-bold text-accent tracking-wide flex items-center gap-2">
-            <Package size={18} className="text-status-confirmado" />
-            Equipamentos
-          </h2>
-          <p className="text-xs text-accent-subtle mt-0.5">Catálogo com QR codes · Histórico de movimentações</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setScanner(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold hover:bg-amber-500/25 transition-colors">
-            <QrCode size={14} /> Scan QR
-          </button>
-          <button onClick={abrirCriar}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-status-confirmado/15 border border-status-confirmado/30 text-status-confirmado text-xs font-semibold hover:bg-status-confirmado/25 transition-colors">
-            <Plus size={14} /> Novo Equipamento
-          </button>
-        </div>
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <h2 className="text-lg font-bold text-accent tracking-wide flex items-center gap-2">
+          <Package size={18} className="text-status-confirmado" />
+          Equipamentos
+        </h2>
+        {aba === 'saidas' && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setScanner(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold hover:bg-amber-500/25 transition-colors">
+              <QrCode size={13} /> Scan QR
+            </button>
+            <button onClick={abrirCriar}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-status-confirmado/15 border border-status-confirmado/30 text-status-confirmado text-xs font-semibold hover:bg-status-confirmado/25 transition-colors">
+              <Plus size={13} /> Novo
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* ── Abas ── */}
+      <div className="flex gap-1 border-b border-border mb-4">
+        {[
+          { id: 'saidas', label: 'Saídas e entradas' },
+          { id: 'stocks', label: 'Gestão de stocks' },
+        ].map(a => (
+          <button key={a.id} onClick={() => setAba(a.id)}
+            className={clsx('px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px flex items-center gap-1.5',
+              aba === a.id ? 'border-status-confirmado text-status-confirmado' : 'border-transparent text-accent-muted hover:text-accent')}>
+            {a.id === 'stocks' && <Boxes size={13} />}
+            {a.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Aba Gestão de stocks ── */}
+      {aba === 'stocks' && (() => {
+        const linhas = equipamentosApi.categorias.map(cat => {
+          const unidades = equipamentos.filter(e => e.categoria === cat)
+          const emUsoCat = unidades.filter(u => u.em_uso).length
+          const reservadoCat = unidades.filter(u => u.reservado).length
+          const disponivel = unidades.length - emUsoCat
+          return { cat, total: unidades.length, emUso: emUsoCat, reservado: reservadoCat, disponivel }
+        }).filter(l => l.total > 0)
+
+        return (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Boxes size={15} className="text-status-confirmado" />
+              <p className="text-xs text-accent-muted">
+                Stock por categoria — equipamento em uso num evento desconta automaticamente da disponibilidade.
+              </p>
+            </div>
+            {loading ? (
+              <div className="text-center py-16 text-accent-subtle text-sm">A carregar…</div>
+            ) : linhas.length === 0 ? (
+              <p className="text-center py-16 text-xs text-accent-subtle italic">Nenhum equipamento registado.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse min-w-[480px]">
+                  <thead>
+                    <tr className="border-b border-border bg-surface-0">
+                      {['Categoria', 'Total', 'Reservado', 'Fora (em uso)', 'Disponível'].map(h => (
+                        <th key={h} className={clsx('py-2.5 font-semibold uppercase tracking-wider text-[10px] text-accent-subtle', h === 'Categoria' ? 'text-left px-4' : 'text-center px-3')}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linhas.map(l => (
+                      <tr key={l.cat} className="border-b border-border/40 hover:bg-surface-2 transition-colors">
+                        <td className="px-4 py-2.5">
+                          <span className={clsx('px-1.5 py-0.5 rounded border font-medium text-[10px]', badgeCategoria(l.cat))}>{l.cat}</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-center tabular-nums text-accent font-semibold">{l.total}</td>
+                        <td className="px-3 py-2.5 text-center tabular-nums text-blue-400">{l.reservado || <span className="text-accent-subtle/30">—</span>}</td>
+                        <td className="px-3 py-2.5 text-center tabular-nums text-amber-400">{l.emUso || <span className="text-accent-subtle/30">—</span>}</td>
+                        <td className={clsx('px-3 py-2.5 text-center tabular-nums font-bold', l.disponivel > 0 ? 'text-status-confirmado' : 'text-red-400')}>{l.disponivel}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="text-[10px] text-accent-subtle mt-3">
+              Para adicionar, editar ou dar baixa a uma unidade, usa a aba "Saídas e entradas".
+            </p>
+          </div>
+        )
+      })()}
+
+      {/* ── Aba Saídas e entradas ── */}
+      {aba === 'saidas' && <>
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-3 gap-3 mb-5">
@@ -669,6 +742,8 @@ export function Equipamentos() {
           </div>
         )
       })()}
+
+      </>}
 
       {/* ── Modal criar/editar ── */}
       {modal && (
