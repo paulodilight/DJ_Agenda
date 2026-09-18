@@ -524,7 +524,7 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         }
       }
       const isConvidado = !djIdFinal && !!form.dj_externo?.trim()
-      const { subtipo_key: _sk, ...formData } = form
+      const { subtipo_key: _sk, valor_total_cliente: _vtc, ...formData } = form
       const payload = {
         ...formData,
         turno_id:         formData.turno_id || null,

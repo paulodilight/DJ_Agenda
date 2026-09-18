@@ -1922,6 +1922,11 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   ...prev,
                   proprio: prev.proprio.map(r => r._key === equipKey ? { ...r, [field]: val } : r),
                 }))}
+                onUpdateAtuacao={(artistaKey, val) => {
+                  const slotId = Number(artistaKey.replace('slot_', ''))
+                  setAtuacoes(prev => prev.map(s => s.id === slotId ? { ...s, notas: val } : s))
+                  supabase.from('agenda').update({ notas: val }).eq('id', slotId).catch(console.error)
+                }}
               />
             </div>
           )}
