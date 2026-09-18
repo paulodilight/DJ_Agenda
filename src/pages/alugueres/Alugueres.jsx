@@ -582,11 +582,11 @@ export function Alugueres() {
         </div>
       )}
 
-      {/* ── Drawer form ──────────────────────────────────────────── */}
+      {/* ── Modal form ──────────────────────────────────────────── */}
       {drawer !== null && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={fecharDrawer} />
-          <div className="relative ml-auto w-full max-w-xl bg-surface-1 border-l border-border flex flex-col h-full shadow-2xl overflow-hidden">
+          <div className="relative w-full max-w-2xl bg-surface-1 border border-border flex flex-col max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
               <h3 className="text-sm font-bold text-accent uppercase tracking-wider">
                 {drawer === 'criar' ? 'Novo aluguer' : `Editar — ${form.numero}`}
