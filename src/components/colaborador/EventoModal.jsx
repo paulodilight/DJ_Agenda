@@ -1,12 +1,9 @@
-﻿import { useState, useEffect, useRef } from 'react'
-import { X, StickyNote, Boxes, Save, MapPin, Check, Loader2, AlertCircle, PenLine, ListChecks, Lock, FileText, Plus, Trash2, Clock, Flag, Camera, ImageIcon, Printer, CheckCircle2, QrCode } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Boxes, Save, Check, ListChecks, Lock, FileText, Plus, Trash2, Clock, Camera, ImageIcon, Printer, CheckCircle2, QrCode, StickyNote } from 'lucide-react'
 import { QrScannerModal } from '@/components/equipamentos/QrScannerModal'
-import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 import { clsx } from 'clsx'
 import { Badge } from '@/components/ui/Badge'
-import { colaboradorApi } from '@/lib/colaboradorApi'
 import { supabase } from '@/lib/supabase'
-import { usePresenca, podeAssinar, presencaAtrasada, TOLERANCIA_MIN } from '@/hooks/usePresenca'
 import { useColaboradorStore } from '@/store'
 import { PrintModal } from '@/components/shared/PrintModal'
 import { FolhaEvento } from '@/components/shared/FolhaEvento'
@@ -63,24 +60,31 @@ function Campo({ rotulo, valor, negrito, isLink, full, size = 14 }) {
   )
 }
 
+function SeccaoTitulo({ label }) {
+  return (
+    <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>{label}</p>
+  )
+}
+
 export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] }) {
-  const [aba, setAba]             = useState('detalhes')
+  const [aba, setAba]             = useState('evento')
   const [dir, setDir]             = useState('right')
-  const [notas, setNotas]         = useState('')
+  const [notasPessoais, setNotasPessoais] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado]   = useState(false)
   const [erro, setErro]           = useState(null)
   const touchX = useRef(null)
   const [eventoListas,  setEventoListas]  = useState([])
   const [eventoChecks,  setEventoChecks]  = useState(new Set())
-  const [clSubmetidas,  setClSubmetidas]  = useState(new Set()) // Set de checklist_id já guardados
-  const [clGuardando,   setClGuardando]   = useState(new Set()) // Set de checklist_id a guardar agora
+  const [clSubmetidas,  setClSubmetidas]  = useState(new Set())
+  const [clGuardando,   setClGuardando]   = useState(new Set())
   const [equipItems,    setEquipItems]    = useState([])
   const [equipEvento,   setEquipEvento]   = useState([])
   const [equipInput,    setEquipInput]    = useState('')
   const [equipAdding,   setEquipAdding]   = useState(false)
   const [execucaoNotas,  setExecucaoNotas]  = useState('')
   const [execucaoSaving, setExecucaoSaving] = useState(false)
+  const [execucaoSaved,  setExecucaoSaved]  = useState(false)
   const [feedbackId,     setFeedbackId]     = useState(null)
   const [feedbackFotos,  setFeedbackFotos]  = useState([])
   const [fotoUploading,  setFotoUploading]  = useState(false)
@@ -88,9 +92,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const [printEvento,    setPrintEvento]    = useState(false)
   const [scanner,        setScanner]        = useState(false)
   const [assinEvento,    setAssinEvento]    = useState({
-    assinatura_lmd_at: evento.assinatura_lmd_at ?? null,
-    assinatura_in_at:  evento.assinatura_in_at  ?? null,
-    assinatura_out_at: evento.assinatura_out_at ?? null,
+    assinatura_lmd_at:        evento.assinatura_lmd_at        ?? null,
+    assinatura_in_at:         evento.assinatura_in_at          ?? null,
+    assinatura_out_at:        evento.assinatura_out_at         ?? null,
+    assinatura_fim_evento_at: evento.assinatura_fim_evento_at  ?? null,
   })
   const [assinEvSaving,  setAssinEvSaving]  = useState({})
   const [concluindoFase, setConcluindoFase] = useState(false)
@@ -98,84 +103,40 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const [eventoCarros,   setEventoCarros]   = useState({ carro_id: '', condutor_id: '', km_saida: '', km_chegada: '' })
   const [veiculoSaving,  setVeiculoSaving]  = useState(false)
   const [veiculoSaved,   setVeiculoSaved]   = useState(false)
-  const [execucaoSaved,  setExecucaoSaved]  = useState(false)
   const [equipEventoChecks,   setEquipEventoChecks]   = useState(new Set())
   const [equipConfirmadoEm,   setEquipConfirmadoEm]   = useState(null)
+  const [lightboxUrl,    setLightboxUrl]    = useState(null)
 
-  // ── Identidade do colaborador logado ──
   const colaborador = useColaboradorStore(s => s.colaborador)
 
-  // Só pode ver/editar as suas próprias notas se estiver atribuído ao evento
   const isAtribuido = colaborador && (
     evento.todos_tecnicos === true ||
     (evento._tecnicosIds ?? []).includes(colaborador.id) ||
     evento.tecnico_id === colaborador.id
   )
-  // Só o responsável principal pode assinar presença
   const isResponsavel = evento.todos_tecnicos === true || colaborador?.id === evento.tecnico_id
   const isLmd = evento.tipo === 'Apoio LMD'
 
-  // ── Assinatura de início/fim de evento ──
-  const { proxima: proximaAssin, registar: registarAssin, loading: assinLoading, feitas: feitasAssin, tiposFeitos: tiposAssinFeitos } = useAssinaturaDia(colaborador?.id ?? null, evento.id)
-  const [assinandoEvento, setAssinandoEvento] = useState(false)
-  const mostrarInEvento = !assinLoading && proximaAssin?.tipo === 'in_evento' && proximaAssin?.eventoId === evento.id
-
-  const assinarEvento = async (tipo) => {
-    setAssinandoEvento(true)
-    await registarAssin(tipo, { eventoId: evento.id })
-    setAssinandoEvento(false)
-  }
-
-  // ── Assinatura de presença do técnico (GPS) ──
-  const pres = usePresenca({ kind: 'tecnico', refId: evento.id, ownerId: colaborador?.id ?? null, signedBy: 'tecnico' })
-  const [aConfirmarPres, setConfirmarPres] = useState(false)
-  const presDisponivel = podeAssinar(evento.data_evento, evento.hora_inicio)
-  const presAtrasada = presencaAtrasada(pres.presenca, evento.data_evento, evento.hora_inicio)
-
-  // Quando Marcar Presença (GPS) é assinado, auto-regista IN-Work
-  useEffect(() => {
-    if (pres.status === 'signed' && !assinEvento.assinatura_lmd_at) {
-      registarAssinEvento('assinatura_lmd_at')
-    }
-  }, [pres.status]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Busca timestamps de assinatura frescos da BD — o evento prop pode estar stale
+  // ── Busca timestamps frescos da BD ──
   useEffect(() => {
     if (!evento?.id) return
     let activo = true
     supabase.from('supa_eventos')
-      .select('assinatura_lmd_at, assinatura_in_at, assinatura_out_at, equip_confirmado_em')
+      .select('assinatura_lmd_at, assinatura_in_at, assinatura_out_at, assinatura_fim_evento_at, equip_confirmado_em')
       .eq('id', evento.id)
       .single()
       .then(({ data }) => {
         if (!activo || !data) return
         setAssinEvento({
-          assinatura_lmd_at: data.assinatura_lmd_at ?? null,
-          assinatura_in_at:  data.assinatura_in_at  ?? null,
-          assinatura_out_at: data.assinatura_out_at ?? null,
+          assinatura_lmd_at:        data.assinatura_lmd_at        ?? null,
+          assinatura_in_at:         data.assinatura_in_at         ?? null,
+          assinatura_out_at:        data.assinatura_out_at        ?? null,
+          assinatura_fim_evento_at: data.assinatura_fim_evento_at ?? null,
         })
         setEquipConfirmadoEm(data.equip_confirmado_em ?? null)
       })
     return () => { activo = false }
   }, [evento?.id])
-
-  // Sincroniza assinaturas do hook (home) para supa_eventos quando ainda não estão registadas
-  useEffect(() => {
-    if (!tiposAssinFeitos?.length || !evento?.id) return
-    if (evento.data_evento !== hojeISO()) return  // só sincroniza para eventos de hoje
-    const inWork = tiposAssinFeitos.find(f => f.tipo === 'in_work')
-    if (inWork && !assinEvento.assinatura_lmd_at) {
-      const ts = inWork.registado_em
-      supabase.from('supa_eventos').update({ assinatura_lmd_at: ts }).eq('id', evento.id)
-        .then(({ error }) => { if (!error) setAssinEvento(prev => ({ ...prev, assinatura_lmd_at: ts })) })
-    }
-    const outWork = tiposAssinFeitos.find(f => f.tipo === 'out_work')
-    if (outWork && !assinEvento.assinatura_out_at && assinEvento.assinatura_lmd_at) {
-      const ts = outWork.registado_em
-      supabase.from('supa_eventos').update({ assinatura_out_at: ts }).eq('id', evento.id)
-        .then(({ error }) => { if (!error) setAssinEvento(prev => ({ ...prev, assinatura_out_at: ts })) })
-    }
-  }, [tiposAssinFeitos, evento?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     supabase.from('carros').select('id, marca, modelo, matricula').eq('ativo', true).order('marca')
@@ -183,11 +144,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   }, [])
 
   useEffect(() => {
-    if (!evento?.id || !colaborador?.id || !isAtribuido) { setNotas(''); return }
+    if (!evento?.id || !colaborador?.id || !isAtribuido) { setNotasPessoais(''); return }
     let activo = true
     supabase.from('evento_tecnicos')
       .select('notas').eq('evento_id', evento.id).eq('tecnico_id', colaborador.id).maybeSingle()
-      .then(({ data }) => { if (activo) setNotas(data?.notas ?? '') })
+      .then(({ data }) => { if (activo) setNotasPessoais(data?.notas ?? '') })
     return () => { activo = false }
   }, [evento?.id, colaborador?.id, isAtribuido])
 
@@ -243,54 +204,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     const id = setInterval(verificar, 60_000)
     return () => clearInterval(id)
   }, [evento?.data_evento, evento?.hora_inicio, faseLocal])
-
-  const logo    = evento.espacos?.logo_url
-  const cliente = evento.espacos?.nome || evento.cliente || null
-  const tecNomeResp = evento.todos_tecnicos ? 'Todos os técnicos' : (mapaTecnicos[evento.tecnico_id] || evento.responsavel || null)
-
-  const outrosTecs = (evento._tecnicosIds ?? [])
-    .filter(id => id !== evento.tecnico_id)
-    .map(id => mapaTecnicos[id])
-    .filter(Boolean)
-
-  const guardar = async () => {
-    if (!colaborador?.id) return
-    setGuardando(true); setErro(null)
-    try {
-      await supabase.from('evento_tecnicos')
-        .update({ notas })
-        .eq('evento_id', evento.id)
-        .eq('tecnico_id', colaborador.id)
-      setGuardado(true); setTimeout(() => setGuardado(false), 2000)
-    } catch (e) { setErro(e.message) }
-    finally { setGuardando(false) }
-  }
-
-  const toggleCheck = async (itemId, checklistId) => {
-    if (!colaborador?.id || clSubmetidas.has(checklistId)) return
-    const checked = eventoChecks.has(itemId)
-    const newChecks = new Set(eventoChecks)
-    if (checked) newChecks.delete(itemId); else newChecks.add(itemId)
-    setEventoChecks(newChecks)
-
-    // Criação → Preparação quando todos os itens (excl. saída) estão marcados
-    if (!checked && faseLocal === 'criacao') {
-      const itens = eventoListas.filter(l => l.fase !== 'saida').flatMap(l => l.itens.map(it => it.id))
-      if (itens.length > 0 && itens.every(id => newChecks.has(id))) marcarFase('preparacao')
-    }
-
-    if (!checked) {
-      const { error } = await supabase.from('checklist_checks').upsert(
-        { evento_id: evento.id, checklist_item_id: itemId, tecnico_id: colaborador.id },
-        { onConflict: 'evento_id,checklist_item_id,tecnico_id' }
-      )
-      if (error) console.error('checklist_checks upsert error:', error)
-    } else {
-      const { error } = await supabase.from('checklist_checks').delete()
-        .eq('evento_id', evento.id).eq('checklist_item_id', itemId).eq('tecnico_id', colaborador.id)
-      if (error) console.error('checklist_checks delete error:', error)
-    }
-  }
 
   useEffect(() => {
     if (!evento?.id || !colaborador?.id) return
@@ -349,39 +262,51 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     return () => { activo = false }
   }, [evento?.id])
 
-  const adicionarEquip = async () => {
-    const texto = equipInput.trim()
-    if (!texto || !colaborador?.id || equipAdding) return
-    setEquipAdding(true)
-    const { data, error } = await supabase.from('evento_equip_items').insert({
-      evento_id: evento.id, criado_por: colaborador.id, texto,
-    }).select('id, texto, feito, criado_por, criado_em').single()
-    if (!error && data) { setEquipItems(prev => [...prev, data]); setEquipInput('') }
-    setEquipAdding(false)
+  // ── Acções ──
+
+  const guardar = async () => {
+    if (!colaborador?.id) return
+    setGuardando(true); setErro(null)
+    try {
+      await supabase.from('evento_tecnicos')
+        .update({ notas: notasPessoais })
+        .eq('evento_id', evento.id)
+        .eq('tecnico_id', colaborador.id)
+      setGuardado(true); setTimeout(() => setGuardado(false), 2000)
+    } catch (e) { setErro(e.message) }
+    finally { setGuardando(false) }
   }
 
-  const removerEquip = async (id) => {
-    await supabase.from('evento_equip_items').delete().eq('id', id)
-    setEquipItems(prev => prev.filter(e => e.id !== id))
-  }
+  const toggleCheck = async (itemId, checklistId) => {
+    if (!colaborador?.id || clSubmetidas.has(checklistId)) return
+    const checked = eventoChecks.has(itemId)
+    const newChecks = new Set(eventoChecks)
+    if (checked) newChecks.delete(itemId); else newChecks.add(itemId)
+    setEventoChecks(newChecks)
 
-  const toggleEquip = async (id, feito) => {
-    setEquipItems(prev => prev.map(e => e.id === id ? { ...e, feito: !feito } : e))
-    await supabase.from('evento_equip_items')
-      .update({ feito: !feito, feito_por: colaborador?.id ?? null })
-      .eq('id', id)
+    if (!checked && faseLocal === 'criacao') {
+      const itens = eventoListas.filter(l => l.fase !== 'saida').flatMap(l => l.itens.map(it => it.id))
+      if (itens.length > 0 && itens.every(id => newChecks.has(id))) marcarFase('preparacao')
+    }
+
+    if (!checked) {
+      await supabase.from('checklist_checks').upsert(
+        { evento_id: evento.id, checklist_item_id: itemId, tecnico_id: colaborador.id },
+        { onConflict: 'evento_id,checklist_item_id,tecnico_id' }
+      )
+    } else {
+      await supabase.from('checklist_checks').delete()
+        .eq('evento_id', evento.id).eq('checklist_item_id', itemId).eq('tecnico_id', colaborador.id)
+    }
   }
 
   const guardarChecklist = async (checklistId) => {
     if (!colaborador?.id || clSubmetidas.has(checklistId) || clGuardando.has(checklistId)) return
     setClGuardando(prev => new Set([...prev, checklistId]))
     const { error } = await supabase.from('checklist_submissoes').insert({
-      evento_id:    evento.id,
-      tecnico_id:   colaborador.id,
-      checklist_id: checklistId,
+      evento_id: evento.id, tecnico_id: colaborador.id, checklist_id: checklistId,
     })
     if (!error) setClSubmetidas(prev => new Set([...prev, checklistId]))
-    else console.error('checklist_submissoes insert error:', error)
     setClGuardando(prev => { const s = new Set(prev); s.delete(checklistId); return s })
   }
 
@@ -417,6 +342,29 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     }
     setVeiculoSaving(false)
     setVeiculoSaved(true)
+  }
+
+  const adicionarEquip = async () => {
+    const texto = equipInput.trim()
+    if (!texto || !colaborador?.id || equipAdding) return
+    setEquipAdding(true)
+    const { data, error } = await supabase.from('evento_equip_items').insert({
+      evento_id: evento.id, criado_por: colaborador.id, texto,
+    }).select('id, texto, feito, criado_por, criado_em').single()
+    if (!error && data) { setEquipItems(prev => [...prev, data]); setEquipInput('') }
+    setEquipAdding(false)
+  }
+
+  const removerEquip = async (id) => {
+    await supabase.from('evento_equip_items').delete().eq('id', id)
+    setEquipItems(prev => prev.filter(e => e.id !== id))
+  }
+
+  const toggleEquip = async (id, feito) => {
+    setEquipItems(prev => prev.map(e => e.id === id ? { ...e, feito: !feito } : e))
+    await supabase.from('evento_equip_items')
+      .update({ feito: !feito, feito_por: colaborador?.id ?? null })
+      .eq('id', id)
   }
 
   const adicionarFoto = async (file) => {
@@ -455,7 +403,26 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     setAba(novaAba)
   }
 
-  const ABAS_ORDER = isLmd ? ['detalhes'] : ['detalhes', 'notas', 'checklist', 'execucao']
+  // ── Dados fixos ──
+  const logo    = evento.espacos?.logo_url
+  const cliente = evento.espacos?.nome || evento.cliente || null
+  const tecNomeResp = evento.todos_tecnicos ? 'Todos os técnicos' : (mapaTecnicos[evento.tecnico_id] || evento.responsavel || null)
+  const outrosTecs = (evento._tecnicosIds ?? [])
+    .filter(id => id !== evento.tecnico_id)
+    .map(id => mapaTecnicos[id])
+    .filter(Boolean)
+  const dataInstal = evento.dia_instalacao || evento.data_evento
+  const horaInstal = hhmm(evento.hora_instalacao)
+
+  // ── Abas ──
+  const ABAS_ORDER = isLmd ? ['evento'] : ['evento', 'preparacao', 'operacao', 'fecho']
+  const ABAS_DEF = [
+    { id: 'evento',     label: 'Evento' },
+    { id: 'preparacao', label: 'Preparação' },
+    { id: 'operacao',   label: 'Operação' },
+    { id: 'fecho',      label: 'Fecho' },
+  ].filter(t => ABAS_ORDER.includes(t.id))
+
   const onTouchStart = (e) => { touchX.current = e.changedTouches[0].clientX }
   const onTouchEnd   = (e) => {
     if (touchX.current === null) return
@@ -466,10 +433,32 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     touchX.current = null
   }
 
-  const dataInstal = evento.dia_instalacao || evento.data_evento
-  const horaInstal = hhmm(evento.hora_instalacao)
+  // ── Botão sequencial ──
+  const proximoPasso = !isAtribuido || isLmd ? null : (() => {
+    if (!assinEvento.assinatura_lmd_at)
+      return { emoji: '🟢', label: 'Entrada', campo: 'assinatura_lmd_at', color: 'bg-green-500/15 border-green-500/40 text-green-400 hover:bg-green-500/25' }
+    if (!assinEvento.assinatura_in_at)
+      return { emoji: '▶️', label: 'Início Evento', campo: 'assinatura_in_at', color: 'bg-amber-400/10 border-amber-400/30 text-amber-400 hover:bg-amber-400/20' }
+    if (!assinEvento.assinatura_fim_evento_at)
+      return { emoji: '⏹️', label: 'Fim Evento', campo: 'assinatura_fim_evento_at', color: 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25' }
+    if (!assinEvento.assinatura_out_at)
+      return { emoji: '🔴', label: 'Saída', campo: 'assinatura_out_at', color: 'bg-red-500/15 border-red-500/30 text-red-400 hover:bg-red-500/25' }
+    if (faseLocal !== 'concluido')
+      return { emoji: '✅', label: 'Concluir', campo: null, color: 'bg-green-500/15 border-green-500/40 text-green-400 hover:bg-green-500/25' }
+    return null
+  })()
 
-  // ── Dados normalizados para impressão ──
+  const handleProximoPasso = async () => {
+    if (!proximoPasso) return
+    if (proximoPasso.campo) await registarAssinEvento(proximoPasso.campo)
+    else await marcarFase('concluido')
+  }
+
+  const isBotaoSaving = proximoPasso?.campo
+    ? !!assinEvSaving[proximoPasso.campo]
+    : concluindoFase
+
+  // ── Dados para impressão ──
   const dadosEvento = {
     nomeEvento: evento.evento || '—',
     data: evento.data_evento || null,
@@ -514,20 +503,97 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     notasOperacionais: evento.notas_operacionais || null,
     notasPreparacao: evento.notas_preparacao || null,
     dataPreparacao: evento.data_preparacao || null,
-    notasColaborador: notas || null,
+    notasColaborador: notasPessoais || null,
     feedbackTexto: execucaoNotas || null,
     fotosEvento: evento.fotos_urls ?? [],
     fotos: feedbackFotos,
     assinaturas: {
-      lmd_at: assinEvento.assinatura_lmd_at,
-      in_at:  assinEvento.assinatura_in_at,
-      out_at: assinEvento.assinatura_out_at,
+      lmd_at:        assinEvento.assinatura_lmd_at,
+      in_at:         assinEvento.assinatura_in_at,
+      fim_evento_at: assinEvento.assinatura_fim_evento_at,
+      out_at:        assinEvento.assinatura_out_at,
     },
     tipoEvento: evento.tipo || null,
   }
 
+  // ── Helpers de formato ──
+  const fmtTs = (ts) => ts
+    ? new Date(ts).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : null
+
+  // ── Componente de checklist reutilizável ──
+  const RenderChecklist = ({ lista }) => {
+    const submetida = clSubmetidas.has(lista.clId)
+    const aGuardar  = clGuardando.has(lista.clId)
+    const total     = lista.itens.length
+    const feitos    = lista.itens.filter(it => eventoChecks.has(it.id)).length
+    return (
+      <div className="border border-white/10 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
+          <ListChecks size={12} className={submetida ? 'text-green-400 shrink-0' : 'text-amber-400 shrink-0'} />
+          <p className={clsx('font-semibold flex-1', submetida ? 'text-green-400' : 'text-amber-400')} style={{ fontSize: 12 }}>
+            {lista.nome}
+          </p>
+          {submetida ? (
+            <span className="inline-flex items-center gap-1 text-green-400" style={{ fontSize: 10 }}>
+              <Lock size={10} /> Guardado
+            </span>
+          ) : isAtribuido && total > 0 && (
+            <button
+              onClick={() => guardarChecklist(lista.clId)}
+              disabled={aGuardar}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 disabled:opacity-50 transition-all"
+              style={{ fontSize: 10 }}>
+              <Lock size={10} />
+              {aGuardar ? '…' : `Guardar ${feitos}/${total}`}
+            </button>
+          )}
+        </div>
+        <div className="flex flex-col">
+          {lista.itens.map((item) => {
+            const checked = eventoChecks.has(item.id)
+            return (
+              <button key={item.id}
+                onClick={() => toggleCheck(item.id, lista.clId)}
+                disabled={!isAtribuido || submetida}
+                className={clsx(
+                  'flex items-center gap-3 px-3 py-2.5 border-b border-white/5 last:border-0 text-left transition-colors',
+                  checked ? 'bg-green-500/10' : 'hover:bg-white/5',
+                  (!isAtribuido || submetida) ? 'cursor-default' : 'cursor-pointer'
+                )}>
+                <span className={clsx(
+                  'w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors',
+                  checked ? 'bg-green-500/30 border-green-500/60' : 'border-white/20'
+                )}>
+                  {checked && <Check size={12} className="text-green-400" />}
+                </span>
+                <span className={clsx('flex-1', checked ? 'line-through opacity-50' : 'opacity-80')} style={{ fontSize: 13 }}>
+                  {item.texto}
+                </span>
+              </button>
+            )
+          })}
+          {lista.itens.length === 0 && (
+            <p className="px-3 py-2 italic opacity-30" style={{ fontSize: 12 }}>Sem itens.</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
+
+    {/* Lightbox */}
+    {lightboxUrl && (
+      <div className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center" onClick={() => setLightboxUrl(null)}>
+        <img src={lightboxUrl} alt="" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+        <button onClick={() => setLightboxUrl(null)}
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors">
+          <X size={18} />
+        </button>
+      </div>
+    )}
 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70" onClick={onFechar} />
@@ -548,16 +614,9 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
 
         {/* Abas */}
         <div className="flex border-b border-border px-2 shrink-0 items-center justify-center">
-          {(isLmd
-            ? [{ id: 'detalhes', label: 'Detalhes', d: 'left' }]
-            : [
-                { id: 'detalhes',  label: 'Detalhes',       d: 'left' },
-                { id: 'notas',     label: 'Equip. & Notas', d: 'right' },
-                { id: 'execucao',  label: 'Execução',       d: 'right' },
-                { id: 'checklist', label: 'Checklist',      d: 'right' },
-              ]
-          ).map(t => (
-            <button key={t.id} onClick={() => goAba(t.id, t.d)}
+          {ABAS_DEF.map((t, i) => (
+            <button key={t.id}
+              onClick={() => goAba(t.id, ABAS_ORDER.indexOf(t.id) > ABAS_ORDER.indexOf(aba) ? 'right' : 'left')}
               className={clsx(
                 'px-3 py-2.5 font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap',
                 aba === t.id ? 'border-amber-400 text-amber-400' : 'border-transparent text-accent-muted hover:text-accent',
@@ -566,15 +625,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
           ))}
         </div>
 
-        {/* Conteúdo — altura fixa, swipe */}
+        {/* Conteúdo */}
         <div key={aba}
           className={clsx('flex-1 overflow-y-auto px-5 py-3', dir === 'right' ? 'tab-from-right' : 'tab-from-left')}
           onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
 
-          {aba === 'detalhes' ? (
+          {/* ── ABA EVENTO ── */}
+          {aba === 'evento' && (
             <div className="flex flex-col">
 
-              {/* Linha 1 — Técnicos */}
+              {/* Técnicos */}
               <div className="flex gap-5 flex-wrap py-2 border-b border-border/30">
                 {tecNomeResp && (
                   <div>
@@ -592,14 +652,12 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 )}
               </div>
 
-              {/* Linha 2 — Instalação em 2 colunas (branco translúcido) */}
+              {/* Instalação */}
               {(dataInstal || horaInstal) && (
                 <div className="my-2 rounded-lg bg-accent/[0.06] border border-accent/10 px-3 py-2 grid grid-cols-2 gap-2">
                   <div>
                     <p className="text-accent-subtle uppercase tracking-wider" style={{ fontSize: 10 }}>Instalação</p>
-                    <p className="text-accent font-medium capitalize" style={{ fontSize: 14 }}>
-                      {dataInstal ? dataLonga(dataInstal) : '—'}
-                    </p>
+                    <p className="text-accent font-medium capitalize" style={{ fontSize: 14 }}>{dataInstal ? dataLonga(dataInstal) : '—'}</p>
                   </div>
                   <div>
                     <p className="text-accent-subtle uppercase tracking-wider" style={{ fontSize: 10 }}>Hora</p>
@@ -608,7 +666,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 </div>
               )}
 
-              {/* Linha 3 — Data do evento */}
+              {/* Data */}
               {evento.data_evento && (
                 <div className="py-2 border-b border-border/30">
                   <p className="uppercase tracking-wider text-accent-subtle mb-0.5" style={{ fontSize: 10 }}>Data do evento</p>
@@ -618,7 +676,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 </div>
               )}
 
-              {/* Linha 4 — Hora início | Hora fim em 2 colunas */}
+              {/* Horas */}
               {(evento.hora_inicio || evento.hora_fim) && (
                 <div className="py-2 border-b border-border/30 grid grid-cols-2 gap-2">
                   <div>
@@ -632,40 +690,52 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 </div>
               )}
 
-              {/* Grid 2 colunas para os restantes campos */}
+              {/* Grid campos */}
               <div className="grid grid-cols-2 gap-x-4">
-                {/* Linha 5 — Nome do evento (14px, largura total) */}
                 <Campo rotulo="Nome do evento" valor={evento.evento} full size={14} />
-
-                {/* Tipo | Status */}
                 <Campo rotulo="Tipo"   valor={evento.tipo} />
                 <Campo rotulo="Status" valor={labelEstado(evento.status) || evento.status} />
-
-                {/* LOCAL | ícone checklist centrado na coluna direita */}
-                <Campo rotulo="Local" valor={cliente} />
-                {eventoListas.length > 0 && cliente ? (
-                  <div className="flex items-center justify-center py-2 border-b border-border/30">
-                    <button onClick={() => goAba('checklist', 'right')}
-                      title="Ver checklists"
-                      className="text-amber-400/70 hover:text-amber-400 transition-colors">
-                      <ListChecks size={32} />
-                    </button>
-                  </div>
-                ) : (
-                  <Campo rotulo="Contacto" valor={evento.contacto_pelo_evento} />
-                )}
-                {eventoListas.length > 0 && cliente && (
-                  <Campo rotulo="Contacto" valor={evento.contacto_pelo_evento} />
-                )}
-
-                {/* Morada — coluna única */}
+                <Campo rotulo="Local"  valor={cliente} />
+                <Campo rotulo="Contacto" valor={evento.contacto_pelo_evento} />
+                <Campo rotulo="Responsável" valor={evento.responsavel} />
                 <Campo rotulo="Morada" valor={evento.morada} isLink full />
+                {evento.notas_operacionais && (
+                  <Campo rotulo="Observações" valor={evento.notas_operacionais} full />
+                )}
               </div>
 
-              {/* ── LMD: Assinaturas (IN Work + OUT Work) ── */}
+              {/* Rider PDF */}
+              {evento.rider_url && (
+                <div className="mt-3">
+                  <SeccaoTitulo label="Rider Técnico" />
+                  <a href={evento.rider_url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-surface-2 text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
+                    style={{ fontSize: 13 }}>
+                    <FileText size={14} />
+                    Ver PDF
+                  </a>
+                </div>
+              )}
+
+              {/* Fotos do evento */}
+              {(evento.fotos_urls ?? []).length > 0 && (
+                <div className="mt-3">
+                  <SeccaoTitulo label="Fotos do Evento" />
+                  <div className="grid grid-cols-3 gap-2">
+                    {(evento.fotos_urls ?? []).map((url, i) => (
+                      <button key={i} onClick={() => setLightboxUrl(url)}
+                        className="relative rounded-lg overflow-hidden aspect-square bg-white/5 block">
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* LMD: assinaturas IN/OUT Work */}
               {isLmd && isAtribuido && (
                 <div className="mt-3">
-                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Presença / Assinaturas</p>
+                  <SeccaoTitulo label="Presença / Assinaturas" />
                   <div className="flex flex-col gap-2">
                     {[
                       { campo: 'assinatura_lmd_at', label: 'IN — Work' },
@@ -679,18 +749,12 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                           <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-green-400' : 'bg-white/20')} />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-accent" style={{ fontSize: 12 }}>{label}</p>
-                            {val && (
-                              <p className="text-accent-subtle/60 tabular-nums mt-0.5" style={{ fontSize: 10 }}>
-                                {new Date(val).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            )}
+                            {val && <p className="text-accent-subtle/60 tabular-nums mt-0.5" style={{ fontSize: 10 }}>{fmtTs(val)}</p>}
                           </div>
                           {val ? (
                             <Check size={14} className="text-green-400 shrink-0" />
                           ) : !bloqueado && isAtribuido ? (
-                            <button
-                              onClick={() => registarAssinEvento(campo)}
-                              disabled={!!saving}
+                            <button onClick={() => registarAssinEvento(campo)} disabled={!!saving}
                               className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-medium hover:bg-amber-400/20 disabled:opacity-40 transition-colors"
                               style={{ fontSize: 11 }}>
                               <Clock size={11} />
@@ -704,10 +768,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 </div>
               )}
 
-              {/* ── LMD: Tarefas do técnico ── */}
+              {/* LMD: Tarefas */}
               {isLmd && tarefas.filter(t => !['concluída', 'concluida', 'cancelada'].includes(t.estado)).length > 0 && (
                 <div className="mt-3">
-                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>As minhas tarefas</p>
+                  <SeccaoTitulo label="As minhas tarefas" />
                   <div className="flex flex-col gap-1.5">
                     {tarefas
                       .filter(t => !['concluída', 'concluida', 'cancelada'].includes(t.estado))
@@ -718,16 +782,38 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                             <p className="text-accent-subtle/60 mt-0.5" style={{ fontSize: 11 }}>{dataLonga(t.data_conclusao)}</p>
                           )}
                         </div>
-                      ))
-                    }
+                      ))}
                   </div>
                 </div>
               )}
             </div>
+          )}
 
-          ) : aba === 'checklist' ? (
+          {/* ── ABA PREPARAÇÃO ── */}
+          {aba === 'preparacao' && (
             <div className="flex flex-col gap-3 py-2">
-              {/* Equipamentos para o evento (checklist interativa) — topo */}
+
+              {/* Progresso */}
+              {(() => {
+                const todosItens = eventoListas.filter(l => l.fase !== 'saida').flatMap(l => l.itens.map(i => i.id))
+                const total = todosItens.length + equipItems.length
+                const feitos = todosItens.filter(id => eventoChecks.has(id)).length + equipItems.filter(i => i.feito).length
+                const pct = total > 0 ? Math.round((feitos / total) * 100) : 0
+                return total > 0 ? (
+                  <div className="rounded-xl bg-white/[0.03] border border-white/8 px-3 py-2.5">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>Progresso</span>
+                      <span className={clsx('font-bold tabular-nums', pct === 100 ? 'text-green-400' : 'text-amber-400')} style={{ fontSize: 12 }}>{pct}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div className={clsx('h-full rounded-full transition-all', pct === 100 ? 'bg-green-400' : 'bg-amber-400')}
+                        style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                ) : null
+              })()}
+
+              {/* Equipamentos para o evento */}
               {equipEvento.length > 0 && (() => {
                 const total  = equipEvento.length
                 const feitos = equipEvento.filter(r => equipEventoChecks.has(r.id)).length
@@ -787,74 +873,24 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 )
               })()}
 
-              {eventoListas.length === 0 && equipEvento.length === 0 && (
-                <p className="text-center italic py-6" style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>Sem checklists neste evento.</p>
-              )}
-              {eventoListas.filter(l => l.fase !== 'saida').map(lista => {
-                const submetida = clSubmetidas.has(lista.clId)
-                const aGuardar  = clGuardando.has(lista.clId)
-                const total     = lista.itens.length
-                const feitos    = lista.itens.filter(it => eventoChecks.has(it.id)).length
-                return (
-                  <div key={lista.clId} className="border border-white/10 rounded-xl overflow-hidden">
-                    {/* Cabeçalho do card */}
-                    <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
-                      <ListChecks size={12} className={submetida ? 'text-green-400 shrink-0' : 'text-amber-400 shrink-0'} />
-                      <p className={clsx('font-semibold flex-1', submetida ? 'text-green-400' : 'text-amber-400')} style={{ fontSize: 12 }}>
-                        {lista.nome}
-                      </p>
-                      {submetida ? (
-                        <span className="inline-flex items-center gap-1 text-green-400" style={{ fontSize: 10 }}>
-                          <Lock size={10} /> Guardado
-                        </span>
-                      ) : isAtribuido && total > 0 && (
-                        <button
-                          onClick={() => guardarChecklist(lista.clId)}
-                          disabled={aGuardar}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 disabled:opacity-50 transition-all"
-                          style={{ fontSize: 10 }}>
-                          <Lock size={10} />
-                          {aGuardar ? '…' : `Guardar ${feitos}/${total}`}
-                        </button>
-                      )}
-                    </div>
-                    {/* Itens */}
-                    <div className="flex flex-col">
-                      {lista.itens.map((item) => {
-                        const checked = eventoChecks.has(item.id)
-                        return (
-                          <button key={item.id}
-                            onClick={() => toggleCheck(item.id, lista.clId)}
-                            disabled={!isAtribuido || submetida}
-                            className={clsx(
-                              'flex items-center gap-3 px-3 py-2.5 border-b border-white/5 last:border-0 text-left transition-colors',
-                              checked ? 'bg-green-500/10' : 'hover:bg-white/5',
-                              (!isAtribuido || submetida) ? 'cursor-default' : 'cursor-pointer'
-                            )}>
-                            <span className={clsx(
-                              'w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors',
-                              checked ? 'bg-green-500/30 border-green-500/60' : 'border-white/20'
-                            )}>
-                              {checked && <Check size={12} className="text-green-400" />}
-                            </span>
-                            <span className={clsx('flex-1', checked ? 'line-through opacity-50' : 'opacity-80')} style={{ fontSize: 13 }}>
-                              {item.texto}
-                            </span>
-                          </button>
-                        )
-                      })}
-                      {lista.itens.length === 0 && (
-                        <p className="px-3 py-2 italic opacity-30" style={{ fontSize: 12 }}>Sem itens.</p>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-              {/* Equipamentos do responsável */}
+              {/* Checklists não-saída */}
+              {eventoListas.filter(l => l.fase !== 'saida').map(lista => (
+                <RenderChecklist key={lista.clId} lista={lista} />
+              ))}
+
+              {/* Equipamentos do técnico + botão QR */}
               <div className="border border-white/10 rounded-xl overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
                   <Boxes size={12} className="text-amber-400 shrink-0" />
                   <p className="font-semibold flex-1 text-amber-400" style={{ fontSize: 12 }}>Equipamentos</p>
+                  {isResponsavel && (
+                    <button onClick={() => setScanner(true)}
+                      title="Scan QR"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-400/10 border border-amber-400/20 text-amber-400/70 hover:text-amber-400 transition-colors"
+                      style={{ fontSize: 10 }}>
+                      <QrCode size={11} /> QR
+                    </button>
+                  )}
                 </div>
                 <div className="flex flex-col">
                   {equipItems.map(item => (
@@ -908,83 +944,58 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 </div>
               </div>
 
-              {!isAtribuido && eventoListas.length > 0 && (
-                <p className="text-center opacity-40 italic" style={{ fontSize: 12 }}>Só técnicos atribuídos podem marcar itens.</p>
+              {/* 3 tipos de notas */}
+              {evento.notas_preparacao && (
+                <div className="rounded-xl border border-purple-500/20 bg-purple-500/[0.06] px-3 py-3">
+                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-purple-400/70 mb-2" style={{ fontSize: 10 }}>
+                    <StickyNote size={12} /> Notas de preparação
+                  </p>
+                  <p className="text-accent-muted whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
+                    {evento.notas_preparacao}
+                  </p>
+                </div>
               )}
-            </div>
 
-          ) : aba === 'execucao' ? (
+              <div>
+                <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
+                  <StickyNote size={12} /> Notas operacionais
+                </p>
+                <div className={clsx('whitespace-pre-wrap rounded-xl px-3 py-2.5 border',
+                  evento.notas_operacionais ? 'text-accent-muted bg-surface-2 border-border' : 'text-accent-subtle/40 italic bg-surface-2/40 border-border/40')}
+                  style={{ fontSize: 14 }}>
+                  {evento.notas_operacionais || 'Sem notas.'}
+                </div>
+              </div>
+
+              {isAtribuido && (
+                <div>
+                  <SeccaoTitulo label="As minhas notas" />
+                  <textarea value={notasPessoais} onChange={e => setNotasPessoais(e.target.value)} rows={3}
+                    placeholder="Notas pessoais sobre este evento…"
+                    style={{ fontSize: 14 }}
+                    className="w-full bg-surface-2 border border-white/30 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/60 resize-none" />
+                  {erro && <p className="text-xs text-status-cancelado mt-1">{erro}</p>}
+                  <div className="flex justify-end mt-2">
+                    <button onClick={guardar} disabled={guardando}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 disabled:opacity-40 transition-colors"
+                      style={{ fontSize: 12 }}>
+                      {guardado ? <CheckCircle2 size={13} className="text-green-600" /> : <Save size={13} />}
+                      {guardando ? 'A guardar…' : guardado ? 'Guardado' : 'Guardar notas'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!isAtribuido && <p className="text-center opacity-40 italic" style={{ fontSize: 12 }}>Só técnicos atribuídos podem marcar itens.</p>}
+            </div>
+          )}
+
+          {/* ── ABA OPERAÇÃO ── */}
+          {aba === 'operacao' && (
             <div className="flex flex-col gap-4 py-2">
 
-              {/* Fase do evento */}
-              <div>
-                <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Fase do Evento</p>
-                <div className="flex items-center gap-1.5 p-2.5 bg-white/5 rounded-xl border border-white/10 overflow-x-auto">
-                  {[
-                    { id: 'criacao',    label: 'Criação' },
-                    { id: 'preparacao', label: 'Prep.' },
-                    { id: 'execucao',   label: 'Exec.' },
-                    { id: 'concluido',  label: 'Concluído' },
-                    { id: 'faturado',   label: 'Faturado' },
-                  ].map(({ id, label }, i, arr) => {
-                    const fases = ['criacao', 'preparacao', 'execucao', 'concluido', 'faturado']
-                    const idxAtual = fases.indexOf(faseLocal)
-                    const done = i <= idxAtual
-                    return (
-                      <div key={id} className="flex items-center gap-1 shrink-0">
-                        <div className={clsx('w-1.5 h-1.5 rounded-full shrink-0', done ? 'bg-amber-400' : 'bg-white/20')} />
-                        <span className={clsx(done ? 'text-amber-400' : 'text-white/30')} style={{ fontSize: 10 }}>{label}</span>
-                        {i < arr.length - 1 && <div className={clsx('w-4 h-px shrink-0', i < idxAtual ? 'bg-amber-400/40' : 'bg-white/10')} />}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Presença / Assinaturas */}
-              <div>
-                <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Presença / Assinaturas</p>
-                <div className="flex flex-col gap-2">
-                  {[
-                    { campo: 'assinatura_lmd_at', label: 'IN — Work' },
-                    { campo: 'assinatura_in_at',  label: 'IN — Event', requiredCampo: 'assinatura_lmd_at' },
-                    ...(!evento.xclusive ? [{ campo: 'assinatura_out_at', label: 'OUT — Work', requiredCampo: 'assinatura_in_at' }] : []),
-                  ].map(({ campo, label, requiredCampo }) => {
-                    const val       = assinEvento[campo]
-                    const saving    = assinEvSaving[campo]
-                    const bloqueado = requiredCampo ? !assinEvento[requiredCampo] : false
-                    return (
-                      <div key={campo} className={clsx('flex items-center gap-3 p-2.5 rounded-xl border bg-white/[0.03]', bloqueado ? 'border-white/5 opacity-40' : 'border-white/10')}>
-                        <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-green-400' : 'bg-white/20')} />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-accent" style={{ fontSize: 12 }}>{label}</p>
-                          {val && (
-                            <p className="text-accent-subtle/60 tabular-nums mt-0.5" style={{ fontSize: 10 }}>
-                              {new Date(val).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          )}
-                        </div>
-                        {val ? (
-                          <Check size={14} className="text-green-400 shrink-0" />
-                        ) : !bloqueado && isAtribuido ? (
-                          <button
-                            onClick={() => registarAssinEvento(campo)}
-                            disabled={!!saving}
-                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-medium hover:bg-amber-400/20 disabled:opacity-40 transition-colors"
-                            style={{ fontSize: 11 }}>
-                            <Clock size={11} />
-                            {saving ? '…' : 'Registar'}
-                          </button>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-
-              {/* Checklist de saída */}
-              {eventoListas.some(l => l.fase === 'saida') && (
+              {/* Checklists de saída */}
+              {eventoListas.filter(l => l.fase === 'saida').length > 0 ? (
                 <div className="flex flex-col gap-2">
                   {eventoListas.filter(l => l.fase === 'saida').map(lista => {
                     const submetida = clSubmetidas.has(lista.clId)
@@ -1040,12 +1051,14 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                     )
                   })}
                 </div>
+              ) : (
+                <p className="text-center italic py-4 opacity-40" style={{ fontSize: 13 }}>Sem checklists de saída.</p>
               )}
 
-              {/* Veículo */}
+              {/* Viatura */}
               {isAtribuido && (
                 <div>
-                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Veículo</p>
+                  <SeccaoTitulo label="Veículo" />
                   <div className="flex flex-col gap-2 p-3 rounded-xl border border-white/10 bg-white/[0.03]">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
@@ -1069,25 +1082,14 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                         </select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="text-accent-subtle/60 mb-1" style={{ fontSize: 10 }}>Km saída</p>
-                        <input type="number" min="0" step="1"
-                          value={eventoCarros.km_saida}
-                          onChange={e => setEventoCarros(p => ({ ...p, km_saida: e.target.value }))}
-                          placeholder="—"
-                          className="w-full bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-accent placeholder:text-accent-subtle/30 focus:outline-none focus:border-white/30"
-                          style={{ fontSize: 12 }} />
-                      </div>
-                      <div>
-                        <p className="text-accent-subtle/60 mb-1" style={{ fontSize: 10 }}>Km chegada</p>
-                        <input type="number" min="0" step="1"
-                          value={eventoCarros.km_chegada}
-                          onChange={e => setEventoCarros(p => ({ ...p, km_chegada: e.target.value }))}
-                          placeholder="—"
-                          className="w-full bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-accent placeholder:text-accent-subtle/30 focus:outline-none focus:border-white/30"
-                          style={{ fontSize: 12 }} />
-                      </div>
+                    <div>
+                      <p className="text-accent-subtle/60 mb-1" style={{ fontSize: 10 }}>Km saída</p>
+                      <input type="number" min="0" step="1"
+                        value={eventoCarros.km_saida}
+                        onChange={e => setEventoCarros(p => ({ ...p, km_saida: e.target.value }))}
+                        placeholder="—"
+                        className="w-full bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-accent placeholder:text-accent-subtle/30 focus:outline-none focus:border-white/30"
+                        style={{ fontSize: 12 }} />
                     </div>
                     <div className="flex justify-end">
                       <button onClick={guardarVeiculo} disabled={veiculoSaving}
@@ -1100,261 +1102,225 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                   </div>
                 </div>
               )}
+            </div>
+          )}
 
-              {/* Fotos do evento (anexadas na criação) */}
-              {(evento.fotos_urls ?? []).length > 0 && (
-                <div>
-                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Fotos do Evento</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(evento.fotos_urls ?? []).map((url, i) => (
-                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                        className="relative rounded-lg overflow-hidden aspect-square bg-white/5 block">
-                        <img src={url} alt="" className="w-full h-full object-cover" />
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {/* ── ABA FECHO ── */}
+          {aba === 'fecho' && (
+            <div className="flex flex-col gap-4 py-2">
 
-              {/* Feedback / notas de execução */}
+              {/* 1. Durante o evento */}
               {isAtribuido && (
                 <div>
-                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>Feedback / Notas</p>
+                  <SeccaoTitulo label="Durante o evento" />
                   <textarea
                     value={execucaoNotas}
                     onChange={e => setExecucaoNotas(e.target.value)}
                     rows={3}
-                    placeholder="Feedback sobre o evento, ocorrências, observações…"
+                    placeholder="Ocorrências, observações durante o evento…"
                     style={{ fontSize: 13 }}
                     className="w-full bg-surface-2 border border-white/20 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/40 resize-none"
                   />
-                  {/* Fotos */}
-                  <div className="mt-2">
-                    {feedbackFotos.length > 0 && (
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        {feedbackFotos.map((url, i) => (
-                          <div key={i} className="relative rounded-lg overflow-hidden aspect-square bg-white/5">
-                            <img src={url} alt="" className="w-full h-full object-cover" />
-                            <button
-                              onClick={() => removerFoto(url)}
-                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors">
-                              <X size={10} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <label className={clsx(
-                        'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
-                        fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
-                      )}>
-                        <Camera size={14} className="text-accent-subtle shrink-0" />
-                        <span className="text-accent-subtle" style={{ fontSize: 12 }}>
-                          {fotoUploading ? 'A carregar…' : 'Câmara'}
-                        </span>
-                        <input type="file" accept="image/*" capture="environment" className="hidden"
-                          disabled={fotoUploading}
-                          onChange={e => { const f = e.target.files?.[0]; if (f) adicionarFoto(f); e.target.value = '' }} />
-                      </label>
-                      <label className={clsx(
-                        'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
-                        fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
-                      )}>
-                        <ImageIcon size={14} className="text-accent-subtle shrink-0" />
-                        <span className="text-accent-subtle" style={{ fontSize: 12 }}>
-                          {fotoUploading ? 'A carregar…' : 'Galeria'}
-                        </span>
-                        <input type="file" accept="image/*" multiple className="hidden"
-                          disabled={fotoUploading}
-                          onChange={async e => {
-                            const files = Array.from(e.target.files ?? [])
-                            for (const f of files) await adicionarFoto(f)
-                            e.target.value = ''
-                          }} />
-                      </label>
+                </div>
+              )}
+
+              {/* 2. Registo Fotográfico */}
+              {isAtribuido && (
+                <div>
+                  <SeccaoTitulo label="Registo Fotográfico" />
+                  {feedbackFotos.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      {feedbackFotos.map((url, i) => (
+                        <div key={i} className="relative rounded-lg overflow-hidden aspect-square bg-white/5">
+                          <img src={url} alt="" className="w-full h-full object-cover cursor-pointer" onClick={() => setLightboxUrl(url)} />
+                          <button
+                            onClick={() => removerFoto(url)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors">
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
                     </div>
+                  )}
+                  <div className="flex gap-2">
+                    <label className={clsx(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
+                      fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
+                    )}>
+                      <Camera size={14} className="text-accent-subtle shrink-0" />
+                      <span className="text-accent-subtle" style={{ fontSize: 12 }}>
+                        {fotoUploading ? 'A carregar…' : 'Câmara'}
+                      </span>
+                      <input type="file" accept="image/*" capture="environment" className="hidden"
+                        disabled={fotoUploading}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) adicionarFoto(f); e.target.value = '' }} />
+                    </label>
+                    <label className={clsx(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
+                      fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
+                    )}>
+                      <ImageIcon size={14} className="text-accent-subtle shrink-0" />
+                      <span className="text-accent-subtle" style={{ fontSize: 12 }}>
+                        {fotoUploading ? 'A carregar…' : 'Galeria'}
+                      </span>
+                      <input type="file" accept="image/*" multiple className="hidden"
+                        disabled={fotoUploading}
+                        onChange={async e => {
+                          const files = Array.from(e.target.files ?? [])
+                          for (const f of files) await adicionarFoto(f)
+                          e.target.value = ''
+                        }} />
+                    </label>
                   </div>
-                  <div className="flex justify-end mt-2">
-                    <button onClick={guardarFeedback} disabled={execucaoSaving}
+                </div>
+              )}
+
+              {/* 3. Feedback — guardar */}
+              {isAtribuido && (
+                <div className="flex justify-end">
+                  <button onClick={guardarFeedback} disabled={execucaoSaving}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
+                    style={{ fontSize: 12 }}>
+                    {execucaoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
+                    {execucaoSaving ? 'A guardar…' : execucaoSaved ? 'Guardado' : 'Guardar'}
+                  </button>
+                </div>
+              )}
+
+              {/* 4. Registo dos horários */}
+              <div>
+                <SeccaoTitulo label="Registo dos horários" />
+                <div className="flex flex-col gap-2">
+                  {[
+                    { campo: 'assinatura_lmd_at',        emoji: '🟢', label: 'Entrada' },
+                    { campo: 'assinatura_in_at',          emoji: '▶️', label: 'Início Evento', requiredCampo: 'assinatura_lmd_at' },
+                    { campo: 'assinatura_fim_evento_at',  emoji: '⏹️', label: 'Fim Evento',    requiredCampo: 'assinatura_in_at' },
+                    { campo: 'assinatura_out_at',         emoji: '🔴', label: 'Saída',         requiredCampo: 'assinatura_fim_evento_at' },
+                  ].map(({ campo, emoji, label, requiredCampo }) => {
+                    const val       = assinEvento[campo]
+                    const saving    = assinEvSaving[campo]
+                    const bloqueado = requiredCampo ? !assinEvento[requiredCampo] : false
+                    return (
+                      <div key={campo} className={clsx('flex items-center gap-3 p-2.5 rounded-xl border bg-white/[0.03]', bloqueado ? 'border-white/5 opacity-40' : 'border-white/10')}>
+                        <span style={{ fontSize: 16 }}>{emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-accent" style={{ fontSize: 12 }}>{label}</p>
+                          {val && <p className="text-accent-subtle/60 tabular-nums mt-0.5" style={{ fontSize: 10 }}>{fmtTs(val)}</p>}
+                        </div>
+                        {val ? (
+                          <Check size={14} className="text-green-400 shrink-0" />
+                        ) : !bloqueado && isAtribuido ? (
+                          <button
+                            onClick={() => registarAssinEvento(campo)}
+                            disabled={!!saving}
+                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-medium hover:bg-amber-400/20 disabled:opacity-40 transition-colors"
+                            style={{ fontSize: 11 }}>
+                            <Clock size={11} />
+                            {saving ? '…' : 'Registar'}
+                          </button>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 5. Km chegada */}
+              {isAtribuido && (
+                <div>
+                  <SeccaoTitulo label="Km chegada" />
+                  <div className="flex gap-2 items-center">
+                    <input type="number" min="0" step="1"
+                      value={eventoCarros.km_chegada}
+                      onChange={e => setEventoCarros(p => ({ ...p, km_chegada: e.target.value }))}
+                      placeholder="—"
+                      className="flex-1 bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-accent placeholder:text-accent-subtle/30 focus:outline-none focus:border-white/30"
+                      style={{ fontSize: 12 }} />
+                    <button onClick={guardarVeiculo} disabled={veiculoSaving}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
                       style={{ fontSize: 12 }}>
-                      {execucaoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
-                      {execucaoSaving ? 'A guardar…' : execucaoSaved ? 'Guardado' : 'Guardar'}
+                      {veiculoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
+                      {veiculoSaving ? '…' : veiculoSaved ? 'Guardado' : 'Guardar'}
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Marcar como Concluído */}
-              {isAtribuido && (faseLocal === 'execucao' || faseLocal === 'preparacao' || faseLocal === 'criacao') && (
+              {/* 6. Resumo */}
+              <div>
+                <SeccaoTitulo label="Resumo" />
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 flex flex-col gap-2">
+                  {[
+                    { label: '🟢 Entrada',       val: fmtTs(assinEvento.assinatura_lmd_at) },
+                    { label: '▶️ Início Evento', val: fmtTs(assinEvento.assinatura_in_at) },
+                    { label: '⏹️ Fim Evento',    val: fmtTs(assinEvento.assinatura_fim_evento_at) },
+                    { label: '🔴 Saída',          val: fmtTs(assinEvento.assinatura_out_at) },
+                    { label: '📸 Fotos',          val: feedbackFotos.length > 0 ? `${feedbackFotos.length} foto${feedbackFotos.length > 1 ? 's' : ''}` : null },
+                    { label: '📝 Notas',          val: execucaoNotas.trim() ? 'Sim' : null },
+                    { label: '🚗 Km chegada',     val: eventoCarros.km_chegada || null },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="flex items-center justify-between">
+                      <span className="text-accent-subtle/70" style={{ fontSize: 12 }}>{label}</span>
+                      <span className={clsx('tabular-nums font-medium', val ? 'text-green-400' : 'text-white/20')} style={{ fontSize: 12 }}>
+                        {val || '—'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 7. Concluir Trabalho */}
+              {isAtribuido && faseLocal !== 'concluido' && (
                 <button
                   onClick={() => marcarFase('concluido')}
-                  disabled={concluindoFase}
+                  disabled={concluindoFase || !assinEvento.assinatura_lmd_at}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 font-semibold hover:bg-green-500/20 disabled:opacity-40 transition-colors"
                   style={{ fontSize: 14 }}>
-                  <Flag size={16} />
-                  {concluindoFase ? 'A marcar…' : 'Marcar como Concluído'}
+                  <CheckCircle2 size={16} />
+                  {concluindoFase ? 'A marcar…' : '✅ Concluir Trabalho'}
                 </button>
               )}
               {faseLocal === 'concluido' && (
                 <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 font-semibold" style={{ fontSize: 14 }}>
-                  <Check size={16} /> Evento Concluído
-                </div>
-              )}
-            </div>
-
-          ) : (
-            <div className="flex flex-col gap-4 py-2">
-              {/* Equipamentos — topo */}
-              {equipEvento.length > 0 && (
-                <div className="rounded-xl border border-white/15 overflow-hidden">
-                  <div className="px-3 py-2 bg-white/5 border-b border-white/10">
-                    <p className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-amber-400" style={{ fontSize: 10 }}>
-                      <Boxes size={11} /> Equipamentos para o evento
-                    </p>
-                  </div>
-                  <div className="flex flex-col">
-                    {equipEvento.map((r, i) => (
-                      <div key={i} className="px-3 py-2 border-b border-white/5 last:border-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-accent-subtle/60 tabular-nums shrink-0 font-medium" style={{ fontSize: 12 }}>{r.quantidade}×</span>
-                          <span className="text-accent-muted" style={{ fontSize: 13 }}>
-                            {r.descricao_manual || r.equipamentos?.nome || '—'}
-                          </span>
-                        </div>
-                        {r.observacoes && (
-                          <p className="text-accent-subtle/50 italic ml-6 mt-0.5" style={{ fontSize: 11 }}>{r.observacoes}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {evento.notas_preparacao && (
-                <div className="rounded-xl border border-purple-500/20 bg-purple-500/[0.06] px-3 py-3">
-                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-purple-400/70 mb-2" style={{ fontSize: 10 }}>
-                    <StickyNote size={12} /> Notas de preparação
-                  </p>
-                  <p className="text-accent-muted whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
-                    {evento.notas_preparacao}
-                  </p>
-                </div>
-              )}
-              <div>
-                <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
-                  <StickyNote size={12} /> Notas do evento
-                </p>
-                <div className={clsx('whitespace-pre-wrap rounded-xl px-3 py-2.5 border',
-                  evento.notas_operacionais ? 'text-accent-muted bg-surface-2 border-border' : 'text-accent-subtle/40 italic bg-surface-2/40 border-border/40')}
-                  style={{ fontSize: 14 }}>
-                  {evento.notas_operacionais || 'Sem notas de evento.'}
-                </div>
-              </div>
-              {evento.rider_url && (
-                <div>
-                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
-                    <FileText size={12} /> Rider Técnico
-                  </p>
-                  <a href={evento.rider_url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-surface-2 text-accent-muted hover:text-accent hover:border-white/20 transition-colors"
-                    style={{ fontSize: 13 }}>
-                    <FileText size={14} />
-                    Ver PDF
-                  </a>
-                </div>
-              )}
-              {isAtribuido && (
-                <div>
-                  <p className="uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>As minhas notas</p>
-                  <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={4}
-                    placeholder="Notas pessoais sobre este evento…"
-                    style={{ fontSize: 14 }}
-                    className="w-full bg-surface-2 border border-white/30 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/50 focus:outline-none focus:border-white/60 resize-none" />
-                  {erro && <p className="text-xs text-status-cancelado mt-1">{erro}</p>}
-                  <div className="flex justify-end mt-2">
-                    <button onClick={guardar} disabled={guardando}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 disabled:opacity-40 transition-colors"
-                      style={{ fontSize: 12 }}>
-                      {guardado ? <CheckCircle2 size={13} className="text-green-600" /> : <Save size={13} />}
-                      {guardando ? 'A guardar…' : guardado ? 'Guardado' : 'Guardar notas'}
-                    </button>
-                  </div>
+                  <CheckCircle2 size={16} /> Trabalho Concluído
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* Rodapé — assinatura de início de evento + presença + fechar */}
+        {/* Rodapé */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 shrink-0">
-          <div className="flex flex-col gap-1.5 items-start">
-            {/* Botão In Evento */}
-            {mostrarInEvento && (
-              <button onClick={() => assinarEvento('in_evento')} disabled={assinandoEvento}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-green-400/30 bg-green-400/[0.07] text-green-400 text-xs font-semibold hover:opacity-80 disabled:opacity-50 transition-opacity">
-                <PenLine size={13} />
-                {assinandoEvento ? 'A registar…' : 'In Evento'}
+          <div className="flex-1 min-w-0">
+            {!isLmd && isAtribuido && proximoPasso && (
+              <button
+                onClick={handleProximoPasso}
+                disabled={isBotaoSaving}
+                className={clsx(
+                  'inline-flex items-center gap-2 px-4 py-2 rounded-xl border font-semibold transition-colors disabled:opacity-40',
+                  proximoPasso.color
+                )}
+                style={{ fontSize: 13 }}>
+                {proximoPasso.emoji} {isBotaoSaving ? '…' : proximoPasso.label}
               </button>
             )}
-            {/* Badge In Evento já feito */}
-            {!mostrarInEvento && feitasAssin.some(f => f.tipo === 'in_evento') && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-400">
-                <Check size={13} /> In Evento · {new Date(feitasAssin.find(f => f.tipo === 'in_evento').registado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+            {!isLmd && faseLocal === 'concluido' && !proximoPasso && (
+              <span className="inline-flex items-center gap-1.5 text-green-400 font-semibold" style={{ fontSize: 13 }}>
+                <CheckCircle2 size={15} /> Trabalho concluído
               </span>
             )}
-            {/* Presença GPS */}
-            <div className="flex items-center gap-3 flex-wrap">
-              {isResponsavel && pres.status === 'signed' && pres.presenca ? (
-                <span
-                  title={`Presente · ${new Date(pres.presenca.signed_at).toLocaleString('pt-PT')}${pres.presenca.latitude != null ? ` · ${Number(pres.presenca.latitude).toFixed(5)}, ${Number(pres.presenca.longitude).toFixed(5)}${pres.presenca.accuracy_m != null ? ` (±${pres.presenca.accuracy_m}m)` : ''}` : ' · sem GPS'}`}
-                  className={clsx('inline-flex items-center gap-1.5 text-sm font-medium', presAtrasada ? 'text-status-cancelado' : 'text-status-confirmado')}>
-                  <Check size={16} /> Presente · {new Date(pres.presenca.signed_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              ) : isResponsavel && pres.status === 'loading' ? (
-                <span className="inline-flex items-center gap-1.5 text-accent-subtle text-sm">
-                  <Loader2 size={15} className="animate-spin" /> A localizar…
-                </span>
-              ) : isResponsavel && pres.status === 'error' ? (
-                <button onClick={() => pres.assinar()} title={pres.erro || ''}
-                  className="inline-flex items-center gap-1.5 text-status-cancelado text-sm hover:opacity-80">
-                  <AlertCircle size={15} /> Erro — repetir
-                </button>
-              ) : isResponsavel && aConfirmarPres ? (
-                <span className="inline-flex items-center gap-2">
-                  <button onClick={() => { setConfirmarPres(false); pres.assinar() }}
-                    className="px-3 py-1.5 rounded-lg bg-status-confirmado/15 border border-status-confirmado/40 text-status-confirmado text-xs font-medium hover:bg-status-confirmado/25 transition-colors">
-                    Confirmar presença
-                  </button>
-                  <button onClick={() => setConfirmarPres(false)}
-                    className="px-2 py-1.5 rounded-lg border border-border text-accent-subtle text-xs hover:text-accent transition-colors">
-                    Cancelar
-                  </button>
-                </span>
-              ) : isResponsavel && presDisponivel ? (
-                <button onClick={() => setConfirmarPres(true)} disabled={!colaborador}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-medium hover:bg-amber-400/20 transition-colors disabled:opacity-40">
-                  <MapPin size={14} /> Marcar presença
-                </button>
-              ) : null}
-            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setScanner(true)}
-              title="Scan QR equipamento"
-              className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-amber-400/60 hover:text-amber-400 hover:bg-surface-3 active:scale-95 transition-all">
-              <QrCode size={18} />
-            </button>
+          <div className="flex items-center gap-2 shrink-0">
             <button onClick={() => setPrintEvento(true)}
               title="Folha de Evento"
               className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
               <Printer size={18} />
             </button>
+            <button onClick={onFechar}
+              className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
+              <X size={22} />
+            </button>
           </div>
-          <button onClick={onFechar}
-            className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
-            <X size={22} />
-          </button>
         </div>
       </div>
     </div>
