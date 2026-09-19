@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import { X, Database, Star, Plus, Check, Trash2, ListChecks, Send, Printer, FileSpreadsheet, ArrowRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -207,6 +207,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   })
   // Equipamentos do evento (evento_equipamentos)
   const [equipRows, setEquipRows] = useState({ proprio: [], alugado: [], comprado: [], extra: [] })
+  const equipRowsRef = useRef(equipRows)
+  equipRowsRef.current = equipRows
   const [equipamentosList, setEquipamentosList] = useState([])
   const [searchEquipBusca, setSearchEquipBusca] = useState('')
   const [searchEquipAberta, setSearchEquipAberta] = useState(false)
@@ -1940,14 +1942,14 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   proprio: prev.proprio.filter(r => r._key !== equipKey),
                 }))}
                 onUpdateEquip={(equipKey, field, val) => {
-                  setEquipRows(prev => {
-                    const updated = { ...prev, proprio: prev.proprio.map(r => r._key === equipKey ? { ...r, [field]: val } : r) }
-                    if (field === 'observacoes') {
-                      const row = prev.proprio.find(r => r._key === equipKey)
-                      if (row?.id) supabase.from('evento_equipamentos').update({ observacoes: val || null }).eq('id', row.id).catch(console.error)
-                    }
-                    return updated
-                  })
+                  if (field === 'observacoes') {
+                    const row = equipRowsRef.current.proprio.find(r => r._key === equipKey)
+                    if (row?.id) supabase.from('evento_equipamentos').update({ observacoes: val || null }).eq('id', row.id).catch(console.error)
+                  }
+                  setEquipRows(prev => ({
+                    ...prev,
+                    proprio: prev.proprio.map(r => r._key === equipKey ? { ...r, [field]: val } : r),
+                  }))
                 }}
                 onUpdateAtuacao={(artistaKey, val) => {
                   const slotId = Number(artistaKey.replace('slot_', ''))
