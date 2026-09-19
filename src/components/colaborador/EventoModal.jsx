@@ -1259,31 +1259,64 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
 
               {/* Resumo de estado */}
               <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-4 flex flex-col gap-3">
-                  {(() => {
-                    const saidaLists = eventoListas.filter(l => l.fase === 'saida')
-                    const checklistOk = saidaLists.length === 0 || saidaLists.every(l => clSubmetidas.has(l.clId))
-                    const rows = [
-                      { label: '🟢 Entrada',          val: fmtTs(assinEvento.assinatura_lmd_at) },
-                      ...(!isRecorrente ? [
-                        { label: '▶️ Início Evento',  val: fmtTs(assinEvento.assinatura_in_at) },
-                        { label: '⏹️ Fim Evento',     val: fmtTs(assinEvento.assinatura_fim_evento_at) },
-                      ] : []),
-                      { label: '🔴 Saída',             val: fmtTs(assinEvento.assinatura_out_at) },
-                      { label: '📦 Equip. confirmado', val: equipConfirmadoEm ? 'OK' : null },
-                      { label: '📋 Notas verificadas', val: notasLidas ? 'OK' : null },
-                      ...(!isRecorrente ? [{ label: '✅ Checklist saída', val: checklistOk && saidaLists.length > 0 ? 'OK' : saidaLists.length === 0 ? '—' : null }] : []),
-                      { label: '📸 Fotos',             val: feedbackFotos.length > 0 ? `${feedbackFotos.length} foto${feedbackFotos.length > 1 ? 's' : ''}` : null },
-                      { label: '📝 Notas',             val: execucaoNotas.trim() ? 'Sim' : null },
-                    ]
-                    return rows.map(({ label, val }) => (
-                      <div key={label} className="flex items-center justify-between">
-                        <span className="text-accent-subtle/70" style={{ fontSize: 13 }}>{label}</span>
-                        <span className={clsx('tabular-nums font-medium', val ? 'text-green-400' : 'text-white/20')} style={{ fontSize: 13 }}>
-                          {val || '—'}
-                        </span>
-                      </div>
-                    ))
-                  })()}
+                {(() => {
+                  const saidaLists = eventoListas.filter(l => l.fase === 'saida')
+                  const checklistOk = saidaLists.length === 0 || saidaLists.every(l => clSubmetidas.has(l.clId))
+                  const rows = [
+                    { label: '🟢 Entrada',          val: fmtTs(assinEvento.assinatura_lmd_at) },
+                    ...(!isRecorrente ? [
+                      { label: '▶️ Início Evento',  val: fmtTs(assinEvento.assinatura_in_at) },
+                      { label: '⏹️ Fim Evento',     val: fmtTs(assinEvento.assinatura_fim_evento_at) },
+                    ] : []),
+                    { label: '🔴 Saída',             val: fmtTs(assinEvento.assinatura_out_at) },
+                    { label: '📦 Equip. confirmado', val: equipConfirmadoEm ? 'OK' : null },
+                    { label: '📋 Notas verificadas', val: notasLidas ? 'OK' : null },
+                    ...(!isRecorrente ? [{ label: '✅ Checklist saída', val: checklistOk && saidaLists.length > 0 ? 'OK' : saidaLists.length === 0 ? '—' : null }] : []),
+                  ]
+                  return rows.map(({ label, val }) => (
+                    <div key={label} className="flex items-center justify-between">
+                      <span className="text-accent-subtle/70" style={{ fontSize: 13 }}>{label}</span>
+                      <span className={clsx('tabular-nums font-medium', val ? 'text-green-400' : 'text-white/20')} style={{ fontSize: 13 }}>
+                        {val || '—'}
+                      </span>
+                    </div>
+                  ))
+                })()}
+
+                {/* Miniaturas de fotos */}
+                {feedbackFotos.length > 0 ? (
+                  <div>
+                    <p className="text-accent-subtle/70 mb-1.5" style={{ fontSize: 13 }}>📸 Fotos ({feedbackFotos.length})</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {feedbackFotos.map((url, idx) => (
+                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
+                          <img src={url} alt={`foto ${idx + 1}`}
+                            className="w-14 h-14 object-cover rounded-lg border border-white/10 hover:opacity-80 transition-opacity" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="text-accent-subtle/70" style={{ fontSize: 13 }}>📸 Fotos</span>
+                    <span className="text-white/20 font-medium" style={{ fontSize: 13 }}>—</span>
+                  </div>
+                )}
+
+                {/* Notas */}
+                {execucaoNotas.trim() ? (
+                  <div>
+                    <p className="text-accent-subtle/70 mb-1" style={{ fontSize: 13 }}>📝 Notas</p>
+                    <p className="text-accent/80 leading-relaxed whitespace-pre-wrap bg-white/[0.03] rounded-lg px-2.5 py-2 border border-white/5" style={{ fontSize: 12 }}>
+                      {execucaoNotas.trim()}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="text-accent-subtle/70" style={{ fontSize: 13 }}>📝 Notas</span>
+                    <span className="text-white/20 font-medium" style={{ fontSize: 13 }}>—</span>
+                  </div>
+                )}
               </div>
 
               {/* Concluir Trabalho */}
