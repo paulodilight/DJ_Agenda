@@ -19,7 +19,7 @@ function hoje() {
   return new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento, espaco, numeroProposta, logoUrl, comIva = true, nomeEvento = '', nomeCliente = '' }) {
+export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento, espaco, numeroProposta, logoUrl, comIva = true, nomeEvento = '', nomeCliente = '', modoServicos = false }) {
   const subtotal = linhas.reduce((s, l) => s + (Number(l.preco) || 0) * (Number(l.qtd) || 1), 0)
   const iva = comIva ? subtotal * 0.23 : 0
   const total = subtotal + iva
@@ -79,10 +79,14 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
     <div>
       <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:4px;">
-        ${logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:38px;display:block;flex-shrink:0;">` : ''}
+        ${modoServicos ? '' : (logoUrl ? `<img src="${logoUrl}" alt="Xclusive" style="height:38px;display:block;flex-shrink:0;">` : '')}
         <div style="line-height:1.35;">
-          <div style="font-size:14px;font-weight:bold;">ARTISTAS XCLUSIVOS</div>
-          <div><span style="font-size:9px;">Para </span><span style="font-size:12px;font-weight:bold;">EVENTOS DE LUXO</span></div>
+          ${modoServicos
+            ? `<div style="font-size:14px;font-weight:bold;">ARTISTAS &amp; SERVIÇOS</div>
+               <div><span style="font-size:9px;">para </span><span style="font-size:12px;font-weight:bold;">EVENTOS DE LUXO</span></div>`
+            : `<div style="font-size:14px;font-weight:bold;">ARTISTAS XCLUSIVOS</div>
+               <div><span style="font-size:9px;">Para </span><span style="font-size:12px;font-weight:bold;">EVENTOS DE LUXO</span></div>`
+          }
         </div>
       </div>
       <div style="font-size:11px;color:#333;line-height:1.7;margin-top:14px;">

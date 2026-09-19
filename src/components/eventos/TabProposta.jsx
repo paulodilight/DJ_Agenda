@@ -155,6 +155,7 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
   const nomeEvento = evento?.evento || ''
   const espaco = espacos.find(e => String(e.id) === String(evento?.espaco_id)) || null
   const [clienteEditado, setClienteEditado] = useState(espaco?.nome || '')
+  const [modoServicos, setModoServicos] = useState(false)
 
   function imprimir() {
     const logoUrl = window.location.origin + '/logo-x.png'
@@ -169,6 +170,7 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       comIva,
       nomeEvento,
       nomeCliente: clienteEditado,
+      modoServicos,
     })
     const win = window.open('', '_blank', 'width=900,height=700')
     win.document.write(html)
@@ -206,14 +208,28 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
           </button>
         </div>
 
-        {/* Botão imprimir */}
-        <button
-          onClick={imprimir}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 border border-accent/20 text-accent text-xs font-semibold hover:bg-accent/20 transition-colors"
-        >
-          <Printer size={14} />
-          Imprimir Proposta
-        </button>
+        {/* Botão imprimir + toggle cabeçalho */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setModoServicos(v => !v)}
+            title={modoServicos ? 'Cabeçalho: Artistas & Serviços' : 'Cabeçalho: Artistas Xclusivos'}
+            className={clsx(
+              'px-3 py-2 rounded-lg border text-xs font-semibold transition-colors',
+              modoServicos
+                ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+                : 'bg-surface-2 border-border text-accent-muted hover:text-accent'
+            )}
+          >
+            {modoServicos ? 'A&S' : 'AX'}
+          </button>
+          <button
+            onClick={imprimir}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 border border-accent/20 text-accent text-xs font-semibold hover:bg-accent/20 transition-colors"
+          >
+            <Printer size={14} />
+            Imprimir Proposta
+          </button>
+        </div>
       </div>
 
       {/* Evento + Cliente */}
