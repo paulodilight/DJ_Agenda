@@ -1939,10 +1939,16 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   ...prev,
                   proprio: prev.proprio.filter(r => r._key !== equipKey),
                 }))}
-                onUpdateEquip={(equipKey, field, val) => setEquipRows(prev => ({
-                  ...prev,
-                  proprio: prev.proprio.map(r => r._key === equipKey ? { ...r, [field]: val } : r),
-                }))}
+                onUpdateEquip={(equipKey, field, val) => {
+                  setEquipRows(prev => {
+                    const updated = { ...prev, proprio: prev.proprio.map(r => r._key === equipKey ? { ...r, [field]: val } : r) }
+                    if (field === 'observacoes') {
+                      const row = prev.proprio.find(r => r._key === equipKey)
+                      if (row?.id) supabase.from('evento_equipamentos').update({ observacoes: val || null }).eq('id', row.id).catch(console.error)
+                    }
+                    return updated
+                  })
+                }}
                 onUpdateAtuacao={(artistaKey, val) => {
                   const slotId = Number(artistaKey.replace('slot_', ''))
                   setAtuacoes(prev => prev.map(s => s.id === slotId ? { ...s, notas: val } : s))
