@@ -1257,50 +1257,8 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
           {aba === 'fecho' && (
             <div className="flex flex-col gap-4 py-2">
 
-              {/* Horários */}
-              <div>
-                <SeccaoTitulo label="Horários" />
-                <div className="flex flex-col gap-2">
-                  {[
-                    { campo: 'assinatura_lmd_at',        emoji: '🟢', label: 'Entrada' },
-                    ...(!isRecorrente ? [
-                      { campo: 'assinatura_in_at',         emoji: '▶️', label: 'Início Evento', requiredCampo: 'assinatura_lmd_at' },
-                      { campo: 'assinatura_fim_evento_at', emoji: '⏹️', label: 'Fim Evento',    requiredCampo: 'assinatura_in_at' },
-                    ] : []),
-                    { campo: 'assinatura_out_at',         emoji: '🔴', label: 'Saída', requiredCampo: isRecorrente ? 'assinatura_lmd_at' : 'assinatura_fim_evento_at' },
-                  ].map(({ campo, emoji, label, requiredCampo }) => {
-                    const val       = assinEvento[campo]
-                    const saving    = assinEvSaving[campo]
-                    const bloqueado = requiredCampo ? !assinEvento[requiredCampo] : false
-                    return (
-                      <div key={campo} className={clsx('flex items-center gap-3 p-2.5 rounded-xl border bg-white/[0.03]', bloqueado ? 'border-white/5 opacity-40' : 'border-white/10')}>
-                        <span style={{ fontSize: 16 }}>{emoji}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-accent" style={{ fontSize: 12 }}>{label}</p>
-                          {val && <p className="text-accent-subtle/60 tabular-nums mt-0.5" style={{ fontSize: 10 }}>{fmtTs(val)}</p>}
-                        </div>
-                        {val ? (
-                          <Check size={14} className="text-green-400 shrink-0" />
-                        ) : !bloqueado && isAtribuido && evento.data_evento === hojeISO() ? (
-                          <button
-                            onClick={() => registarAssinEvento(campo)}
-                            disabled={!!saving}
-                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-medium hover:bg-amber-400/20 disabled:opacity-40 transition-colors"
-                            style={{ fontSize: 11 }}>
-                            <Clock size={11} />
-                            {saving ? '…' : 'Registar'}
-                          </button>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
               {/* Resumo de estado */}
-              <div>
-                <SeccaoTitulo label="Resumo" />
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 flex flex-col gap-2">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-4 flex flex-col gap-3">
                   {(() => {
                     const saidaLists = eventoListas.filter(l => l.fase === 'saida')
                     const checklistOk = saidaLists.length === 0 || saidaLists.every(l => clSubmetidas.has(l.clId))
@@ -1319,14 +1277,13 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                     ]
                     return rows.map(({ label, val }) => (
                       <div key={label} className="flex items-center justify-between">
-                        <span className="text-accent-subtle/70" style={{ fontSize: 12 }}>{label}</span>
-                        <span className={clsx('tabular-nums font-medium', val ? 'text-green-400' : 'text-white/20')} style={{ fontSize: 12 }}>
+                        <span className="text-accent-subtle/70" style={{ fontSize: 13 }}>{label}</span>
+                        <span className={clsx('tabular-nums font-medium', val ? 'text-green-400' : 'text-white/20')} style={{ fontSize: 13 }}>
                           {val || '—'}
                         </span>
                       </div>
                     ))
                   })()}
-                </div>
               </div>
 
               {/* Concluir Trabalho */}
