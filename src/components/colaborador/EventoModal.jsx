@@ -1374,11 +1374,13 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => setPrintEvento(true)}
-              title="Folha de Evento"
-              className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
-              <Printer size={18} />
-            </button>
+            {evento.data_evento === hojeISO() && (
+              <button onClick={() => setPrintEvento(true)}
+                title="Folha de Evento"
+                className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
+                <Printer size={18} />
+              </button>
+            )}
             <button onClick={onFechar}
               className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
               <X size={22} />
