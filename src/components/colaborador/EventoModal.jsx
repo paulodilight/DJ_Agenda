@@ -1355,7 +1355,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
         {/* Rodapé */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 shrink-0">
           <div className="flex-1 min-w-0">
-            {!isLmd && isAtribuido && proximoPasso && (
+            {!isLmd && isAtribuido && proximoPasso && evento.data_evento === hojeISO() && (
               <button
                 onClick={handleProximoPasso}
                 disabled={isBotaoSaving}
@@ -1367,20 +1367,18 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 {proximoPasso.emoji} {isBotaoSaving ? '…' : proximoPasso.label}
               </button>
             )}
-            {!isLmd && faseLocal === 'concluido' && !proximoPasso && (
+            {!isLmd && faseLocal === 'concluido' && !proximoPasso && evento.data_evento === hojeISO() && (
               <span className="inline-flex items-center gap-1.5 text-green-400 font-semibold" style={{ fontSize: 13 }}>
                 <CheckCircle2 size={15} /> Trabalho concluído
               </span>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {evento.data_evento === hojeISO() && (
-              <button onClick={() => setPrintEvento(true)}
-                title="Folha de Evento"
-                className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
-                <Printer size={18} />
-              </button>
-            )}
+            <button onClick={() => setPrintEvento(true)}
+              title="Folha de Evento"
+              className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
+              <Printer size={18} />
+            </button>
             <button onClick={onFechar}
               className="w-11 h-11 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent-subtle hover:text-accent hover:bg-surface-3 active:scale-95 transition-all">
               <X size={22} />
