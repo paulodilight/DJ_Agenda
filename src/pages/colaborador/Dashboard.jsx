@@ -299,9 +299,18 @@ export function ColaboradorDashboard() {
     : null
 
   const isRecorrenteDash = !!(proximoEvento?.recorrente)
-  const fmtTs = (ts) => ts
-    ? new Date(ts).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-    : null
+  const [faseDash, setFaseDash] = useState(null)
+  const [concluindoDash, setConcluindoDash] = useState(false)
+  useEffect(() => { setFaseDash(proximoEvento?.fase ?? null) }, [proximoEvento?.id])
+
+  const concluirEventoDash = async () => {
+    if (!proximoEventoId || concluindoDash) return
+    setConcluindoDash(true)
+    const { error } = await supabase.from('supa_eventos').update({ fase: 'concluido' }).eq('id', proximoEventoId)
+    if (!error) setFaseDash('concluido')
+    setConcluindoDash(false)
+  }
+
   const proximoPassoDash = !proximoEvento ? null : (() => {
     if (!assinEvento.assinatura_lmd_at)
       return { emoji: '🟢', label: 'Entrada', campo: 'assinatura_lmd_at', color: 'bg-green-500/15 border-green-500/40 text-green-400 hover:bg-green-500/25' }
@@ -311,7 +320,9 @@ export function ColaboradorDashboard() {
       return { emoji: '⏹️', label: 'Fim Evento', campo: 'assinatura_fim_evento_at', color: 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25' }
     if (!assinEvento.assinatura_out_at)
       return { emoji: '🔴', label: 'Saída', campo: 'assinatura_out_at', color: 'bg-red-500/15 border-red-500/30 text-red-400 hover:bg-red-500/25' }
-    return null // concluído — não mostrar botão
+    if (faseDash !== 'concluido')
+      return { emoji: '✅', label: 'Concluir', campo: null, color: 'bg-green-500/15 border-green-500/40 text-green-400 hover:bg-green-500/25' }
+    return null
   })()
 
   const onUploadFoto = async (e) => {
@@ -341,50 +352,21 @@ export function ColaboradorDashboard() {
 
         {/* Botão sequencial do próximo evento */}
         {proximoEvento && (
-          <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 p-4 flex flex-col items-center gap-3">
+          <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 p-4 flex flex-col items-center gap-2">
             <p className="text-[10px] uppercase tracking-wider text-accent-subtle/50 self-start">Presença — {proximoEvento.evento}</p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {[
-                { campo: 'assinatura_lmd_at',        emoji: '🟢', label: 'Entrada' },
-                ...(!isRecorrenteDash ? [
-                  { campo: 'assinatura_in_at',         emoji: '▶️', label: 'Início' },
-                  { campo: 'assinatura_fim_evento_at', emoji: '⏹️', label: 'Fim Evento' },
-                ] : []),
-                { campo: 'assinatura_out_at', emoji: '🔴', label: 'Saída' },
-              ].map(({ campo, emoji, label }) => {
-                const val = assinEvento[campo]
-                return (
-                  <div key={campo} className="flex flex-col items-center gap-0.5">
-                    {val ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 text-[11px] font-semibold">
-                        <CheckCircle2 size={10} /> {emoji} {fmtTs(val)}
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => registarAssinEvento(campo)}
-                        disabled={!!assinSaving[campo]}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 bg-white/5 text-accent-subtle text-[11px] font-semibold hover:text-accent hover:border-white/25 disabled:opacity-40 transition-colors"
-                      >
-                        {emoji} {assinSaving[campo] ? '…' : label}
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            {proximoPassoDash && (
+            {proximoPassoDash ? (
               <button
-                onClick={() => registarAssinEvento(proximoPassoDash.campo)}
-                disabled={!!assinSaving[proximoPassoDash.campo]}
-                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border font-semibold transition-colors disabled:opacity-40 ${proximoPassoDash.color}`}
-                style={{ fontSize: 14 }}>
-                {proximoPassoDash.emoji} {assinSaving[proximoPassoDash.campo] ? '…' : proximoPassoDash.label}
+                onClick={() => proximoPassoDash.campo ? registarAssinEvento(proximoPassoDash.campo) : concluirEventoDash()}
+                disabled={proximoPassoDash.campo ? !!assinSaving[proximoPassoDash.campo] : concluindoDash}
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border font-semibold transition-colors disabled:opacity-40 ${proximoPassoDash.color}`}
+                style={{ fontSize: 15 }}>
+                <span style={{ fontSize: 18 }}>{proximoPassoDash.emoji}</span>
+                {(proximoPassoDash.campo ? assinSaving[proximoPassoDash.campo] : concluindoDash) ? '…' : proximoPassoDash.label}
               </button>
-            )}
-            {!proximoPassoDash && assinEvento.assinatura_out_at && (
-              <span className="inline-flex items-center gap-1.5 text-green-400 font-semibold text-sm">
-                <CheckCircle2 size={14} /> Concluído
-              </span>
+            ) : (
+              <div className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 font-semibold" style={{ fontSize: 15 }}>
+                <CheckCircle2 size={16} /> Concluído
+              </div>
             )}
           </div>
         )}
