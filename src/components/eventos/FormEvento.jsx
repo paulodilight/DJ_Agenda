@@ -900,22 +900,20 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 </Field>
               </div>
 
-              {/* Cliente */}
-              <Field label="Cliente">
-                <select
-                  className={inputCls}
-                  value={form.espaco_id}
-                  onChange={(e) => set('espaco_id', e.target.value)}
-                >
-                  <option value="">— Seleccionar —</option>
-                  {espacos.map((e) => (
-                    <option key={e.id} value={e.id}>{e.nome}</option>
-                  ))}
-                </select>
-              </Field>
-
-              {/* Status + Xclusive */}
-              <div className="grid grid-cols-2 gap-3 items-end">
+              {/* Cliente + Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Cliente">
+                  <select
+                    className={inputCls}
+                    value={form.espaco_id}
+                    onChange={(e) => set('espaco_id', e.target.value)}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    {espacos.map((e) => (
+                      <option key={e.id} value={e.id}>{e.nome}</option>
+                    ))}
+                  </select>
+                </Field>
                 <Field label="Status">
                   <select
                     className={inputCls}
@@ -927,48 +925,63 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     ))}
                   </select>
                 </Field>
-                <div className="pb-1 flex flex-col gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => set('xclusive', !form.xclusive)}
-                    className={clsx(
-                      'w-full flex items-center justify-center gap-2 px-3 py-2 rounded border text-xs font-semibold transition-colors',
-                      form.xclusive
-                        ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
-                        : 'bg-surface-2 border-border text-accent-muted hover:text-accent hover:border-white/20'
-                    )}
-                  >
-                    <Star size={12} className={form.xclusive ? 'fill-violet-400 text-violet-400' : ''} />
-                    Xclusive
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => set('recorrente', !form.recorrente)}
-                    className={clsx(
-                      'w-full flex items-center justify-center gap-2 px-3 py-2 rounded border text-xs font-semibold transition-colors',
-                      form.recorrente
-                        ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
-                        : 'bg-surface-2 border-border text-accent-muted hover:text-accent hover:border-white/20'
-                    )}
-                  >
-                    <span className="text-[11px]">🔁</span>
-                    Recorrente
-                  </button>
-                </div>
               </div>
 
-              {/* Artista — só aparece quando Xclusive está activo */}
-              {form.xclusive && (
-                <ArtistaPicker
-                  artistas={artistas}
-                  value={form.artista_id}
-                  onChange={(id) => set('artista_id', id)}
-                  onNovoArtista={(novoArtista) => {
-                    setArtistas(prev => [...prev, novoArtista].sort((a, b) => a.nome.localeCompare(b.nome)))
-                    set('artista_id', novoArtista.id)
-                  }}
-                />
-              )}
+              {/* Recorrente + Evento com carro */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => set('recorrente', !form.recorrente)}
+                  className={clsx(
+                    'w-full flex items-center justify-center gap-2 px-3 py-2 rounded border text-xs font-semibold transition-colors',
+                    form.recorrente
+                      ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+                      : 'bg-surface-2 border-border text-accent-muted hover:text-accent hover:border-white/20'
+                  )}
+                >
+                  <span className="text-[11px]">🔁</span>Recorrente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleComCarro(!form.com_carro)}
+                  className={clsx(
+                    'w-full flex items-center justify-center gap-2 px-3 py-2 rounded border text-xs font-semibold transition-colors',
+                    form.com_carro
+                      ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+                      : 'bg-surface-2 border-border text-accent-muted hover:text-accent hover:border-white/20'
+                  )}
+                >
+                  <span className="text-[11px]">🚗</span>Evento com carro
+                </button>
+              </div>
+
+              {/* Xclusive + Artista */}
+              <div className={clsx('grid gap-3 items-start', form.xclusive ? 'grid-cols-2' : 'grid-cols-1')}>
+                <button
+                  type="button"
+                  onClick={() => set('xclusive', !form.xclusive)}
+                  className={clsx(
+                    'w-full flex items-center justify-center gap-2 px-3 py-2 rounded border text-xs font-semibold transition-colors',
+                    form.xclusive
+                      ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
+                      : 'bg-surface-2 border-border text-accent-muted hover:text-accent hover:border-white/20'
+                  )}
+                >
+                  <Star size={12} className={form.xclusive ? 'fill-violet-400 text-violet-400' : ''} />
+                  Xclusive
+                </button>
+                {form.xclusive && (
+                  <ArtistaPicker
+                    artistas={artistas}
+                    value={form.artista_id}
+                    onChange={(id) => set('artista_id', id)}
+                    onNovoArtista={(novoArtista) => {
+                      setArtistas(prev => [...prev, novoArtista].sort((a, b) => a.nome.localeCompare(b.nome)))
+                      set('artista_id', novoArtista.id)
+                    }}
+                  />
+                )}
+              </div>
 
               {/* Valor artístico — calculado automaticamente a partir das Atuações */}
               {(() => {
@@ -990,13 +1003,33 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 ) : null
               })()}
 
+              {/* Contacto + Morada */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Contacto pelo evento">
+                  <input
+                    className={inputCls}
+                    value={form.contacto_pelo_evento}
+                    onChange={(e) => set('contacto_pelo_evento', e.target.value)}
+                    placeholder="Telefone / email…"
+                  />
+                </Field>
+                <Field label="Morada">
+                  <input
+                    className={inputCls}
+                    value={form.morada}
+                    onChange={(e) => set('morada', e.target.value)}
+                    placeholder="Local do evento…"
+                  />
+                </Field>
+              </div>
+
               {/* Técnico Responsável + 2º Técnico */}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Técnico Responsável" action={
                   <div className="flex items-center gap-1.5">
                     <span
-                      title={eventoCarros.carro_id ? 'Com viatura' : 'Sem viatura'}
-                      className={clsx('text-sm leading-none', eventoCarros.carro_id ? 'opacity-100' : 'opacity-25')}
+                      title={form.com_carro ? 'Com viatura' : 'Sem viatura'}
+                      className={clsx('text-sm leading-none', form.com_carro ? 'opacity-100' : 'opacity-25')}
                     >🚗</span>
                     {form.tecnico_id && form.tecnico_id !== 'todos' ? (
                       <button type="button" onClick={() => dispararNotificacao(1)}
@@ -1054,45 +1087,6 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   </select>
                 </Field>
               </div>
-
-              {/* Viatura */}
-              <div className="flex items-center gap-3 py-0.5">
-                <button
-                  type="button"
-                  onClick={() => toggleComCarro(!form.com_carro)}
-                  className={clsx(
-                    'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
-                    form.com_carro ? 'bg-blue-500' : 'bg-white/15'
-                  )}>
-                  <span className={clsx(
-                    'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200',
-                    form.com_carro ? 'translate-x-4' : 'translate-x-0'
-                  )} />
-                </button>
-                <span className="text-xs text-accent-subtle">🚗 Evento com carro</span>
-              </div>
-
-              {/* Contacto */}
-              <div className="grid grid-cols-1 gap-3">
-                <Field label="Contacto pelo evento">
-                  <input
-                    className={inputCls}
-                    value={form.contacto_pelo_evento}
-                    onChange={(e) => set('contacto_pelo_evento', e.target.value)}
-                    placeholder="Telefone / email…"
-                  />
-                </Field>
-              </div>
-
-              {/* Morada */}
-              <Field label="Morada">
-                <input
-                  className={inputCls}
-                  value={form.morada}
-                  onChange={(e) => set('morada', e.target.value)}
-                  placeholder="Local do evento…"
-                />
-              </Field>
 
               {/* Data + Horário */}
               <div className="grid grid-cols-3 gap-3">
