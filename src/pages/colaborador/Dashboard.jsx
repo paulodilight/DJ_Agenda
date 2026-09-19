@@ -325,6 +325,26 @@ export function ColaboradorDashboard() {
     return null
   })()
 
+  const fecharModal = () => {
+    const id = eventoAberto?.id
+    setEventoAberto(null)
+    if (!id) return
+    supabase.from('supa_eventos')
+      .select('assinatura_lmd_at, assinatura_in_at, assinatura_fim_evento_at, assinatura_out_at, fase')
+      .eq('id', id)
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        setAssinEvento({
+          assinatura_lmd_at:        data.assinatura_lmd_at        ?? null,
+          assinatura_in_at:         data.assinatura_in_at          ?? null,
+          assinatura_fim_evento_at: data.assinatura_fim_evento_at  ?? null,
+          assinatura_out_at:        data.assinatura_out_at         ?? null,
+        })
+        setFaseDash(data.fase ?? null)
+      })
+  }
+
   const onUploadFoto = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -485,7 +505,7 @@ export function ColaboradorDashboard() {
           evento={eventoAberto}
           mapaTecnicos={mapaTecnicos}
           tarefas={tarefas}
-          onFechar={() => setEventoAberto(null)}
+          onFechar={fecharModal}
         />
       )}
 
