@@ -552,7 +552,26 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             })
           })
         })
-        if (equipInserts.length > 0) await supabase.from('evento_equipamentos').insert(equipInserts)
+        if (equipInserts.length > 0) {
+          const { data: insertedEquip } = await supabase.from('evento_equipamentos').insert(equipInserts).select('id, tipo')
+          // Actualizar ids reais nos equipRows para permitir saves directos de observações
+          if (insertedEquip) {
+            const countByTipo = {}
+            setEquipRows(prev => {
+              const next = {}
+              Object.entries(prev).forEach(([tipo, rows]) => {
+                countByTipo[tipo] = 0
+                const tipoRows = insertedEquip.filter(r => r.tipo === tipo)
+                next[tipo] = rows.map(r => {
+                  if (!r.descricao.trim() && !r.equipamento_id) return r
+                  const idx = countByTipo[tipo]++
+                  return tipoRows[idx] ? { ...r, id: tipoRows[idx].id } : r
+                })
+              })
+              return next
+            })
+          }
+        }
       }
 
       // Guardar evento_carros
