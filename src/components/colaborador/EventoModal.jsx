@@ -99,6 +99,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   })
   const [assinEvSaving,  setAssinEvSaving]  = useState({})
   const [concluindoFase, setConcluindoFase] = useState(false)
+  const [comCarro,       setComCarro]       = useState(evento.com_carro ?? false)
   const [carros,         setCarros]         = useState([])
   const [eventoCarros,   setEventoCarros]   = useState({ carro_id: '', condutor_id: '', km_saida: '', km_chegada: '' })
   const [veiculoSaving,  setVeiculoSaving]  = useState(false)
@@ -123,7 +124,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     if (!evento?.id) return
     let activo = true
     supabase.from('supa_eventos')
-      .select('assinatura_lmd_at, assinatura_in_at, assinatura_out_at, assinatura_fim_evento_at, equip_confirmado_em')
+      .select('assinatura_lmd_at, assinatura_in_at, assinatura_out_at, assinatura_fim_evento_at, equip_confirmado_em, com_carro')
       .eq('id', evento.id)
       .single()
       .then(({ data }) => {
@@ -135,6 +136,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
           assinatura_fim_evento_at: data.assinatura_fim_evento_at ?? null,
         })
         setEquipConfirmadoEm(data.equip_confirmado_em ?? null)
+        setComCarro(data.com_carro ?? false)
       })
     return () => { activo = false }
   }, [evento?.id])
@@ -1183,7 +1185,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
               )}
 
               {/* Km chegada */}
-              {isAtribuido && evento.com_carro && eventoCarros.carro_id && (
+              {isAtribuido && comCarro && eventoCarros.carro_id && (
                 <div>
                   <SeccaoTitulo label="Km chegada" />
                   <div className="flex gap-2 items-center">
@@ -1204,7 +1206,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
               )}
 
               {/* Viatura — mostra quando com_carro está ativo */}
-              {isAtribuido && evento.com_carro && (
+              {isAtribuido && comCarro && (
                 <div>
                   <SeccaoTitulo label="Veículo" />
                   <div className="flex flex-col gap-2 p-3 rounded-xl border border-white/10 bg-white/[0.03]">
