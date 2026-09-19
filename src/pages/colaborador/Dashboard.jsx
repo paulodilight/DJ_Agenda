@@ -350,22 +350,22 @@ export function ColaboradorDashboard() {
           Olá, {colaborador?.nome}!
         </p>
 
-        {/* Botão sequencial do próximo evento */}
-        {proximoEvento && (
-          <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 p-4 flex flex-col items-center gap-2">
+        {/* Botão sequencial — só aparece no dia do evento */}
+        {proximoEvento && proximoEvento.data_evento === hoje && (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 px-4 py-3 flex flex-col items-center gap-2">
             <p className="text-[10px] uppercase tracking-wider text-accent-subtle/50 self-start">Presença — {proximoEvento.evento}</p>
             {proximoPassoDash ? (
               <button
                 onClick={() => proximoPassoDash.campo ? registarAssinEvento(proximoPassoDash.campo) : concluirEventoDash()}
                 disabled={proximoPassoDash.campo ? !!assinSaving[proximoPassoDash.campo] : concluindoDash}
-                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border font-semibold transition-colors disabled:opacity-40 ${proximoPassoDash.color}`}
-                style={{ fontSize: 15 }}>
-                <span style={{ fontSize: 18 }}>{proximoPassoDash.emoji}</span>
+                className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl border font-semibold transition-colors disabled:opacity-40 ${proximoPassoDash.color}`}
+                style={{ fontSize: 13 }}>
+                <span style={{ fontSize: 15 }}>{proximoPassoDash.emoji}</span>
                 {(proximoPassoDash.campo ? assinSaving[proximoPassoDash.campo] : concluindoDash) ? '…' : proximoPassoDash.label}
               </button>
             ) : (
-              <div className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 font-semibold" style={{ fontSize: 15 }}>
-                <CheckCircle2 size={16} /> Concluído
+              <div className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 font-semibold" style={{ fontSize: 13 }}>
+                <CheckCircle2 size={14} /> Concluído
               </div>
             )}
           </div>
