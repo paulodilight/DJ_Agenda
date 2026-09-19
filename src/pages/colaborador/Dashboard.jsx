@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ClipboardList, Camera, ChevronRight, CalendarClock, Wrench, LayoutList, PenLine, AlertTriangle, Clock, X } from 'lucide-react'
+import { ClipboardList, Camera, ChevronRight, CalendarClock, Wrench, LayoutList, AlertTriangle, Clock, X, CheckCircle2 } from 'lucide-react'
 import { useColaboradorStore } from '@/store'
 import { colaboradorApi } from '@/lib/colaboradorApi'
 import { supabase } from '@/lib/supabase'
@@ -9,70 +9,6 @@ import { EventoModal } from '@/components/colaborador/EventoModal'
 import { OcorrenciaDetalhe } from '@/components/ocorrencias/OcorrenciaDetalhe'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { hhmm, dataLonga } from '@/components/colaborador/format'
-import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
-
-const LABELS_ASSIN = {
-  in_work:   { label: 'In Work',   cor: 'text-green-400  border-green-400/30  bg-green-400/[0.07]'  },
-  in_evento: { label: 'In Evento', cor: 'text-amber-400  border-amber-400/30  bg-amber-400/[0.07]'  },
-  out_work:  { label: 'Out Work',  cor: 'text-red-400    border-red-400/30    bg-red-400/[0.07]'    },
-}
-
-const ORDEM_PASSOS = ['in_work', 'in_evento', 'out_work']
-
-function BotaoAssinatura({ proxima, registar, tiposFeitos = [] }) {
-  const [loading, setLoading] = useState(false)
-
-  const badgeMap = Object.fromEntries(
-    tiposFeitos
-      .filter(tf => LABELS_ASSIN[tf.tipo])
-      .map(tf => [tf.tipo, new Date(tf.registado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })])
-  )
-
-  const temInEvento = 'in_evento' in badgeMap || proxima?.tipo === 'in_evento'
-  const passos = ORDEM_PASSOS.filter(t => t !== 'in_evento' || temInEvento)
-
-  const algumVisivel = passos.some(t => t in badgeMap || proxima?.tipo === t)
-  if (!algumVisivel) return null
-
-  const onClick = async (e) => {
-    e.stopPropagation()
-    if (!proxima || loading) return
-    setLoading(true)
-    await registar(proxima.tipo, { eventoId: proxima.eventoId, agendamentoId: proxima.agendamentoId })
-    setLoading(false)
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-[10px] uppercase tracking-wider text-accent-subtle/50">Assinatura de hoje</p>
-      <div className="flex items-center gap-2 flex-wrap">
-        {passos.map(tipo => {
-          const cfg = LABELS_ASSIN[tipo]
-          const hora = badgeMap[tipo]
-          const eProximo = proxima?.tipo === tipo
-          if (hora) {
-            return (
-              <span key={tipo} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${cfg.cor}`}>
-                <PenLine size={11} />
-                {cfg.label} · {hora}
-              </span>
-            )
-          }
-          if (eProximo) {
-            return (
-              <button key={tipo} onClick={onClick} disabled={loading}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-opacity disabled:opacity-50 ${cfg.cor}`}>
-                <PenLine size={11} />
-                {loading ? 'A registar…' : cfg.label}
-              </button>
-            )
-          }
-          return null
-        })}
-      </div>
-    </div>
-  )
-}
 
 const hojeISO = () => {
   const d = new Date()
@@ -229,8 +165,9 @@ function CardNav({ to, Icone, rotulo }) {
 
 export function ColaboradorDashboard() {
   const { colaborador, actualizarFoto } = useColaboradorStore()
-  const { proxima: proximaAssin, registar: registarAssin, tiposFeitos } = useAssinaturaDia(colaborador?.id ?? null)
   const [loading, setLoading]           = useState(true)
+  const [assinEvento, setAssinEvento]   = useState({ assinatura_lmd_at: null, assinatura_in_at: null, assinatura_fim_evento_at: null, assinatura_out_at: null })
+  const [assinSaving, setAssinSaving]   = useState({})
   const [eventos, setEventos]           = useState([])
   const [mapaTecnicos, setMapaTecnicos] = useState({})
   const [tarefas, setTarefas]           = useState([])
@@ -277,6 +214,45 @@ export function ColaboradorDashboard() {
   }, [colaborador])
 
   const hoje = hojeISO()
+
+  const proximos0 = eventos
+    .filter(e => e.meu && e.data_evento)
+    .sort((a, b) => {
+      const ha = a.hora_instalacao ?? a.hora_inicio ?? '00:00'
+      const hb = b.hora_instalacao ?? b.hora_inicio ?? '00:00'
+      return `${a.data_evento}T${ha}`.localeCompare(`${b.data_evento}T${hb}`)
+    })
+  const proximoEventoId = proximos0.find(e => e.data_evento >= hoje)?.id ?? null
+
+  // Busca timestamps frescos para o próximo evento
+  useEffect(() => {
+    if (!proximoEventoId) return
+    let activo = true
+    supabase.from('supa_eventos')
+      .select('assinatura_lmd_at, assinatura_in_at, assinatura_fim_evento_at, assinatura_out_at')
+      .eq('id', proximoEventoId)
+      .single()
+      .then(({ data }) => {
+        if (!activo || !data) return
+        setAssinEvento({
+          assinatura_lmd_at:        data.assinatura_lmd_at        ?? null,
+          assinatura_in_at:         data.assinatura_in_at          ?? null,
+          assinatura_fim_evento_at: data.assinatura_fim_evento_at  ?? null,
+          assinatura_out_at:        data.assinatura_out_at         ?? null,
+        })
+      })
+    return () => { activo = false }
+  }, [proximoEventoId])
+
+  const registarAssinEvento = async (campo) => {
+    if (!proximoEventoId || assinEvento[campo] || assinSaving[campo]) return
+    const agora = new Date().toISOString()
+    setAssinSaving(prev => ({ ...prev, [campo]: true }))
+    const { error } = await supabase.from('supa_eventos').update({ [campo]: agora }).eq('id', proximoEventoId)
+    if (!error) setAssinEvento(prev => ({ ...prev, [campo]: agora }))
+    setAssinSaving(prev => ({ ...prev, [campo]: false }))
+  }
+
   const chaveOrdem = (e) => {
     const hora = e.hora_instalacao ?? e.hora_inicio ?? '00:00'
     return `${e.data_evento ?? '9999-99-99'}T${hora}`
@@ -322,6 +298,22 @@ export function ColaboradorDashboard() {
     ? [dataLonga(proximoEvento.dia_instalacao || proximoEvento.data_evento), hhmm(proximoEvento.hora_instalacao)].filter(Boolean).join(' · ')
     : null
 
+  const isRecorrenteDash = !!(proximoEvento?.recorrente)
+  const fmtTs = (ts) => ts
+    ? new Date(ts).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : null
+  const proximoPassoDash = !proximoEvento ? null : (() => {
+    if (!assinEvento.assinatura_lmd_at)
+      return { emoji: '🟢', label: 'Entrada', campo: 'assinatura_lmd_at', color: 'bg-green-500/15 border-green-500/40 text-green-400 hover:bg-green-500/25' }
+    if (!isRecorrenteDash && !assinEvento.assinatura_in_at)
+      return { emoji: '▶️', label: 'Início Evento', campo: 'assinatura_in_at', color: 'bg-amber-400/10 border-amber-400/30 text-amber-400 hover:bg-amber-400/20' }
+    if (!isRecorrenteDash && !assinEvento.assinatura_fim_evento_at)
+      return { emoji: '⏹️', label: 'Fim Evento', campo: 'assinatura_fim_evento_at', color: 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25' }
+    if (!assinEvento.assinatura_out_at)
+      return { emoji: '🔴', label: 'Saída', campo: 'assinatura_out_at', color: 'bg-red-500/15 border-red-500/30 text-red-400 hover:bg-red-500/25' }
+    return null // concluído — não mostrar botão
+  })()
+
   const onUploadFoto = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -347,10 +339,53 @@ export function ColaboradorDashboard() {
           Olá, {colaborador?.nome}!
         </p>
 
-        {/* Assinatura de hoje — separada do próximo evento */}
-        {(proximaAssin || tiposFeitos.length > 0) && (
-          <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 p-4">
-            <BotaoAssinatura proxima={proximaAssin} registar={registarAssin} tiposFeitos={tiposFeitos} />
+        {/* Botão sequencial do próximo evento */}
+        {proximoEvento && (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-surface-1 p-4 flex flex-col items-center gap-3">
+            <p className="text-[10px] uppercase tracking-wider text-accent-subtle/50 self-start">Presença — {proximoEvento.evento}</p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {[
+                { campo: 'assinatura_lmd_at',        emoji: '🟢', label: 'Entrada' },
+                ...(!isRecorrenteDash ? [
+                  { campo: 'assinatura_in_at',         emoji: '▶️', label: 'Início' },
+                  { campo: 'assinatura_fim_evento_at', emoji: '⏹️', label: 'Fim Evento' },
+                ] : []),
+                { campo: 'assinatura_out_at', emoji: '🔴', label: 'Saída' },
+              ].map(({ campo, emoji, label }) => {
+                const val = assinEvento[campo]
+                return (
+                  <div key={campo} className="flex flex-col items-center gap-0.5">
+                    {val ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 text-[11px] font-semibold">
+                        <CheckCircle2 size={10} /> {emoji} {fmtTs(val)}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => registarAssinEvento(campo)}
+                        disabled={!!assinSaving[campo]}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 bg-white/5 text-accent-subtle text-[11px] font-semibold hover:text-accent hover:border-white/25 disabled:opacity-40 transition-colors"
+                      >
+                        {emoji} {assinSaving[campo] ? '…' : label}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {proximoPassoDash && (
+              <button
+                onClick={() => registarAssinEvento(proximoPassoDash.campo)}
+                disabled={!!assinSaving[proximoPassoDash.campo]}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border font-semibold transition-colors disabled:opacity-40 ${proximoPassoDash.color}`}
+                style={{ fontSize: 14 }}>
+                {proximoPassoDash.emoji} {assinSaving[proximoPassoDash.campo] ? '…' : proximoPassoDash.label}
+              </button>
+            )}
+            {!proximoPassoDash && assinEvento.assinatura_out_at && (
+              <span className="inline-flex items-center gap-1.5 text-green-400 font-semibold text-sm">
+                <CheckCircle2 size={14} /> Concluído
+              </span>
+            )}
           </div>
         )}
 

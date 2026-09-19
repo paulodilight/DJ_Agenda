@@ -68,6 +68,7 @@ const VAZIO = {
   fase:              '',
   proposta_notas_tecnicas: '',
   proposta_notas_proposta: '',
+  recorrente: false,
 }
 
 const ESTADO_PAG_OPCOES = [
@@ -271,6 +272,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         notas_contas:     evento.notas_contas     ?? '',
         notas_faturacao:  evento.notas_faturacao  ?? '',
         xclusive:    evento.xclusive    ?? false,
+        recorrente:  evento.recorrente  ?? false,
         artista_id:  evento.artista_id  ?? '',
         tecnico_id:      evento.todos_tecnicos ? 'todos' : (evento.tecnico_id ?? ''),
         tecnico2_id:     evento.tecnico2_id ?? '',
@@ -878,7 +880,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     ))}
                   </select>
                 </Field>
-                <div className="pb-1">
+                <div className="pb-1 flex flex-col gap-1.5">
                   <button
                     type="button"
                     onClick={() => set('xclusive', !form.xclusive)}
@@ -891,6 +893,19 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   >
                     <Star size={12} className={form.xclusive ? 'fill-violet-400 text-violet-400' : ''} />
                     Xclusive
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => set('recorrente', !form.recorrente)}
+                    className={clsx(
+                      'w-full flex items-center justify-center gap-2 px-3 py-2 rounded border text-xs font-semibold transition-colors',
+                      form.recorrente
+                        ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+                        : 'bg-surface-2 border-border text-accent-muted hover:text-accent hover:border-white/20'
+                    )}
+                  >
+                    <span className="text-[11px]">🔁</span>
+                    Recorrente
                   </button>
                 </div>
               </div>
@@ -931,20 +946,26 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               {/* Técnico Responsável + 2º Técnico */}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Técnico Responsável" action={
-                  form.tecnico_id && form.tecnico_id !== 'todos' ? (
-                    <button type="button" onClick={() => dispararNotificacao(1)}
-                      disabled={notifState[1] === 'loading'}
-                      title="Enviar notificação WhatsApp"
-                      className={clsx(
-                        'flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors disabled:opacity-50',
-                        notifState[1] === 'ok'
-                          ? 'border-status-confirmado/40 bg-status-confirmado/10 text-status-confirmado'
-                          : 'border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20'
-                      )}>
-                      <Send size={9} />
-                      {notifState[1] === 'loading' ? '...' : notifState[1] === 'ok' ? 'Enviado' : 'Notificar'}
-                    </button>
-                  ) : null
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      title={eventoCarros.carro_id ? 'Com viatura' : 'Sem viatura'}
+                      className={clsx('text-sm leading-none', eventoCarros.carro_id ? 'opacity-100' : 'opacity-25')}
+                    >🚗</span>
+                    {form.tecnico_id && form.tecnico_id !== 'todos' ? (
+                      <button type="button" onClick={() => dispararNotificacao(1)}
+                        disabled={notifState[1] === 'loading'}
+                        title="Enviar notificação WhatsApp"
+                        className={clsx(
+                          'flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors disabled:opacity-50',
+                          notifState[1] === 'ok'
+                            ? 'border-status-confirmado/40 bg-status-confirmado/10 text-status-confirmado'
+                            : 'border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20'
+                        )}>
+                        <Send size={9} />
+                        {notifState[1] === 'loading' ? '...' : notifState[1] === 'ok' ? 'Enviado' : 'Notificar'}
+                      </button>
+                    ) : null}
+                  </div>
                 }>
                   <select
                     className={inputCls}

@@ -106,6 +106,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const [equipEventoChecks,   setEquipEventoChecks]   = useState(new Set())
   const [equipConfirmadoEm,   setEquipConfirmadoEm]   = useState(null)
   const [lightboxUrl,    setLightboxUrl]    = useState(null)
+  const [notasLidas,     setNotasLidas]     = useState(false)
 
   const colaborador = useColaboradorStore(s => s.colaborador)
 
@@ -420,7 +421,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     { id: 'evento',     label: 'Evento' },
     { id: 'preparacao', label: 'Preparação' },
     { id: 'operacao',   label: 'Operação' },
-    { id: 'fecho',      label: 'Fecho' },
+    { id: 'fecho',      label: 'Resumo' },
   ].filter(t => ABAS_ORDER.includes(t.id))
 
   const onTouchStart = (e) => { touchX.current = e.changedTouches[0].clientX }
@@ -434,12 +435,13 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   }
 
   // ── Botão sequencial ──
+  const isRecorrente = !!(evento.recorrente)
   const proximoPasso = !isAtribuido || isLmd ? null : (() => {
     if (!assinEvento.assinatura_lmd_at)
       return { emoji: '🟢', label: 'Entrada', campo: 'assinatura_lmd_at', color: 'bg-green-500/15 border-green-500/40 text-green-400 hover:bg-green-500/25' }
-    if (!assinEvento.assinatura_in_at)
+    if (!isRecorrente && !assinEvento.assinatura_in_at)
       return { emoji: '▶️', label: 'Início Evento', campo: 'assinatura_in_at', color: 'bg-amber-400/10 border-amber-400/30 text-amber-400 hover:bg-amber-400/20' }
-    if (!assinEvento.assinatura_fim_evento_at)
+    if (!isRecorrente && !assinEvento.assinatura_fim_evento_at)
       return { emoji: '⏹️', label: 'Fim Evento', campo: 'assinatura_fim_evento_at', color: 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25' }
     if (!assinEvento.assinatura_out_at)
       return { emoji: '🔴', label: 'Saída', campo: 'assinatura_out_at', color: 'bg-red-500/15 border-red-500/30 text-red-400 hover:bg-red-500/25' }
@@ -457,6 +459,32 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const isBotaoSaving = proximoPasso?.campo
     ? !!assinEvSaving[proximoPasso.campo]
     : concluindoFase
+
+  // ── Barra de progresso ──
+  const progressoPct = (() => {
+    if (isLmd) return 0
+    let pct = 0
+    if (isRecorrente) {
+      if (assinEvento.assinatura_lmd_at)        pct += 20
+      if (equipConfirmadoEm)                     pct += 20
+      if (notasLidas)                            pct += 10
+      const saidaLists = eventoListas.filter(l => l.fase === 'saida')
+      if (saidaLists.length > 0 && saidaLists.every(l => clSubmetidas.has(l.clId))) pct += 30
+      else if (saidaLists.length === 0 && assinEvento.assinatura_out_at) pct += 30
+      if (faseLocal === 'concluido')             pct += 20
+    } else {
+      if (assinEvento.assinatura_lmd_at)        pct += 10
+      if (assinEvento.assinatura_in_at)          pct += 10
+      if (equipConfirmadoEm)                     pct += 20
+      if (notasLidas)                            pct += 10
+      const saidaLists = eventoListas.filter(l => l.fase === 'saida')
+      if (saidaLists.length > 0 && saidaLists.every(l => clSubmetidas.has(l.clId))) pct += 30
+      else if (saidaLists.length === 0 && assinEvento.assinatura_out_at) pct += 30
+      if (assinEvento.assinatura_fim_evento_at) pct += 10
+      if (faseLocal === 'concluido')             pct += 10
+    }
+    return Math.min(pct, 100)
+  })()
 
   // ── Dados para impressão ──
   const dadosEvento = {
@@ -624,6 +652,16 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
               style={{ fontSize: 12 }}>{t.label}</button>
           ))}
         </div>
+
+        {/* Barra de progresso */}
+        {!isLmd && isAtribuido && (
+          <div className="h-1 bg-white/5 shrink-0">
+            <div
+              className={clsx('h-full transition-all duration-500', progressoPct === 100 ? 'bg-green-400/60' : 'bg-amber-400/50')}
+              style={{ width: `${progressoPct}%` }}
+            />
+          </div>
+        )}
 
         {/* Conteúdo */}
         <div key={aba}
@@ -957,9 +995,24 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
               )}
 
               <div>
-                <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle mb-2" style={{ fontSize: 10 }}>
-                  <StickyNote size={12} /> Notas operacionais
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>
+                    <StickyNote size={12} /> Notas operacionais
+                  </p>
+                  {isAtribuido && (
+                    <button
+                      onClick={() => setNotasLidas(true)}
+                      disabled={notasLidas}
+                      className={clsx(
+                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] transition-all',
+                        notasLidas
+                          ? 'border-green-500/30 bg-green-500/10 text-green-400 cursor-default'
+                          : 'border-amber-400/30 bg-amber-400/10 text-amber-400 hover:bg-amber-400/20'
+                      )}>
+                      {notasLidas ? <><Check size={9} /> Lido</> : 'Confirmar leitura'}
+                    </button>
+                  )}
+                </div>
                 <div className={clsx('whitespace-pre-wrap rounded-xl px-3 py-2.5 border',
                   evento.notas_operacionais ? 'text-accent-muted bg-surface-2 border-border' : 'text-accent-subtle/40 italic bg-surface-2/40 border-border/40')}
                   style={{ fontSize: 14 }}>
@@ -994,8 +1047,8 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
           {aba === 'operacao' && (
             <div className="flex flex-col gap-4 py-2">
 
-              {/* Checklists de saída */}
-              {eventoListas.filter(l => l.fase === 'saida').length > 0 ? (
+              {/* Checklists de saída — ocultas se recorrente */}
+              {!isRecorrente && eventoListas.filter(l => l.fase === 'saida').length > 0 ? (
                 <div className="flex flex-col gap-2">
                   {eventoListas.filter(l => l.fase === 'saida').map(lista => {
                     const submetida = clSubmetidas.has(lista.clId)
@@ -1051,12 +1104,107 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                     )
                   })}
                 </div>
-              ) : (
+              ) : !isRecorrente ? (
                 <p className="text-center italic py-4 opacity-40" style={{ fontSize: 13 }}>Sem checklists de saída.</p>
+              ) : null}
+
+              {/* Durante o evento */}
+              {isAtribuido && (
+                <div>
+                  <SeccaoTitulo label="Durante o evento" />
+                  <textarea
+                    value={execucaoNotas}
+                    onChange={e => setExecucaoNotas(e.target.value)}
+                    rows={3}
+                    placeholder="Ocorrências, observações durante o evento…"
+                    style={{ fontSize: 13 }}
+                    className="w-full bg-surface-2 border border-white/20 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/40 resize-none"
+                  />
+                </div>
               )}
 
-              {/* Viatura */}
+              {/* Registo Fotográfico */}
               {isAtribuido && (
+                <div>
+                  <SeccaoTitulo label="Registo Fotográfico" />
+                  {feedbackFotos.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      {feedbackFotos.map((url, i) => (
+                        <div key={i} className="relative rounded-lg overflow-hidden aspect-square bg-white/5">
+                          <img src={url} alt="" className="w-full h-full object-cover cursor-pointer" onClick={() => setLightboxUrl(url)} />
+                          <button
+                            onClick={() => removerFoto(url)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors">
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <label className={clsx(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
+                      fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
+                    )}>
+                      <Camera size={14} className="text-accent-subtle shrink-0" />
+                      <span className="text-accent-subtle" style={{ fontSize: 12 }}>{fotoUploading ? 'A carregar…' : 'Câmara'}</span>
+                      <input type="file" accept="image/*" capture="environment" className="hidden"
+                        disabled={fotoUploading}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) adicionarFoto(f); e.target.value = '' }} />
+                    </label>
+                    <label className={clsx(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
+                      fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
+                    )}>
+                      <ImageIcon size={14} className="text-accent-subtle shrink-0" />
+                      <span className="text-accent-subtle" style={{ fontSize: 12 }}>{fotoUploading ? 'A carregar…' : 'Galeria'}</span>
+                      <input type="file" accept="image/*" multiple className="hidden"
+                        disabled={fotoUploading}
+                        onChange={async e => {
+                          const files = Array.from(e.target.files ?? [])
+                          for (const f of files) await adicionarFoto(f)
+                          e.target.value = ''
+                        }} />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Guardar notas/fotos */}
+              {isAtribuido && (
+                <div className="flex justify-end">
+                  <button onClick={guardarFeedback} disabled={execucaoSaving}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
+                    style={{ fontSize: 12 }}>
+                    {execucaoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
+                    {execucaoSaving ? 'A guardar…' : execucaoSaved ? 'Guardado' : 'Guardar'}
+                  </button>
+                </div>
+              )}
+
+              {/* Km chegada */}
+              {isAtribuido && eventoCarros.carro_id && (
+                <div>
+                  <SeccaoTitulo label="Km chegada" />
+                  <div className="flex gap-2 items-center">
+                    <input type="number" min="0" step="1"
+                      value={eventoCarros.km_chegada}
+                      onChange={e => setEventoCarros(p => ({ ...p, km_chegada: e.target.value }))}
+                      placeholder="—"
+                      className="flex-1 bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-accent placeholder:text-accent-subtle/30 focus:outline-none focus:border-white/30"
+                      style={{ fontSize: 12 }} />
+                    <button onClick={guardarVeiculo} disabled={veiculoSaving}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
+                      style={{ fontSize: 12 }}>
+                      {veiculoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
+                      {veiculoSaving ? '…' : veiculoSaved ? 'Guardado' : 'Guardar'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Viatura — só se tiver carro atribuído */}
+              {isAtribuido && eventoCarros.carro_id && (
                 <div>
                   <SeccaoTitulo label="Veículo" />
                   <div className="flex flex-col gap-2 p-3 rounded-xl border border-white/10 bg-white/[0.03]">
@@ -1105,97 +1253,21 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
             </div>
           )}
 
-          {/* ── ABA FECHO ── */}
+          {/* ── ABA RESUMO (ex-Fecho) ── */}
           {aba === 'fecho' && (
             <div className="flex flex-col gap-4 py-2">
 
-              {/* 1. Durante o evento */}
-              {isAtribuido && (
-                <div>
-                  <SeccaoTitulo label="Durante o evento" />
-                  <textarea
-                    value={execucaoNotas}
-                    onChange={e => setExecucaoNotas(e.target.value)}
-                    rows={3}
-                    placeholder="Ocorrências, observações durante o evento…"
-                    style={{ fontSize: 13 }}
-                    className="w-full bg-surface-2 border border-white/20 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/40 resize-none"
-                  />
-                </div>
-              )}
-
-              {/* 2. Registo Fotográfico */}
-              {isAtribuido && (
-                <div>
-                  <SeccaoTitulo label="Registo Fotográfico" />
-                  {feedbackFotos.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2 mb-2">
-                      {feedbackFotos.map((url, i) => (
-                        <div key={i} className="relative rounded-lg overflow-hidden aspect-square bg-white/5">
-                          <img src={url} alt="" className="w-full h-full object-cover cursor-pointer" onClick={() => setLightboxUrl(url)} />
-                          <button
-                            onClick={() => removerFoto(url)}
-                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors">
-                            <X size={10} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <label className={clsx(
-                      'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
-                      fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
-                    )}>
-                      <Camera size={14} className="text-accent-subtle shrink-0" />
-                      <span className="text-accent-subtle" style={{ fontSize: 12 }}>
-                        {fotoUploading ? 'A carregar…' : 'Câmara'}
-                      </span>
-                      <input type="file" accept="image/*" capture="environment" className="hidden"
-                        disabled={fotoUploading}
-                        onChange={e => { const f = e.target.files?.[0]; if (f) adicionarFoto(f); e.target.value = '' }} />
-                    </label>
-                    <label className={clsx(
-                      'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
-                      fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
-                    )}>
-                      <ImageIcon size={14} className="text-accent-subtle shrink-0" />
-                      <span className="text-accent-subtle" style={{ fontSize: 12 }}>
-                        {fotoUploading ? 'A carregar…' : 'Galeria'}
-                      </span>
-                      <input type="file" accept="image/*" multiple className="hidden"
-                        disabled={fotoUploading}
-                        onChange={async e => {
-                          const files = Array.from(e.target.files ?? [])
-                          for (const f of files) await adicionarFoto(f)
-                          e.target.value = ''
-                        }} />
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. Feedback — guardar */}
-              {isAtribuido && (
-                <div className="flex justify-end">
-                  <button onClick={guardarFeedback} disabled={execucaoSaving}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
-                    style={{ fontSize: 12 }}>
-                    {execucaoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
-                    {execucaoSaving ? 'A guardar…' : execucaoSaved ? 'Guardado' : 'Guardar'}
-                  </button>
-                </div>
-              )}
-
-              {/* 4. Registo dos horários */}
+              {/* Horários */}
               <div>
-                <SeccaoTitulo label="Registo dos horários" />
+                <SeccaoTitulo label="Horários" />
                 <div className="flex flex-col gap-2">
                   {[
                     { campo: 'assinatura_lmd_at',        emoji: '🟢', label: 'Entrada' },
-                    { campo: 'assinatura_in_at',          emoji: '▶️', label: 'Início Evento', requiredCampo: 'assinatura_lmd_at' },
-                    { campo: 'assinatura_fim_evento_at',  emoji: '⏹️', label: 'Fim Evento',    requiredCampo: 'assinatura_in_at' },
-                    { campo: 'assinatura_out_at',         emoji: '🔴', label: 'Saída',         requiredCampo: 'assinatura_fim_evento_at' },
+                    ...(!isRecorrente ? [
+                      { campo: 'assinatura_in_at',         emoji: '▶️', label: 'Início Evento', requiredCampo: 'assinatura_lmd_at' },
+                      { campo: 'assinatura_fim_evento_at', emoji: '⏹️', label: 'Fim Evento',    requiredCampo: 'assinatura_in_at' },
+                    ] : []),
+                    { campo: 'assinatura_out_at',         emoji: '🔴', label: 'Saída', requiredCampo: isRecorrente ? 'assinatura_lmd_at' : 'assinatura_fim_evento_at' },
                   ].map(({ campo, emoji, label, requiredCampo }) => {
                     const val       = assinEvento[campo]
                     const saving    = assinEvSaving[campo]
@@ -1225,54 +1297,45 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 </div>
               </div>
 
-              {/* 5. Km chegada */}
-              {isAtribuido && (
-                <div>
-                  <SeccaoTitulo label="Km chegada" />
-                  <div className="flex gap-2 items-center">
-                    <input type="number" min="0" step="1"
-                      value={eventoCarros.km_chegada}
-                      onChange={e => setEventoCarros(p => ({ ...p, km_chegada: e.target.value }))}
-                      placeholder="—"
-                      className="flex-1 bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-accent placeholder:text-accent-subtle/30 focus:outline-none focus:border-white/30"
-                      style={{ fontSize: 12 }} />
-                    <button onClick={guardarVeiculo} disabled={veiculoSaving}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
-                      style={{ fontSize: 12 }}>
-                      {veiculoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
-                      {veiculoSaving ? '…' : veiculoSaved ? 'Guardado' : 'Guardar'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 6. Resumo */}
+              {/* Resumo de estado */}
               <div>
                 <SeccaoTitulo label="Resumo" />
                 <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 flex flex-col gap-2">
-                  {[
-                    { label: '🟢 Entrada',       val: fmtTs(assinEvento.assinatura_lmd_at) },
-                    { label: '▶️ Início Evento', val: fmtTs(assinEvento.assinatura_in_at) },
-                    { label: '⏹️ Fim Evento',    val: fmtTs(assinEvento.assinatura_fim_evento_at) },
-                    { label: '🔴 Saída',          val: fmtTs(assinEvento.assinatura_out_at) },
-                    { label: '📸 Fotos',          val: feedbackFotos.length > 0 ? `${feedbackFotos.length} foto${feedbackFotos.length > 1 ? 's' : ''}` : null },
-                    { label: '📝 Notas',          val: execucaoNotas.trim() ? 'Sim' : null },
-                    { label: '🚗 Km chegada',     val: eventoCarros.km_chegada || null },
-                  ].map(({ label, val }) => (
-                    <div key={label} className="flex items-center justify-between">
-                      <span className="text-accent-subtle/70" style={{ fontSize: 12 }}>{label}</span>
-                      <span className={clsx('tabular-nums font-medium', val ? 'text-green-400' : 'text-white/20')} style={{ fontSize: 12 }}>
-                        {val || '—'}
-                      </span>
-                    </div>
-                  ))}
+                  {(() => {
+                    const saidaLists = eventoListas.filter(l => l.fase === 'saida')
+                    const checklistOk = saidaLists.length === 0 || saidaLists.every(l => clSubmetidas.has(l.clId))
+                    const rows = [
+                      { label: '🟢 Entrada',          val: fmtTs(assinEvento.assinatura_lmd_at) },
+                      ...(!isRecorrente ? [
+                        { label: '▶️ Início Evento',  val: fmtTs(assinEvento.assinatura_in_at) },
+                        { label: '⏹️ Fim Evento',     val: fmtTs(assinEvento.assinatura_fim_evento_at) },
+                      ] : []),
+                      { label: '🔴 Saída',             val: fmtTs(assinEvento.assinatura_out_at) },
+                      { label: '📦 Equip. confirmado', val: equipConfirmadoEm ? 'OK' : null },
+                      { label: '📋 Notas verificadas', val: notasLidas ? 'OK' : null },
+                      ...(!isRecorrente ? [{ label: '✅ Checklist saída', val: checklistOk && saidaLists.length > 0 ? 'OK' : saidaLists.length === 0 ? '—' : null }] : []),
+                      { label: '📸 Fotos',             val: feedbackFotos.length > 0 ? `${feedbackFotos.length} foto${feedbackFotos.length > 1 ? 's' : ''}` : null },
+                      { label: '📝 Notas',             val: execucaoNotas.trim() ? 'Sim' : null },
+                    ]
+                    return rows.map(({ label, val }) => (
+                      <div key={label} className="flex items-center justify-between">
+                        <span className="text-accent-subtle/70" style={{ fontSize: 12 }}>{label}</span>
+                        <span className={clsx('tabular-nums font-medium', val ? 'text-green-400' : 'text-white/20')} style={{ fontSize: 12 }}>
+                          {val || '—'}
+                        </span>
+                      </div>
+                    ))
+                  })()}
                 </div>
               </div>
 
-              {/* 7. Concluir Trabalho */}
+              {/* Concluir Trabalho */}
               {isAtribuido && faseLocal !== 'concluido' && (
                 <button
-                  onClick={() => marcarFase('concluido')}
+                  onClick={() => {
+                    if (!execucaoNotas.trim() && !window.confirm('Não tens observações ou ocorrências a registar?')) return
+                    marcarFase('concluido')
+                  }}
                   disabled={concluindoFase || !assinEvento.assinatura_lmd_at}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 font-semibold hover:bg-green-500/20 disabled:opacity-40 transition-colors"
                   style={{ fontSize: 14 }}>

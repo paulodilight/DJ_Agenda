@@ -45,7 +45,7 @@ export const supaEventosApi = {
     const COLS = [
       'evento', 'data_evento', 'hora_inicio', 'hora_fim', 'hora_instalacao', 'dia_instalacao',
       'status', 'espaco_id', 'tecnico_id', 'tecnico2_id', 'todos_tecnicos', 'tipo', 'notas_operacionais', 'Equipamentos',
-      'contacto_pelo_evento', 'morada', 'responsavel', 'artista_id', 'xclusive', 'rider_url', 'fotos_urls',
+      'contacto_pelo_evento', 'morada', 'responsavel', 'artista_id', 'xclusive', 'recorrente', 'rider_url', 'fotos_urls',
       'valor', 'valor_artistico', 'valor_apoio_tecnico', 'notas_faturacao',
       'margem', 'transporte', 'extras_contas',
       'estado_pagamento', 'forma_pagamento', 'notas_contas',
