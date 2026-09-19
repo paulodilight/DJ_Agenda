@@ -181,12 +181,15 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
   </div>
 
   <!-- Detalhes do evento -->
-  ${(evento?.hora_instalacao || evento?.hora_inicio || evento?.hora_fim || evento?.morada) ? `
-  <div style="margin-top:20px;font-size:10px;border-top:1px solid #eee;padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;">
-    ${evento?.hora_instalacao ? `<div><strong>Hora de instalação:</strong> ${evento.hora_instalacao.slice(0,5)}</div>` : ''}
-    ${evento?.hora_inicio     ? `<div><strong>Hora de início:</strong> ${evento.hora_inicio.slice(0,5)}</div>` : ''}
-    ${evento?.hora_fim        ? `<div><strong>Hora de fim:</strong> ${evento.hora_fim.slice(0,5)}</div>` : ''}
-    ${evento?.morada          ? `<div style="grid-column:1/-1;"><strong>Morada do evento:</strong> ${evento.morada}</div>` : ''}
+  ${(evento?.data_evento || evento?.hora_instalacao || evento?.hora_inicio || evento?.hora_fim || evento?.morada) ? `
+  <div style="margin-top:20px;border-top:1px solid #eee;padding-top:12px;">
+    ${evento?.data_evento ? `<div style="font-size:12px;font-weight:bold;margin-bottom:8px;">Dia do evento: ${new Date(evento.data_evento + 'T00:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })}</div>` : ''}
+    <div style="font-size:10px;display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;">
+      ${evento?.hora_inicio     ? `<div><strong>Hora de início:</strong> ${evento.hora_inicio.slice(0,5)}</div>` : '<div></div>'}
+      ${evento?.hora_instalacao ? `<div><strong>Hora de instalação:</strong> ${evento.hora_instalacao.slice(0,5)}</div>` : '<div></div>'}
+      ${evento?.hora_fim        ? `<div><strong>Hora de fim:</strong> ${evento.hora_fim.slice(0,5)}</div>` : '<div></div>'}
+      ${evento?.morada          ? `<div><strong>Local:</strong> ${evento.morada}</div>` : '<div></div>'}
+    </div>
   </div>` : ''}
 
   <!-- Nota legal -->
