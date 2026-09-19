@@ -1281,7 +1281,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                         </div>
                         {val ? (
                           <Check size={14} className="text-green-400 shrink-0" />
-                        ) : !bloqueado && isAtribuido ? (
+                        ) : !bloqueado && isAtribuido && evento.data_evento === hojeISO() ? (
                           <button
                             onClick={() => registarAssinEvento(campo)}
                             disabled={!!saving}
@@ -1330,7 +1330,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
               </div>
 
               {/* Concluir Trabalho */}
-              {isAtribuido && faseLocal !== 'concluido' && (
+              {isAtribuido && faseLocal !== 'concluido' && evento.data_evento === hojeISO() && (
                 <button
                   onClick={() => {
                     if (!execucaoNotas.trim() && !window.confirm('Não tens observações ou ocorrências a registar?')) return
