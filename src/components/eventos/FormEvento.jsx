@@ -69,6 +69,7 @@ const VAZIO = {
   proposta_notas_tecnicas: '',
   proposta_notas_proposta: '',
   recorrente: false,
+  com_carro: false,
 }
 
 const ESTADO_PAG_OPCOES = [
@@ -275,6 +276,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         notas_faturacao:  evento.notas_faturacao  ?? '',
         xclusive:    evento.xclusive    ?? false,
         recorrente:  evento.recorrente  ?? false,
+        com_carro:   evento.com_carro   ?? false,
         artista_id:  evento.artista_id  ?? '',
         tecnico_id:      evento.todos_tecnicos ? 'todos' : (evento.tecnico_id ?? ''),
         tecnico2_id:     evento.tecnico2_id ?? '',
@@ -460,6 +462,30 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
       setTimeout(() => setNotifState(s => { const n = { ...s }; delete n[num]; return n }), 3000)
     } catch {
       setNotifState(s => { const n = { ...s }; delete n[num]; return n })
+    }
+  }
+
+  const CL_CARRO_ID = '3951ccbd-99cb-4845-aebf-7b3cf034df94'
+  const toggleComCarro = (val) => {
+    set('com_carro', val)
+    if (val) {
+      const jatem = eventoChecklists.some(ec => !ec.removed && ec.clId === CL_CARRO_ID)
+      if (!jatem) {
+        const tmpl = allChecklists.find(c => c.id === CL_CARRO_ID)
+        if (tmpl) {
+          setEventoChecklists(prev => [...prev, {
+            _key: uidF(), ecId: null, clId: tmpl.id,
+            nome: tmpl.nome, tipo_evento_id: tmpl.tipo_evento_id ?? null,
+            fase: tmpl.fase ?? null,
+            itens: (tmpl.checklist_itens ?? []).sort((a, b) => a.ordem - b.ordem).map(it => ({ _key: uidF(), id: it.id, texto: it.texto })),
+            _deletedItemIds: [],
+          }])
+        }
+      }
+    } else {
+      setEventoChecklists(prev => prev
+        .map(ec => ec.clId === CL_CARRO_ID ? (ec.ecId ? { ...ec, removed: true } : null) : ec)
+        .filter(Boolean))
     }
   }
 
@@ -1027,6 +1053,23 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     ))}
                   </select>
                 </Field>
+              </div>
+
+              {/* Viatura */}
+              <div className="flex items-center gap-3 py-0.5">
+                <button
+                  type="button"
+                  onClick={() => toggleComCarro(!form.com_carro)}
+                  className={clsx(
+                    'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
+                    form.com_carro ? 'bg-blue-500' : 'bg-white/15'
+                  )}>
+                  <span className={clsx(
+                    'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200',
+                    form.com_carro ? 'translate-x-4' : 'translate-x-0'
+                  )} />
+                </button>
+                <span className="text-xs text-accent-subtle">🚗 Evento com carro</span>
               </div>
 
               {/* Contacto */}

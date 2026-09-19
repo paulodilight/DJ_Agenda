@@ -1183,7 +1183,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
               )}
 
               {/* Km chegada */}
-              {isAtribuido && eventoCarros.carro_id && (
+              {isAtribuido && evento.com_carro && eventoCarros.carro_id && (
                 <div>
                   <SeccaoTitulo label="Km chegada" />
                   <div className="flex gap-2 items-center">
@@ -1203,8 +1203,8 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 </div>
               )}
 
-              {/* Viatura — só se tiver carro atribuído */}
-              {isAtribuido && eventoCarros.carro_id && (
+              {/* Viatura — mostra quando com_carro está ativo */}
+              {isAtribuido && evento.com_carro && (
                 <div>
                   <SeccaoTitulo label="Veículo" />
                   <div className="flex flex-col gap-2 p-3 rounded-xl border border-white/10 bg-white/[0.03]">
