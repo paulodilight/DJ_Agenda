@@ -1932,9 +1932,9 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 equipRows={equipRows}
                 equipamentosList={equipamentosList}
                 atuacoes={atuacoes}
-                notasTecnicasInicial={form.proposta_notas_tecnicas || ''}
-                notasPropostaInicial={form.proposta_notas_proposta || ''}
-                linhasIniciais={form.proposta_linhas ?? null}
+                notasTecnicasInicial={evento?.proposta_notas_tecnicas || ''}
+                notasPropostaInicial={evento?.proposta_notas_proposta || ''}
+                linhasIniciais={evento?.proposta_linhas ?? null}
                 onNotasChange={({ notasTecnicas, notasProposta }) => {
                   set('proposta_notas_tecnicas', notasTecnicas)
                   set('proposta_notas_proposta', notasProposta)
