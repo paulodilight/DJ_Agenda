@@ -104,9 +104,13 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       const existingArtKeys = new Set(prev.filter(l => l._artistaKey).map(l => l._artistaKey))
 
       if (existingArtKeys.size > 0) {
-        // Artistas já posicionados — actualizar dados no sítio sem mover
+        // Artistas já posicionados — actualizar só descricao/preco, preservar observacoes do utilizador
         const artMap = Object.fromEntries(artLines.map(l => [l._artistaKey, l]))
-        return prev.map(l => l._artistaKey ? (artMap[l._artistaKey] ?? l) : l)
+        return prev.map(l => {
+          if (!l._artistaKey) return l
+          const fresh = artMap[l._artistaKey]
+          return fresh ? { ...l, descricao: fresh.descricao, preco: fresh.preco } : l
+        })
       }
 
       // Nenhum artista guardado ainda — colocar no topo
@@ -125,7 +129,8 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
     const proprios = equipRows.proprio ?? []
     setLinhas(prev => {
       const validKeys = new Set(proprios.map(r => r._key))
-      const kept = prev.filter(l => !l._equipKey || validKeys.has(l._equipKey))
+      // Preservar todas as linhas — _key muda a cada carregamento, não remover por falta de correspondência
+      const kept = prev
       const updated = kept.map(l => {
         if (!l._equipKey) return l
         const equip = proprios.find(r => r._key === l._equipKey)
