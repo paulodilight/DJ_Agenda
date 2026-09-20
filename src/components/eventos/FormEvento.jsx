@@ -192,6 +192,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   const [form, setForm]       = useState(VAZIO)
   const [loading, setLoading] = useState(false)
   const [erro, setErro]       = useState(null)
+  const [dirty, setDirty]     = useState(false)
   const { pushUndo } = useUndo()
   const [abaActiva, setAba]   = useState('geral')
   const [tipos, setTipos]       = useState([])
@@ -247,6 +248,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
 
   useEffect(() => {
     if (!aberto) return
+    setDirty(false)
     setErro(null)
     setAba('geral')
     setBilling({ equipamentos_alugado: [], equipamentos_comprado: [], extras: [] })
@@ -412,7 +414,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
 
   const [notifState, setNotifState] = useState({}) // { 1: 'loading'|'ok', 2: 'loading'|'ok' }
 
-  const set = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }))
+  const set = (campo, valor) => { setForm((f) => ({ ...f, [campo]: valor })); setDirty(true) }
 
   const onAtuacoesChange = useCallback((slots) => {
     setAtuacoes(slots)
@@ -487,6 +489,11 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         .map(ec => ec.clId === CL_CARRO_ID ? (ec.ecId ? { ...ec, removed: true } : null) : ec)
         .filter(Boolean))
     }
+  }
+
+  const fechar = () => {
+    if (dirty && !window.confirm('Tens alterações não guardadas. Fechar na mesma?')) return
+    onFechar()
   }
 
   const guardar = async () => {
@@ -785,7 +792,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               <button onClick={() => setPrintContas(true)} title="Folha de Contas"
                 className="text-accent-subtle hover:text-accent transition-colors"><FileSpreadsheet size={16} /></button>
             )}
-            <button onClick={onFechar} className="text-accent-subtle hover:text-accent transition-colors">
+            <button onClick={fechar} className="text-accent-subtle hover:text-accent transition-colors">
               <X size={16} />
             </button>
           </div>
@@ -2066,8 +2073,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             )}
           </div>
           <div className="flex gap-2">
-            <Button variante="secundario" onClick={onFechar} disabled={loading}>
-              Cancelar
+            <Button variante="secundario" onClick={fechar} disabled={loading}>
+              Fechar
             </Button>
             <Button onClick={guardar} disabled={loading}>
               {loading ? 'A guardar…' : evento?.id ? 'Guardar alterações' : 'Criar evento'}
