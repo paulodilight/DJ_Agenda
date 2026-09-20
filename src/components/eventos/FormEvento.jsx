@@ -794,9 +794,6 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
               <button onClick={() => setPrintContas(true)} title="Folha de Contas"
                 className="text-accent-subtle hover:text-accent transition-colors"><FileSpreadsheet size={16} /></button>
             )}
-            <button onClick={fechar} className="text-accent-subtle hover:text-accent transition-colors">
-              <X size={16} />
-            </button>
           </div>
         </div>
 
