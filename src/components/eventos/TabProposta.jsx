@@ -128,18 +128,29 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
     if (!hasInit.current) return
     const proprios = equipRows.proprio ?? []
     setLinhas(prev => {
-      const validKeys = new Set(proprios.map(r => r._key))
-      // Preservar todas as linhas — _key muda a cada carregamento, não remover por falta de correspondência
-      const kept = prev
-      const updated = kept.map(l => {
+      const updated = prev.map(l => {
         if (!l._equipKey) return l
         const equip = proprios.find(r => r._key === l._equipKey)
-        if (!equip) return l
-        const newDesc = equipamentosList.find(e => e.id === equip.equipamento_id)?.nome || equip.descricao || l.descricao
-        const newQtd = equip.unidades || 1
-        const newObs = equip.observacoes ?? ''
-        if (newDesc === l.descricao && newQtd === l.qtd && newObs === l.observacoes) return l
-        return { ...l, descricao: newDesc, qtd: newQtd, observacoes: newObs }
+        if (equip) {
+          const newDesc = equipamentosList.find(e => e.id === equip.equipamento_id)?.nome || equip.descricao || l.descricao
+          const newQtd = equip.unidades || 1
+          const newObs = equip.observacoes ?? ''
+          if (newDesc === l.descricao && newQtd === l.qtd && newObs === l.observacoes) return l
+          return { ...l, descricao: newDesc, qtd: newQtd, observacoes: newObs }
+        }
+        // Sem correspondência por _key — tentar por descrição para associar ao equipamento real
+        const lDesc = (l.descricao || '').toLowerCase().trim()
+        const equipByDesc = proprios.find(r => {
+          const rDesc = (equipamentosList.find(e => e.id === r.equipamento_id)?.nome || r.descricao || '').toLowerCase().trim()
+          return rDesc === lDesc
+        })
+        if (equipByDesc) {
+          const newDesc = equipamentosList.find(e => e.id === equipByDesc.equipamento_id)?.nome || equipByDesc.descricao || l.descricao
+          const newQtd = equipByDesc.unidades || 1
+          const newObs = equipByDesc.observacoes ?? ''
+          return { ...l, _equipKey: equipByDesc._key, descricao: newDesc, qtd: newQtd, observacoes: newObs }
+        }
+        return l
       })
       const existingKeys = new Set(updated.filter(l => l._equipKey).map(l => l._equipKey))
       const newLines = proprios
