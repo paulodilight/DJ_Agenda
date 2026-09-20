@@ -95,8 +95,17 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
   const artistaSyncKey = atuacoes.map(s => `${s.id}:${s.valor_total_cliente ?? s.valor}:${s.notas ?? ''}`).join('|')
   useEffect(() => {
     setLinhas(prev => {
-      const withoutArtista = prev.filter(l => !l._artistaKey)
       const artLines = linhasDeAtuacoes(atuacoes)
+      const existingArtKeys = new Set(prev.filter(l => l._artistaKey).map(l => l._artistaKey))
+
+      if (existingArtKeys.size > 0) {
+        // Artistas já posicionados — actualizar dados no sítio sem mover
+        const artMap = Object.fromEntries(artLines.map(l => [l._artistaKey, l]))
+        return prev.map(l => l._artistaKey ? (artMap[l._artistaKey] ?? l) : l)
+      }
+
+      // Nenhum artista guardado ainda — colocar no topo
+      const withoutArtista = prev.filter(l => !l._artistaKey)
       if (artLines.length === 0) return withoutArtista.length > 0 ? withoutArtista : [linhaVazia()]
       return [...artLines, ...withoutArtista]
     })
