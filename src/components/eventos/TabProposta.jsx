@@ -59,8 +59,10 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       const techTotal = (Number(evento?.valor_apoio_tecnico) || 0) + (Number(evento?.valor_apoio_tecnico_2) || 0)
       const transporteVal = Number(evento?.transporte) || 0
       const extras = []
+      const alimentacaoVal = Number(evento?.valor_alimentacao) || 0
       if (techTotal > 0) extras.push({ descricao: 'Instalação e Apoio Técnico', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(techTotal) })
       if (transporteVal > 0) extras.push({ descricao: 'Transporte', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(transporteVal) })
+      if (alimentacaoVal > 0) extras.push({ descricao: 'Alimentação', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(alimentacaoVal) })
       setLinhas(extras.length > 0 ? extras : [linhaVazia()])
     }
   }, [evento?.id])

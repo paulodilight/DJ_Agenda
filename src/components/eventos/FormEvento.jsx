@@ -69,6 +69,7 @@ const VAZIO = {
   proposta_notas_tecnicas: '',
   proposta_notas_proposta: '',
   proposta_linhas: null,
+  tecnicos_externos: [],
   recorrente: false,
   com_carro: false,
 }
@@ -293,6 +294,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         notas_preparacao: evento.notas_preparacao             ?? '',
         fase:             evento.fase                         ?? 'criacao',
         proposta_linhas:  evento.proposta_linhas              ?? null,
+        tecnicos_externos: evento.tecnicos_externos            ?? [],
       })
       // Carregar itens de billing existentes para este evento
       supabase.from('contas_clientes').select('*').eq('evento_id', evento.id)
@@ -803,7 +805,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             { id: 'geral',        label: 'Geral' },
             { id: 'equipamentos', label: 'Equipamentos' },
             { id: 'preparacao',   label: 'Preparação' },
-            { id: 'execucao',     label: 'Execução' },
+            { id: 'apoio_t',      label: 'Apoio T' },
             { id: 'financeiro',   label: 'Financeiro' },
             ...(evento?.id ? [{ id: 'atuacoes',  label: 'Atuações' }] : []),
             ...(evento?.id ? [{ id: 'proposta',  label: 'Proposta' }] : []),
@@ -1583,214 +1585,18 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             </div>
           )}
 
-          {/* ── Aba Execução ── */}
-          {abaActiva === 'execucao' && (
-            <div className="flex flex-col gap-5">
-
-              {/* Assinaturas / Fases */}
-              <div className="flex flex-col gap-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
-                  Assinaturas / Fases <span className="font-normal normal-case tracking-normal text-accent-subtle/40">recolhidas in-loco via Apoio T</span>
-                </p>
-                <div className="flex flex-col gap-2">
-                  {[
-                    { label: 'Saída LMD',             key: 'assinatura_lmd_at' },
-                    { label: 'IN — Chegada ao evento', key: 'assinatura_in_at' },
-                    { label: 'OUT — Fim do evento',    key: 'assinatura_out_at' },
-                  ].map(({ label, key }) => {
-                    const val = evento?.[key]
-                    return (
-                      <div key={key} className="flex items-center gap-3 p-3 rounded-lg bg-surface-2/50 border border-border/40">
-                        <div className={clsx('w-2 h-2 rounded-full shrink-0', val ? 'bg-status-confirmado' : 'bg-border')} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-medium text-accent">{label}</p>
-                          <p className="text-[10px] text-accent-subtle/60 mt-0.5">
-                            {val ? new Date(val).toLocaleString('pt-PT') : 'Pendente — registo via Apoio T'}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="p-3 bg-surface-2/50 border border-border/40 rounded-lg flex items-center gap-3">
-                  <span className={clsx(
-                    'text-xs font-semibold px-2.5 py-1 rounded-full',
-                    (form.fase === 'concluido' || form.fase === 'faturado')
-                      ? 'bg-status-confirmado/15 text-status-confirmado'
-                      : 'bg-surface-3 text-accent-muted'
-                  )}>
-                    {({ criacao: 'Criação', preparacao: 'Preparação', execucao: 'Execução', concluido: 'Concluído', faturado: 'Faturado' })[form.fase || 'criacao'] || 'Criação'}
-                  </span>
-                  <p className="text-[10px] text-accent-subtle/50">Fase actualizada pelo Apoio T.</p>
-                </div>
-              </div>
-
-              {/* Checklists com estado — via Apoio T */}
-              {eventoChecklists.filter(ec => !ec.removed && ec.itens.length > 0).length > 0 && (
-                <div className="flex flex-col gap-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
-                    Checklist de Preparação <span className="font-normal normal-case tracking-normal text-accent-subtle/40">— via Apoio T</span>
-                  </p>
-                  {eventoChecklists.filter(ec => !ec.removed && ec.itens.length > 0).map(ec => {
-                    const submittedBy = checkSubs[ec.clId] ?? []
-                    const totalMarcados = ec.itens.filter(it => (checksByItem[it.id] ?? []).length > 0).length
-                    return (
-                      <div key={ec._key} className="rounded-lg border border-border/40 overflow-hidden">
-                        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2/60 border-b border-border/30">
-                          <p className="text-[11px] font-semibold text-accent">{ec.nome}</p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-[10px] text-accent-subtle/50">{totalMarcados}/{ec.itens.length}</p>
-                            {submittedBy.length > 0 && (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-status-confirmado">
-                                <Check size={10} />{submittedBy.map(tid => tecnicos.find(t => t.id === tid)?.nome ?? '—').join(', ')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {ec.itens.map(item => {
-                          const checks = checksByItem[item.id] ?? []
-                          const checked = checks.length > 0
-                          return (
-                            <div key={item._key} className={clsx(
-                              'flex items-center gap-2.5 px-3 py-2 border-b border-border/15 last:border-0',
-                              checked ? 'bg-status-confirmado/5' : ''
-                            )}>
-                              {checked ? (
-                                <Check size={11} className="text-status-confirmado shrink-0" />
-                              ) : (
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-accent-subtle/35 shrink-0 border border-border/30 rounded px-1.5 py-0.5 whitespace-nowrap">Técnico</span>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className={clsx('text-xs', checked ? 'text-accent-muted/70 line-through' : 'text-accent')}>{item.texto}</p>
-                                {checked && checks.map(c => (
-                                  <p key={c.tecnico_id} className="text-[10px] text-accent-subtle/50 mt-0.5">
-                                    {tecnicos.find(t => t.id === c.tecnico_id)?.nome ?? '—'} · {new Date(c.checked_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-                                  </p>
-                                ))}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Veículo */}
-              <div className="flex flex-col gap-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
-                  Veículo
-                </p>
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-accent-subtle/50 uppercase tracking-wider">Carro</label>
-                    <select
-                      className="w-full rounded-md border border-border/50 bg-surface-2 px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
-                      value={eventoCarros.carro_id || ''}
-                      onChange={e => setEventoCarros(prev => ({ ...prev, carro_id: e.target.value || null }))}
-                    >
-                      <option value="">— Nenhum —</option>
-                      {carros.map(c => (
-                        <option key={c.id} value={c.id}>{c.marca} {c.modelo} · {c.matricula}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-accent-subtle/50 uppercase tracking-wider">Condutor</label>
-                    <select
-                      className="w-full rounded-md border border-border/50 bg-surface-2 px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
-                      value={eventoCarros.condutor_id || ''}
-                      onChange={e => setEventoCarros(prev => ({ ...prev, condutor_id: e.target.value || null }))}
-                    >
-                      <option value="">— Nenhum —</option>
-                      {tecnicos.map(t => (
-                        <option key={t.id} value={t.id}>{t.nome}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="flex flex-col gap-1 flex-1">
-                      <label className="text-[10px] text-accent-subtle/50 uppercase tracking-wider">Km saída</label>
-                      <input type="number" min="0" step="1"
-                        className="w-full rounded-md border border-border/50 bg-surface-2 px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
-                        value={eventoCarros.km_saida}
-                        placeholder="0"
-                        onChange={e => setEventoCarros(prev => ({ ...prev, km_saida: e.target.value }))}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1 flex-1">
-                      <label className="text-[10px] text-accent-subtle/50 uppercase tracking-wider">Km chegada</label>
-                      <input type="number" min="0" step="1"
-                        className="w-full rounded-md border border-border/50 bg-surface-2 px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
-                        value={eventoCarros.km_chegada}
-                        placeholder="0"
-                        onChange={e => setEventoCarros(prev => ({ ...prev, km_chegada: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Notas do técnico — via Apoio T */}
-              <div className="flex flex-col gap-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">
-                  Notas do técnico <span className="font-normal normal-case tracking-normal text-accent-subtle/40">via Apoio T</span>
-                </p>
-                {feedbackTecnico.length > 0 ? feedbackTecnico.map(r => (
-                  <div key={r.tecnico_id} className="rounded-lg border border-border/40 bg-surface-2/40 px-3 py-2.5">
-                    <p className="text-[10px] font-semibold text-accent-subtle/60 uppercase tracking-wider mb-1">
-                      {tecnicos.find(t => t.id === r.tecnico_id)?.nome ?? '—'}
-                    </p>
-                    <p className="text-xs text-accent-muted whitespace-pre-wrap">{r.texto}</p>
-                  </div>
-                )) : (
-                  <p className="text-[11px] text-accent-subtle/30 italic px-1">Aguarda input do técnico via Apoio T…</p>
-                )}
-              </div>
-
-            </div>
-          )}
-
-
-          {/* ── Aba Financeiro ── */}
-          {abaActiva === 'financeiro' && (() => {
-            const fmt = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v)
-            const num = (v) => v === '' || v == null ? 0 : Number(v) || 0
-
-            const tec1 = form.tecnico_id === 'todos' ? 'Todos os técnicos' : tecnicos.find(t => t.id === form.tecnico_id)?.nome
-            const tec2 = tecnicos.find(t => t.id === form.tecnico2_id)?.nome
-
-            const GRUPOS_EQUIP = [
-              { tipo: 'proprio', label: 'Equipamentos para o evento' },
-              { tipo: 'extra',   label: 'Extras' },
-            ]
-            const gruposComItens = GRUPOS_EQUIP
-              .map(g => ({ ...g, rows: equipRows[g.tipo] ?? [] }))
-              .filter(g => g.rows.length > 0)
-            const subtotalGrupo = (rows) => rows.reduce((s, r) => s + (r.unidades || 1) * num(r.valor_custo), 0)
-            const totalEquip = gruposComItens.reduce((s, g) => s + subtotalGrupo(g.rows), 0)
-
-            const vApoio   = num(form.valor_apoio_tecnico) + num(form.valor_apoio_tecnico_2)
-            const vTransp  = num(form.transporte)
-            const vAlim    = num(form.valor_alimentacao)
-            const temArtista = !!(form.xclusive || form.artista_id)
-            const vArtista = temArtista ? num(form.valor_artistico) : 0
-
-            const kmS  = eventoCarros.km_saida   !== '' ? Number(eventoCarros.km_saida)   : null
-            const kmC  = eventoCarros.km_chegada !== '' ? Number(eventoCarros.km_chegada) : null
-            const kmDiff = kmS != null && kmC != null ? kmC - kmS : null
-
-            const total = vApoio + totalEquip + vTransp + vAlim + vArtista
-
+          {/* ── Aba Apoio T ── */}
+          {abaActiva === 'apoio_t' && (() => {
+            const tec1 = form.tecnico_id === 'todos' ? 'Todos os técnicos' : tecnicos.find(t => t.id === Number(form.tecnico_id))?.nome
+            const tec2 = form.tecnico2_id ? tecnicos.find(t => t.id === Number(form.tecnico2_id))?.nome : null
             return (
               <div className="flex flex-col gap-5">
 
-                {/* 1. Técnicos */}
+                {/* Técnicos internos */}
                 <div className="flex flex-col gap-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Técnicos</p>
                   <div className="flex flex-col gap-2">
-                    {tec1 && (
+                    {tec1 ? (
                       <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border/40 bg-surface-2/30">
                         <span className="text-xs text-accent flex-1 min-w-0 truncate">{tec1}</span>
                         <input type="number" min="0" step="0.01"
@@ -1799,6 +1605,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                           onChange={(e) => set('valor_apoio_tecnico', e.target.value)}
                           placeholder="0 €" />
                       </div>
+                    ) : (
+                      <p className="text-[11px] text-accent-subtle/30 italic px-1">Nenhum técnico atribuído — atribui na aba Geral.</p>
                     )}
                     {tec2 && (
                       <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border/40 bg-surface-2/30">
@@ -1813,7 +1621,98 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   </div>
                 </div>
 
-                {/* 2. Equipamentos */}
+                {/* Técnicos externos */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Técnicos Externos</p>
+                    <button type="button"
+                      className="text-[11px] text-accent-muted hover:text-accent border border-border/40 hover:border-accent/40 rounded px-2.5 py-1 transition-colors"
+                      onClick={() => set('tecnicos_externos', [...(form.tecnicos_externos || []), { nome: '', valor: '' }])}>
+                      + Adicionar
+                    </button>
+                  </div>
+                  {(form.tecnicos_externos || []).length === 0 ? (
+                    <p className="text-[11px] text-accent-subtle/30 italic px-1">Sem técnicos externos.</p>
+                  ) : (form.tecnicos_externos || []).map((te, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input type="text"
+                        className="flex-1 min-w-0 rounded-md border border-border/50 bg-surface-2 px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
+                        value={te.nome}
+                        onChange={e => {
+                          const next = (form.tecnicos_externos || []).map((x, idx) => idx === i ? { ...x, nome: e.target.value } : x)
+                          set('tecnicos_externos', next)
+                        }}
+                        placeholder="Nome" />
+                      <input type="number" min="0" step="0.01"
+                        className="w-28 shrink-0 rounded-md border border-border/50 bg-surface-2 px-2 py-1.5 text-xs text-accent text-right focus:outline-none focus:border-accent/40"
+                        value={te.valor}
+                        onChange={e => {
+                          const next = (form.tecnicos_externos || []).map((x, idx) => idx === i ? { ...x, valor: e.target.value } : x)
+                          set('tecnicos_externos', next)
+                        }}
+                        placeholder="0 €" />
+                      <button type="button"
+                        className="text-accent-subtle/40 hover:text-status-cancelado transition-colors shrink-0"
+                        onClick={() => {
+                          const next = (form.tecnicos_externos || []).filter((_, idx) => idx !== i)
+                          set('tecnicos_externos', next)
+                        }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Custos */}
+                <div className="flex flex-col gap-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Custos</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Transporte / Combustível (€)">
+                      <input type="number" min="0" step="0.01" className={inputCls}
+                        value={form.transporte}
+                        onChange={(e) => set('transporte', e.target.value)}
+                        placeholder="0" />
+                    </Field>
+                    <Field label="Alimentação (€)">
+                      <input type="number" min="0" step="0.01" className={inputCls}
+                        value={form.valor_alimentacao}
+                        onChange={(e) => set('valor_alimentacao', e.target.value)}
+                        placeholder="0" />
+                    </Field>
+                  </div>
+                </div>
+
+              </div>
+            )
+          })()}
+
+          {/* ── Aba Financeiro ── */}
+          {abaActiva === 'financeiro' && (() => {
+            const fmt = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v)
+            const num = (v) => v === '' || v == null ? 0 : Number(v) || 0
+
+            const GRUPOS_EQUIP = [
+              { tipo: 'proprio', label: 'Equipamentos para o evento' },
+              { tipo: 'extra',   label: 'Extras' },
+            ]
+            const gruposComItens = GRUPOS_EQUIP
+              .map(g => ({ ...g, rows: equipRows[g.tipo] ?? [] }))
+              .filter(g => g.rows.length > 0)
+            const subtotalGrupo = (rows) => rows.reduce((s, r) => s + (r.unidades || 1) * num(r.valor_custo), 0)
+            const totalEquip = gruposComItens.reduce((s, g) => s + subtotalGrupo(g.rows), 0)
+
+            const vApoio   = num(form.valor_apoio_tecnico) + num(form.valor_apoio_tecnico_2) + (form.tecnicos_externos || []).reduce((s, t) => s + (t.valor !== '' && t.valor != null ? Number(t.valor) || 0 : 0), 0)
+            const vTransp  = num(form.transporte)
+            const vAlim    = num(form.valor_alimentacao)
+            const temArtista = !!(form.xclusive || form.artista_id)
+            const vArtista = temArtista ? num(form.valor_artistico) : 0
+
+            const total = vApoio + totalEquip + vTransp + vAlim + vArtista
+
+            return (
+              <div className="flex flex-col gap-5">
+
+                {/* Equipamentos */}
                 <div className="flex flex-col gap-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Equipamentos</p>
                   {GRUPOS_EQUIP.map(g => {
@@ -1901,45 +1800,20 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                     placeholder="Notas que aparecem na fatura / documento de contas…" />
                 </Field>
 
-                {/* 4. Custos */}
-                <div className="flex flex-col gap-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Custos</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
-                      <Field label="Transporte / Combustível (€)">
-                        <input type="number" min="0" step="0.01" className={inputCls}
-                          value={form.transporte}
-                          onChange={(e) => set('transporte', e.target.value)}
-                          placeholder="0" />
-                      </Field>
-                      {kmDiff != null && (
-                        <p className="text-[10px] text-accent-subtle/50 px-1">
-                          Veículo: {kmDiff} km ({kmS} → {kmC})
-                        </p>
-                      )}
-                    </div>
-                    <Field label="Alimentação (€)">
-                      <input type="number" min="0" step="0.01" className={inputCls}
-                        value={form.valor_alimentacao}
-                        onChange={(e) => set('valor_alimentacao', e.target.value)}
-                        placeholder="0" />
-                    </Field>
-                  </div>
-                  {temArtista && (
-                    <Field label="Valor Artista (€)">
-                      <input type="number" min="0" step="0.01" className={inputCls}
-                        value={form.valor_artistico}
-                        onChange={(e) => set('valor_artistico', e.target.value)}
-                        placeholder="0" />
-                    </Field>
-                  )}
-                </div>
+                {temArtista && (
+                  <Field label="Valor Artista (€)">
+                    <input type="number" min="0" step="0.01" className={inputCls}
+                      value={form.valor_artistico}
+                      onChange={(e) => set('valor_artistico', e.target.value)}
+                      placeholder="0" />
+                  </Field>
+                )}
 
-                {/* 5. Totais */}
+                {/* Totais */}
                 <div className="p-3 bg-surface-3/40 border border-border/60 rounded-lg flex flex-col gap-1.5">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60 mb-1">Totais</p>
                   {[
-                    { label: 'Apoio Técnico', v: vApoio },
+                    { label: 'Apoio T', v: vApoio },
                     { label: 'Equipamentos',  v: totalEquip },
                     { label: 'Transporte',    v: vTransp },
                     { label: 'Alimentação',   v: vAlim },
