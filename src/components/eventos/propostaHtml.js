@@ -25,11 +25,27 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
   const total = subtotal + iva
   const dataEmissao = hoje()
 
-  const linhasHTML = linhas.map((l, i) => {
+  let lineNum = 0
+  const linhasHTML = linhas.map((l) => {
+    if (l._separador) {
+      const label = (l.label || '').trim()
+      const cols = comIva ? 7 : 6
+      return `
+        <tr>
+          <td colspan="${cols}" style="padding:8px 4px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;height:1px;background:#ccc;"></div>
+              ${label ? `<span style="font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:0.08em;color:#888;">${label}</span>` : ''}
+              <div style="flex:1;height:1px;background:#ccc;"></div>
+            </div>
+          </td>
+        </tr>`
+    }
+    lineNum++
     const tot = (Number(l.preco) || 0) * (Number(l.qtd) || 1)
     return `
       <tr>
-        <td style="padding:6px 4px;color:#333;">${i + 1}</td>
+        <td style="padding:6px 4px;color:#333;">${lineNum}</td>
         <td style="padding:6px 4px;">
           <div>${l.descricao || '—'}</div>
           ${l.observacoes ? `<div style="color:#333;font-size:10px;">${l.observacoes}</div>` : ''}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Printer } from 'lucide-react'
+import { Plus, Trash2, Printer, GripVertical, Minus } from 'lucide-react'
 import { gerarHTMLProposta } from './propostaHtml'
 import { clsx } from 'clsx'
 
@@ -21,6 +21,10 @@ function fmtEuro(val) {
 
 function linhaVazia() {
   return { descricao: '', observacoes: '', qtd: 1, unidade: 'Uni.', preco: '' }
+}
+
+function separadorVazio() {
+  return { _separador: true, label: '' }
 }
 
 export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [], atuacoes = [], notasTecnicasInicial = '', notasPropostaInicial = '', onNotasChange, onRemoveEquip, onUpdateEquip, onUpdateAtuacao }) {
@@ -152,10 +156,28 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
     }
   }
 
+  function adicionarSeparador() {
+    setLinhas(l => [...l, separadorVazio()])
+  }
+
+  function moverLinha(from, to) {
+    if (from === to || from == null || to == null) return
+    setLinhas(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
+    setDragIdx(null)
+    setDragOverIdx(null)
+  }
+
   const nomeEvento = evento?.evento || ''
   const espaco = espacos.find(e => String(e.id) === String(evento?.espaco_id)) || null
   const [clienteEditado, setClienteEditado] = useState(espaco?.nome || '')
-  const [modoServicos, setModoServicos] = useState(false)
+  const [modoServicos,  setModoServicos]  = useState(false)
+  const [dragIdx,      setDragIdx]      = useState(null)
+  const [dragOverIdx,  setDragOverIdx]  = useState(null)
 
   function imprimir() {
     const logoUrl = window.location.origin + '/logo-x.png'
@@ -257,18 +279,27 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       <div className="bg-surface-1 border border-border rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <span className="text-xs font-semibold text-accent">Itens da Proposta</span>
-          <button
-            onClick={adicionarLinha}
-            className="flex items-center gap-1.5 text-xs text-accent-muted hover:text-accent transition-colors"
-          >
-            <Plus size={13} /> Adicionar linha
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={adicionarSeparador}
+              className="flex items-center gap-1.5 text-xs text-accent-muted hover:text-accent transition-colors"
+            >
+              <Minus size={13} /> Separador
+            </button>
+            <button
+              onClick={adicionarLinha}
+              className="flex items-center gap-1.5 text-xs text-accent-muted hover:text-accent transition-colors"
+            >
+              <Plus size={13} /> Adicionar linha
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
+                <th className="w-8" />
                 <th className="px-3 py-2 text-left text-[10px] text-accent-subtle font-medium uppercase tracking-wider">Designação</th>
                 <th className="px-3 py-2 text-left text-[10px] text-accent-subtle font-medium uppercase tracking-wider w-20">Qtd</th>
                 <th className="px-3 py-2 text-left text-[10px] text-accent-subtle font-medium uppercase tracking-wider w-24">Unidade</th>
@@ -280,9 +311,50 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
             </thead>
             <tbody>
               {linhas.map((l, i) => {
+                const isDragOver = dragOverIdx === i && dragIdx !== i
+                const rowProps = {
+                  draggable: true,
+                  onDragStart: () => setDragIdx(i),
+                  onDragOver: (e) => { e.preventDefault(); setDragOverIdx(i) },
+                  onDrop: () => moverLinha(dragIdx, dragOverIdx),
+                  onDragEnd: () => { setDragIdx(null); setDragOverIdx(null) },
+                  className: clsx('border-b border-border/50 transition-colors', isDragOver && 'bg-amber-400/5 outline outline-1 outline-amber-400/30'),
+                }
+
+                if (l._separador) {
+                  return (
+                    <tr key={i} {...rowProps}>
+                      <td className="px-2 py-2 cursor-grab active:cursor-grabbing">
+                        <GripVertical size={13} className="text-accent-subtle/25" />
+                      </td>
+                      <td colSpan={6} className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-px bg-border/60" />
+                          <input
+                            className="bg-transparent text-[10px] font-semibold uppercase tracking-widest text-accent-subtle text-center focus:outline-none w-32 placeholder:text-accent-subtle/30"
+                            value={l.label || ''}
+                            onChange={e => setLinhas(prev => prev.map((linha, idx) => idx === i ? { ...linha, label: e.target.value } : linha))}
+                            placeholder="Nome da secção…"
+                          />
+                          <div className="flex-1 h-px bg-border/60" />
+                          <button
+                            onClick={() => removerLinha(i)}
+                            className="p-1 text-accent-subtle/40 hover:text-status-cancelado transition-colors shrink-0"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                }
+
                 const totalLinha = (Number(l.preco) || 0) * (Number(l.qtd) || 1)
                 return (
-                  <tr key={i} className="border-b border-border/50">
+                  <tr key={i} {...rowProps}>
+                    <td className="px-2 py-2 cursor-grab active:cursor-grabbing">
+                      <GripVertical size={13} className="text-accent-subtle/25" />
+                    </td>
                     <td className="px-3 py-2">
                       <input
                         className={inputCls}
