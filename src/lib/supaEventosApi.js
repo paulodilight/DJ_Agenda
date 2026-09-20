@@ -50,7 +50,7 @@ export const supaEventosApi = {
       'margem', 'transporte', 'extras_contas',
       'estado_pagamento', 'forma_pagamento', 'notas_contas',
       'data_preparacao', 'hora_preparacao', 'notas_preparacao', 'fase', 'valor_alimentacao', 'valor_apoio_tecnico_2',
-      'proposta_notas_tecnicas', 'proposta_notas_proposta', 'com_carro',
+      'proposta_notas_tecnicas', 'proposta_notas_proposta', 'com_carro', 'proposta_linhas',
     ]
     return Object.fromEntries(COLS.filter(k => k in dados).map(k => [k, dados[k]]))
   },

@@ -68,6 +68,7 @@ const VAZIO = {
   fase:              '',
   proposta_notas_tecnicas: '',
   proposta_notas_proposta: '',
+  proposta_linhas: null,
   recorrente: false,
   com_carro: false,
 }
@@ -291,6 +292,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         hora_preparacao:  evento.hora_preparacao?.slice(0,5)  ?? '',
         notas_preparacao: evento.notas_preparacao             ?? '',
         fase:             evento.fase                         ?? 'criacao',
+        proposta_linhas:  evento.proposta_linhas              ?? null,
       })
       // Carregar itens de billing existentes para este evento
       supabase.from('contas_clientes').select('*').eq('evento_id', evento.id)
@@ -1996,10 +1998,12 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 atuacoes={atuacoes}
                 notasTecnicasInicial={form.proposta_notas_tecnicas || ''}
                 notasPropostaInicial={form.proposta_notas_proposta || ''}
+                linhasIniciais={form.proposta_linhas ?? null}
                 onNotasChange={({ notasTecnicas, notasProposta }) => {
                   set('proposta_notas_tecnicas', notasTecnicas)
                   set('proposta_notas_proposta', notasProposta)
                 }}
+                onLinhasChange={linhas => set('proposta_linhas', linhas)}
                 onRemoveEquip={equipKey => setEquipRows(prev => ({
                   ...prev,
                   proprio: prev.proprio.filter(r => r._key !== equipKey),

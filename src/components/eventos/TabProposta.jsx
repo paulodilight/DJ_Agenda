@@ -27,7 +27,7 @@ function separadorVazio() {
   return { _separador: true, label: '' }
 }
 
-export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [], atuacoes = [], notasTecnicasInicial = '', notasPropostaInicial = '', onNotasChange, onRemoveEquip, onUpdateEquip, onUpdateAtuacao }) {
+export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [], atuacoes = [], notasTecnicasInicial = '', notasPropostaInicial = '', linhasIniciais = null, onNotasChange, onLinhasChange, onRemoveEquip, onUpdateEquip, onUpdateAtuacao }) {
   const [linhas, setLinhas] = useState([linhaVazia()])
   const [notasTecnicas, setNotasTecnicas] = useState(notasTecnicasInicial)
   const [notasProposta, setNotasProposta] = useState(notasPropostaInicial)
@@ -45,20 +45,30 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
     }))
   }
 
-  // Reset quando o evento muda — define linhas base (técnico + transporte, sem artista)
+  // Reset quando o evento muda — usa linhas gravadas ou gera do zero
   useEffect(() => {
     setNotasTecnicas(notasTecnicasInicial || '')
     setNotasProposta(notasPropostaInicial || '')
     setClienteEditado(espaco?.nome || '')
-    hasInit.current = false
 
-    const techTotal = (Number(evento?.valor_apoio_tecnico) || 0) + (Number(evento?.valor_apoio_tecnico_2) || 0)
-    const transporteVal = Number(evento?.transporte) || 0
-    const extras = []
-    if (techTotal > 0) extras.push({ descricao: 'Instalação e Apoio Técnico', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(techTotal) })
-    if (transporteVal > 0) extras.push({ descricao: 'Transporte', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(transporteVal) })
-    setLinhas(extras.length > 0 ? extras : [linhaVazia()])
+    if (linhasIniciais && linhasIniciais.length > 0) {
+      hasInit.current = true
+      setLinhas(linhasIniciais)
+    } else {
+      hasInit.current = false
+      const techTotal = (Number(evento?.valor_apoio_tecnico) || 0) + (Number(evento?.valor_apoio_tecnico_2) || 0)
+      const transporteVal = Number(evento?.transporte) || 0
+      const extras = []
+      if (techTotal > 0) extras.push({ descricao: 'Instalação e Apoio Técnico', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(techTotal) })
+      if (transporteVal > 0) extras.push({ descricao: 'Transporte', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(transporteVal) })
+      setLinhas(extras.length > 0 ? extras : [linhaVazia()])
+    }
   }, [evento?.id])
+
+  // Notificar parent sempre que linhas mudam (para guardar() poder persistir)
+  useEffect(() => {
+    onLinhasChange?.(linhas)
+  }, [linhas])
 
   // Pré-popular com equipamentos quando chegam — inseridos depois do artista, antes das linhas base
   useEffect(() => {
