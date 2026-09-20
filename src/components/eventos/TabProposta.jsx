@@ -65,11 +65,6 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
     }
   }, [evento?.id])
 
-  // Notificar parent sempre que linhas mudam (para guardar() poder persistir)
-  useEffect(() => {
-    onLinhasChange?.(linhas)
-  }, [linhas])
-
   // Pré-popular com equipamentos quando chegam — inseridos depois do artista, antes das linhas base
   useEffect(() => {
     if (hasInit.current) return
@@ -145,17 +140,23 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
   }, [equipSyncKey])
 
   function adicionarLinha() {
-    setLinhas(l => [...l, linhaVazia()])
+    const next = [...linhas, linhaVazia()]
+    setLinhas(next)
+    onLinhasChange?.(next)
   }
 
   function removerLinha(i) {
     const linha = linhas[i]
     if (linha?._equipKey) onRemoveEquip?.(linha._equipKey)
-    setLinhas(l => l.filter((_, idx) => idx !== i))
+    const next = linhas.filter((_, idx) => idx !== i)
+    setLinhas(next)
+    onLinhasChange?.(next)
   }
 
   function setLinha(i, campo, valor) {
-    setLinhas(l => l.map((linha, idx) => idx === i ? { ...linha, [campo]: valor } : linha))
+    const next = linhas.map((l, idx) => idx === i ? { ...l, [campo]: valor } : l)
+    setLinhas(next)
+    onLinhasChange?.(next)
     const linha = linhas[i]
     if (linha?._equipKey && (campo === 'descricao' || campo === 'qtd' || campo === 'observacoes')) {
       const dbCampo = campo === 'descricao' ? 'descricao' : campo === 'qtd' ? 'unidades' : 'observacoes'
@@ -167,19 +168,20 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
   }
 
   function adicionarSeparador() {
-    setLinhas(l => [...l, separadorVazio()])
+    const next = [...linhas, separadorVazio()]
+    setLinhas(next)
+    onLinhasChange?.(next)
   }
 
   function moverLinha(from, to) {
     if (from === to || from == null || to == null) return
-    setLinhas(prev => {
-      const next = [...prev]
-      const [moved] = next.splice(from, 1)
-      next.splice(to, 0, moved)
-      return next
-    })
+    const next = [...linhas]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    setLinhas(next)
     setDragIdx(null)
     setDragOverIdx(null)
+    onLinhasChange?.(next)
   }
 
   const nomeEvento = evento?.evento || ''
