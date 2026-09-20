@@ -53,7 +53,9 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
 
     if (linhasIniciais && linhasIniciais.length > 0) {
       hasInit.current = true
-      setLinhas(linhasIniciais)
+      setLinhas(linhasIniciais.map(l =>
+        l.tipo === 'separador' ? { _separador: true, label: l.label || '' } : l
+      ))
     } else {
       hasInit.current = false
       const techTotal = (Number(evento?.valor_apoio_tecnico) || 0) + (Number(evento?.valor_apoio_tecnico_2) || 0)
