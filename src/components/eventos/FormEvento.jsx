@@ -295,6 +295,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         fase:             evento.fase                         ?? 'criacao',
         proposta_linhas:  evento.proposta_linhas              ?? null,
         tecnicos_externos: evento.tecnicos_externos            ?? [],
+        proposta_notas_tecnicas: evento.proposta_notas_tecnicas ?? '',
+        proposta_notas_proposta: evento.proposta_notas_proposta ?? '',
       })
       // Carregar itens de billing existentes para este evento
       supabase.from('contas_clientes').select('*').eq('evento_id', evento.id)
