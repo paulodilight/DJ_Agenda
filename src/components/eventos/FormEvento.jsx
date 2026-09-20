@@ -665,7 +665,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
       }
 
       onGuardado?.()
-      onFechar()
+      setDirty(false)
     } catch (e) {
       setErro(e.message)
     } finally {

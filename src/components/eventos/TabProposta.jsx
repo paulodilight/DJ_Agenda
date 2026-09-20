@@ -345,9 +345,14 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-px bg-border/60" />
                           <input
-                            className="bg-transparent text-[10px] font-semibold uppercase tracking-widest text-accent-subtle text-center focus:outline-none w-32 placeholder:text-accent-subtle/30"
+                            className="bg-transparent text-[10px] font-semibold uppercase tracking-widest text-accent-subtle text-center focus:outline-none min-w-[4rem] placeholder:text-accent-subtle/30"
+                            style={{ width: `max(4rem, ${((l.label || '').length || 10) + 2}ch)` }}
                             value={l.label || ''}
-                            onChange={e => setLinhas(prev => prev.map((linha, idx) => idx === i ? { ...linha, label: e.target.value } : linha))}
+                            onChange={e => {
+                              const next = linhas.map((linha, idx) => idx === i ? { ...linha, label: e.target.value } : linha)
+                              setLinhas(next)
+                              onLinhasChange?.(next)
+                            }}
                             placeholder="Nome da secção…"
                           />
                           <div className="flex-1 h-px bg-border/60" />
