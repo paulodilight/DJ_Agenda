@@ -540,9 +540,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         proposta_notas_proposta: form.proposta_notas_proposta?.trim() || null,
       }
       let savedId = evento?.id
-      let eventoAtualizado = null
       if (evento?.id) {
-        eventoAtualizado = await supaEventosApi.actualizar(evento.id, dados)
+        await supaEventosApi.actualizar(evento.id, dados)
       } else {
         const criado = await supaEventosApi.criar(dados)
         savedId = criado?.id ?? criado?.[0]?.id
@@ -667,7 +666,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         }
       }
 
-      onGuardado?.(eventoAtualizado)
+      await onGuardado?.()
       setDirty(false)
     } catch (e) {
       setErro(e.message)
