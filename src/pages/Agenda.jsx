@@ -1473,7 +1473,7 @@ export function Agenda() {
       aberto={eventoModalAberto}
       evento={eventoModal}
       onFechar={() => { setEventoModalAberto(false); setEventoModal(null) }}
-      onGuardado={recarregarEventos}
+      onGuardado={(atualizado) => { if (atualizado) setEventoModal(atualizado); recarregarEventos() }}
     />
 
     {/* Documento de impressão — FORA do #agenda-app para não ser afectado pelo display:none */}
