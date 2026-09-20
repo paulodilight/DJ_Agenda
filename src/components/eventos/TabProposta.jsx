@@ -27,12 +27,17 @@ function separadorVazio() {
   return { _separador: true, label: '' }
 }
 
-export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [], atuacoes = [], notasTecnicasInicial = '', notasPropostaInicial = '', linhasIniciais = null, onNotasChange, onLinhasChange, onRemoveEquip, onUpdateEquip, onUpdateAtuacao }) {
+export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentosList = [], atuacoes = [], notasTecnicasInicial = '', notasPropostaInicial = '', linhasIniciais = null, onNotasChange, onLinhasChange, onRemoveEquip, onUpdateEquip, onUpdateAtuacao, linhasRef }) {
   const [linhas, setLinhas] = useState([linhaVazia()])
   const [notasTecnicas, setNotasTecnicas] = useState(notasTecnicasInicial)
   const [notasProposta, setNotasProposta] = useState(notasPropostaInicial)
   const [comIva, setComIva] = useState(true)
   const hasInit = useRef(false)
+
+  // Manter ref sempre actualizada com o estado visual mais recente
+  useEffect(() => {
+    if (linhasRef) linhasRef.current = linhas
+  }, [linhas, linhasRef])
 
   function linhasDeAtuacoes(slots) {
     return slots.map(s => ({

@@ -212,6 +212,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
   // Equipamentos do evento (evento_equipamentos)
   const [equipRows, setEquipRows] = useState({ proprio: [], alugado: [], comprado: [], extra: [] })
   const equipRowsRef = useRef(equipRows)
+  const propostaLinhasRef = useRef(null)
   equipRowsRef.current = equipRows
   const [equipamentosList, setEquipamentosList] = useState([])
   const [searchEquipBusca, setSearchEquipBusca] = useState('')
@@ -538,6 +539,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
         notas_preparacao: form.notas_preparacao?.trim() || null,
         proposta_notas_tecnicas: form.proposta_notas_tecnicas?.trim() || null,
         proposta_notas_proposta: form.proposta_notas_proposta?.trim() || null,
+        proposta_linhas: propostaLinhasRef.current ?? form.proposta_linhas,
       }
       let savedId = evento?.id
       if (evento?.id) {
@@ -1939,6 +1941,7 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   set('proposta_notas_tecnicas', notasTecnicas)
                   set('proposta_notas_proposta', notasProposta)
                 }}
+                linhasRef={propostaLinhasRef}
                 onLinhasChange={linhas => set('proposta_linhas', linhas)}
                 onRemoveEquip={equipKey => setEquipRows(prev => ({
                   ...prev,
