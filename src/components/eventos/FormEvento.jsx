@@ -1682,6 +1682,29 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                   </div>
                 </div>
 
+                {/* Artistas das Atuações */}
+                {atuacoes.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60">Artistas</p>
+                    <div className="flex flex-col gap-2">
+                      {atuacoes.map((s, i) => {
+                        const nome = s.djs?.nome_artistico || s.djs?.nome || s.dj_nome || 'DJ Externo'
+                        const valor = Number(s.valor_total_cliente ?? s.valor) || 0
+                        return (
+                          <div key={s.id ?? i} className="flex items-center gap-3 p-2.5 rounded-lg border border-border/40 bg-surface-2/30">
+                            <span className="text-xs text-accent flex-1 min-w-0 truncate">{nome}</span>
+                            {valor > 0 && (
+                              <span className="text-xs tabular-nums text-accent-muted shrink-0">
+                                {new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(valor)}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
               </div>
             )
           })()}
@@ -1701,13 +1724,21 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             const subtotalGrupo = (rows) => rows.reduce((s, r) => s + (r.unidades || 1) * num(r.valor_custo), 0)
             const totalEquip = gruposComItens.reduce((s, g) => s + subtotalGrupo(g.rows), 0)
 
+            const tec1 = form.tecnico_id === 'todos' ? 'Todos os técnicos' : tecnicos.find(t => t.id === Number(form.tecnico_id))?.nome
+            const tec2 = form.tecnico2_id ? tecnicos.find(t => t.id === Number(form.tecnico2_id))?.nome : null
+
             const vApoio   = num(form.valor_apoio_tecnico) + num(form.valor_apoio_tecnico_2) + (form.tecnicos_externos || []).reduce((s, t) => s + (t.valor !== '' && t.valor != null ? Number(t.valor) || 0 : 0), 0)
             const vTransp  = num(form.transporte)
             const vAlim    = num(form.valor_alimentacao)
             const temArtista = !!(form.xclusive || form.artista_id)
             const vArtista = temArtista ? num(form.valor_artistico) : 0
 
-            const total = vApoio + totalEquip + vTransp + vAlim + vArtista
+            const artistasRows = atuacoes.length > 0
+              ? atuacoes.map(s => ({ label: s.djs?.nome_artistico || s.djs?.nome || s.dj_nome || 'DJ Externo', v: Number(s.valor_total_cliente ?? s.valor) || 0 })).filter(r => r.v > 0)
+              : (temArtista && vArtista > 0 ? [{ label: 'Artista', v: vArtista }] : [])
+            const vArtistasTotal = artistasRows.reduce((s, r) => s + r.v, 0)
+
+            const total = vApoio + totalEquip + vTransp + vAlim + vArtistasTotal
 
             return (
               <div className="flex flex-col gap-5">
@@ -1812,17 +1843,49 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
                 {/* Totais */}
                 <div className="p-3 bg-surface-3/40 border border-border/60 rounded-lg flex flex-col gap-1.5">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle/60 mb-1">Totais</p>
+
+                  {/* Técnicos internos */}
+                  {tec1 && num(form.valor_apoio_tecnico) > 0 && (
+                    <div className="flex justify-between text-xs text-accent-muted">
+                      <span>{tec1}</span><span className="tabular-nums">{fmt(num(form.valor_apoio_tecnico))}</span>
+                    </div>
+                  )}
+                  {tec2 && num(form.valor_apoio_tecnico_2) > 0 && (
+                    <div className="flex justify-between text-xs text-accent-muted">
+                      <span>{tec2}</span><span className="tabular-nums">{fmt(num(form.valor_apoio_tecnico_2))}</span>
+                    </div>
+                  )}
+
+                  {/* Técnicos externos */}
+                  {(form.tecnicos_externos || []).filter(t => t.valor !== '' && Number(t.valor) > 0).map((t, i) => (
+                    <div key={i} className="flex justify-between text-xs text-accent-muted">
+                      <span>{t.nome || 'Técnico externo'}</span><span className="tabular-nums">{fmt(Number(t.valor))}</span>
+                    </div>
+                  ))}
+
+                  {/* Artistas */}
+                  {artistasRows.map(({ label, v }) => (
+                    <div key={label} className="flex justify-between text-xs text-accent-muted">
+                      <span>{label}</span><span className="tabular-nums">{fmt(v)}</span>
+                    </div>
+                  ))}
+
+                  {/* Separador antes de custos se houver pessoas */}
+                  {(vApoio > 0 || vArtistasTotal > 0) && (totalEquip > 0 || vTransp > 0 || vAlim > 0) && (
+                    <div className="border-t border-border/20 my-0.5" />
+                  )}
+
+                  {/* Custos */}
                   {[
-                    { label: 'Apoio T', v: vApoio },
-                    { label: 'Equipamentos',  v: totalEquip },
-                    { label: 'Transporte',    v: vTransp },
-                    { label: 'Alimentação',   v: vAlim },
-                    ...(temArtista ? [{ label: 'Artista', v: vArtista }] : []),
+                    { label: 'Equipamentos', v: totalEquip },
+                    { label: 'Transporte',   v: vTransp },
+                    { label: 'Alimentação',  v: vAlim },
                   ].filter(r => r.v > 0).map(({ label, v }) => (
                     <div key={label} className="flex justify-between text-xs text-accent-muted">
                       <span>{label}</span><span className="tabular-nums">{fmt(v)}</span>
                     </div>
                   ))}
+
                   <div className="flex justify-between text-xs font-semibold text-accent border-t border-border/40 pt-1.5 mt-0.5">
                     <span>Total</span>
                     <span className="tabular-nums">{fmt(total)}</span>
