@@ -1589,8 +1589,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
 
           {/* ── Aba Apoio T ── */}
           {abaActiva === 'apoio_t' && (() => {
-            const tec1 = form.tecnico_id === 'todos' ? 'Todos os técnicos' : tecnicos.find(t => t.id === Number(form.tecnico_id))?.nome
-            const tec2 = form.tecnico2_id ? tecnicos.find(t => t.id === Number(form.tecnico2_id))?.nome : null
+            const tec1 = form.tecnico_id === 'todos' ? 'Todos os técnicos' : tecnicos.find(t => String(t.id) === String(form.tecnico_id))?.nome
+            const tec2 = form.tecnico2_id ? tecnicos.find(t => String(t.id) === String(form.tecnico2_id))?.nome : null
             return (
               <div className="flex flex-col gap-5">
 
@@ -1726,8 +1726,8 @@ export function FormEvento({ aberto, evento, dataInicial = '', onFechar, onGuard
             const subtotalGrupo = (rows) => rows.reduce((s, r) => s + (r.unidades || 1) * num(r.valor_custo), 0)
             const totalEquip = gruposComItens.reduce((s, g) => s + subtotalGrupo(g.rows), 0)
 
-            const tec1 = form.tecnico_id === 'todos' ? 'Todos os técnicos' : tecnicos.find(t => t.id === Number(form.tecnico_id))?.nome
-            const tec2 = form.tecnico2_id ? tecnicos.find(t => t.id === Number(form.tecnico2_id))?.nome : null
+            const tec1 = form.tecnico_id === 'todos' ? 'Todos os técnicos' : tecnicos.find(t => String(t.id) === String(form.tecnico_id))?.nome
+            const tec2 = form.tecnico2_id ? tecnicos.find(t => String(t.id) === String(form.tecnico2_id))?.nome : null
 
             const vApoio   = num(form.valor_apoio_tecnico) + num(form.valor_apoio_tecnico_2) + (form.tecnicos_externos || []).reduce((s, t) => s + (t.valor !== '' && t.valor != null ? Number(t.valor) || 0 : 0), 0)
             const vTransp  = num(form.transporte)
