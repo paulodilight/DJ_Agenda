@@ -84,8 +84,8 @@ export function gerarHTMLProposta({ linhas, notasTecnicas, notasProposta, evento
     body { font-family: Arial, sans-serif; font-size: 11px; color: #333; background: #fff; padding: 28px 36px; }
     table { width: 100%; border-collapse: collapse; }
     @media print {
-      body { padding: 16px 24px; }
-      @page { margin: 1.2cm; }
+      body { padding: 0; }
+      @page { margin: 2cm 1.5cm; }
     }
   </style>
 </head>
