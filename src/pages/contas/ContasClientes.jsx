@@ -1867,13 +1867,21 @@ export function ContasClientes() {
     setSaving(p => ({ ...p, [espacoId]: true }))
     try {
       // Snapshot das linhas manuais actuais antes de apagar (para undo)
-      const { data: prevRows } = await supabase.from('contas_clientes')
+      const { data: prevRowsBase } = await supabase.from('contas_clientes')
         .select('*').eq('espaco_id', espacoId).eq('mes', mes).is('evento_id', null)
+      const { data: prevRowsExtras } = await supabase.from('contas_clientes')
+        .select('*').eq('espaco_id', espacoId).eq('mes', mes).eq('tipo', 'extra').not('evento_id', 'is', null)
+      const prevRows = [...(prevRowsBase ?? []), ...(prevRowsExtras ?? [])]
 
-      // Apagar apenas itens manuais (sem ligação a evento específico)
+      // Apagar itens manuais sem ligação a evento
       const { error: delErr } = await supabase.from('contas_clientes').delete()
         .eq('espaco_id', espacoId).eq('mes', mes).is('evento_id', null)
       if (delErr) throw new Error('Delete: ' + delErr.message)
+
+      // Apagar extras ligados a evento (sempre manuais, mesmo quando têm evento_id)
+      const { error: delExtrasErr } = await supabase.from('contas_clientes').delete()
+        .eq('espaco_id', espacoId).eq('mes', mes).eq('tipo', 'extra').not('evento_id', 'is', null)
+      if (delExtrasErr) throw new Error('Delete extras: ' + delExtrasErr.message)
 
       const inserts = []
 
@@ -1886,7 +1894,7 @@ export function ContasClientes() {
       ]
       secoes.forEach(({ tipo, linhas }) => {
         linhas.forEach(r => {
-          if (r.evento_id) return
+          if (tipo !== 'extra' && r.evento_id) return
           const val = itemTotal(r)
           if (val > 0 || r.descricao) inserts.push({
             espaco_id: espacoId, mes, tipo,
@@ -1898,6 +1906,7 @@ export function ContasClientes() {
             notas: r.notas || null,
             margem_tipo: r.margem_tipo ?? 'eur',
             imprimir: r.imprimir ?? false,
+            evento_id: tipo === 'extra' ? (r.evento_id || null) : undefined,
           })
         })
       })
