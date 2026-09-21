@@ -4,7 +4,7 @@ import { pt } from 'date-fns/locale'
 import {
   Plus, CalendarDays, MapPin, FileText,
   Search, X, ChevronDown, ChevronRight,
-  Clock, Wrench, Star, ArrowUpDown,
+  Clock, Wrench, Star,
 } from 'lucide-react'
 import { useEventos } from '@/hooks/useEventos'
 import { FormEvento } from '@/components/eventos/FormEvento'
@@ -55,7 +55,6 @@ export function Eventos() {
   const [notasModal, setNotasModal]     = useState(null)
   const [pesquisa, setPesquisa]         = useState('')
   const [abertos, setAbertos]           = useState(new Set())
-  const [ordenar, setOrdenar]           = useState('asc') // 'asc' = próximos primeiro
   const [filtroEspaco, setFiltroEspaco] = useState('')
 
   const { dataInicio, dataFim } = useMemo(() => {
@@ -95,7 +94,7 @@ export function Eventos() {
 
   const HOJE = format(new Date(), 'yyyy-MM-dd')
 
-  const eventosFiltrados = useMemo(() => {
+  const { proximos, passados } = useMemo(() => {
     let list = eventos
     const q = pesquisa.trim().toLowerCase()
     if (q) list = list.filter(e =>
@@ -103,13 +102,14 @@ export function Eventos() {
         .some(v => v?.toLowerCase().includes(q))
     )
     if (filtroEspaco) list = list.filter(e => e.espaco_nome === filtroEspaco)
-    if (ordenar === 'asc') list = list.filter(e => (e.data_evento ?? '') >= HOJE)
-    return [...list].sort((a, b) => {
-      const da = a.data_evento ?? ''
-      const db = b.data_evento ?? ''
-      return ordenar === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
-    })
-  }, [eventos, pesquisa, filtroEspaco, ordenar, HOJE])
+    const prox = [...list]
+      .filter(e => (e.data_evento ?? '') >= HOJE)
+      .sort((a, b) => (a.data_evento ?? '').localeCompare(b.data_evento ?? ''))
+    const pass = [...list]
+      .filter(e => (e.data_evento ?? '') < HOJE)
+      .sort((a, b) => (b.data_evento ?? '').localeCompare(a.data_evento ?? ''))
+    return { proximos: prox, passados: pass }
+  }, [eventos, pesquisa, filtroEspaco, HOJE])
 
   return (
     <div className="flex flex-col h-full">
@@ -122,7 +122,7 @@ export function Eventos() {
               Eventos — {titulo}
             </h1>
             <p className="text-xs text-accent-muted mt-0.5">
-              {eventosFiltrados.length}{pesquisa || filtroEspaco ? ` de ${eventos.length}` : ''} evento{eventosFiltrados.length !== 1 ? 's' : ''}
+              {proximos.length + passados.length}{pesquisa || filtroEspaco ? ` de ${eventos.length}` : ''} evento{(proximos.length + passados.length) !== 1 ? 's' : ''}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -142,20 +142,6 @@ export function Eventos() {
                 </button>
               )}
             </div>
-
-            {/* Ordenar */}
-            <button
-              onClick={() => setOrdenar(o => o === 'asc' ? 'desc' : 'asc')}
-              className={clsx(
-                'flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs transition-colors whitespace-nowrap',
-                ordenar === 'asc'
-                  ? 'border-status-confirmado/40 bg-status-confirmado/10 text-status-confirmado'
-                  : 'border-border bg-surface-2 text-accent-muted hover:text-accent'
-              )}
-            >
-              <ArrowUpDown size={11} />
-              {ordenar === 'asc' ? 'Próximos' : 'Recentes'}
-            </button>
 
             {/* Mês */}
             <select
@@ -203,125 +189,129 @@ export function Eventos() {
           </div>
         ) : (
           <div className="p-4 flex flex-col gap-1">
-            {eventosFiltrados.map((ev) => {
-              const aberto   = abertos.has(ev.id)
-              const d        = ev.data_evento ? new Date(ev.data_evento + 'T00:00:00') : null
-              const diaSem   = d ? cap(format(d, 'EEE', { locale: pt })) : ''
-              const dataFmt  = d ? format(d, 'd MMM', { locale: pt }) : 'Sem data'
-              const horario  = ev.hora_inicio
-                ? `${ev.hora_inicio.slice(0,5)}${ev.hora_fim ? `–${ev.hora_fim.slice(0,5)}` : ''}`
-                : null
-              const local    = ev.espaco_nome || ev.morada || null
-              const temNotas = ev.notas_operacionais || ev.Equipamentos
+            {[
+              { grupo: proximos, label: 'PRÓXIMOS', dim: false },
+              { grupo: passados, label: 'PASSADOS', dim: true  },
+            ].map(({ grupo, label, dim }) => grupo.length === 0 ? null : (
+              <div key={label} className={clsx('flex flex-col gap-1', dim && 'mt-4')}>
+                {/* Separador de secção */}
+                <div className="flex items-center gap-2 px-1 py-1.5">
+                  <span className={clsx(
+                    'text-[10px] font-bold tracking-widest uppercase',
+                    dim ? 'text-accent-subtle/40' : 'text-accent-subtle/70'
+                  )}>{label}</span>
+                  <span className={clsx(
+                    'text-[10px] tabular-nums',
+                    dim ? 'text-accent-subtle/30' : 'text-accent-subtle/50'
+                  )}>{grupo.length}</span>
+                  <div className={clsx('flex-1 h-px', dim ? 'bg-border/20' : 'bg-border/40')} />
+                </div>
 
-              return (
-                <div key={ev.id} className={clsx(
-                  'rounded-lg border transition-colors overflow-hidden',
-                  ev.status === 'cancelado'  ? 'opacity-50 border-border/40'
-                    : aberto ? 'border-border bg-surface-1'
-                    : 'border-border/50 bg-surface-1 hover:border-border hover:bg-surface-1'
-                )}>
-                  {/* ── Cabeçalho (sempre visível) ── */}
-                  <button
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left"
-                    onClick={() => toggleAberto(ev.id)}
-                  >
-                    {/* Chevron */}
-                    <span className="text-accent-subtle/50 shrink-0">
-                      {aberto ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                    </span>
+                {grupo.map((ev) => {
+                  const aberto   = abertos.has(ev.id)
+                  const d        = ev.data_evento ? new Date(ev.data_evento + 'T00:00:00') : null
+                  const diaSem   = d ? cap(format(d, 'EEE', { locale: pt })) : ''
+                  const dataFmt  = d ? format(d, 'd MMM', { locale: pt }) : 'Sem data'
+                  const horario  = ev.hora_inicio
+                    ? `${ev.hora_inicio.slice(0,5)}${ev.hora_fim ? `–${ev.hora_fim.slice(0,5)}` : ''}`
+                    : null
+                  const local    = ev.espaco_nome || ev.morada || null
+                  const temNotas = ev.notas_operacionais || ev.Equipamentos
 
-                    {/* Data */}
-                    <span className="text-xs text-accent-subtle tabular-nums whitespace-nowrap w-20 shrink-0">
-                      {diaSem && <span className="text-accent-subtle/60">{diaSem} </span>}
-                      {dataFmt}
-                    </span>
-
-                    {/* Nome */}
-                    <span className={clsx(
-                      'flex-1 text-sm font-semibold truncate',
-                      ev.status === 'cancelado' ? 'line-through text-accent-muted' : 'text-accent'
+                  return (
+                    <div key={ev.id} className={clsx(
+                      'rounded-lg border transition-colors overflow-hidden',
+                      dim && 'opacity-60',
+                      ev.status === 'cancelado'  ? 'opacity-50 border-border/40'
+                        : aberto ? 'border-border bg-surface-1'
+                        : 'border-border/50 bg-surface-1 hover:border-border hover:opacity-100'
                     )}>
-                      {ev.evento || '—'}
-                    </span>
-
-                    {/* Xclusive badge */}
-                    {ev.xclusive && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/20 font-semibold uppercase tracking-wider shrink-0 flex items-center gap-1">
-                        <Star size={8} className="fill-violet-400" />Xclusive
-                      </span>
-                    )}
-
-                    {/* Tipo */}
-                    {ev.tipo && (
-                      <span className="text-[11px] text-accent-subtle/60 whitespace-nowrap shrink-0 hidden sm:block">{ev.tipo}</span>
-                    )}
-
-                    {/* Horário rápido */}
-                    {horario && !aberto && (
-                      <span className="text-[11px] text-accent-subtle/60 tabular-nums whitespace-nowrap shrink-0 hidden md:block">{horario}</span>
-                    )}
-
-                    {/* Status */}
-                    <BadgeStatus status={ev.status} />
-                  </button>
-
-                  {/* ── Detalhe expandido ── */}
-                  {aberto && (
-                    <div className="px-4 pb-4 border-t border-border/40">
-                      <div className="pt-3 flex flex-wrap gap-x-6 gap-y-2">
-                        <Campo label="Horário" valor={horario} icone={Clock} />
-                        <Campo label="Local"   valor={local}   icone={MapPin} />
-                        {ev.morada && ev.espaco_nome && <Campo label="Morada" valor={ev.morada} icone={MapPin} />}
-                        <Campo label="Tipo"    valor={ev.tipo} />
-                        <Campo label="Responsável" valor={ev.tecnico?.nome ?? ev.responsavel} />
-                        <Campo label="Contacto"    valor={ev.contacto_pelo_evento} />
-                        {ev.dia_instalacao && (
-                          <Campo
-                            label="Instalação"
-                            valor={`${format(new Date(ev.dia_instalacao + 'T00:00:00'), 'd MMM', { locale: pt })}${ev.hora_instalacao ? ` às ${ev.hora_instalacao.slice(0,5)}` : ''}`}
-                            icone={Wrench}
-                          />
+                      {/* ── Cabeçalho (sempre visível) ── */}
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left"
+                        onClick={() => toggleAberto(ev.id)}
+                      >
+                        <span className="text-accent-subtle/50 shrink-0">
+                          {aberto ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                        </span>
+                        <span className="text-xs text-accent-subtle tabular-nums whitespace-nowrap w-20 shrink-0">
+                          {diaSem && <span className="text-accent-subtle/60">{diaSem} </span>}
+                          {dataFmt}
+                        </span>
+                        <span className={clsx(
+                          'flex-1 text-sm font-semibold truncate',
+                          ev.status === 'cancelado' ? 'line-through text-accent-muted' : 'text-accent'
+                        )}>
+                          {ev.evento || '—'}
+                        </span>
+                        {ev.xclusive && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/20 font-semibold uppercase tracking-wider shrink-0 flex items-center gap-1">
+                            <Star size={8} className="fill-violet-400" />Xclusive
+                          </span>
                         )}
-                        {ev.valor_artistico     && <Campo label="Valor artístico"   valor={`${ev.valor_artistico} €`} />}
-                        {ev.valor_apoio_tecnico && <Campo label="Apoio técnico"      valor={`${ev.valor_apoio_tecnico} €`} />}
-                        {ev.tecnico2?.nome      && <Campo label="2º Técnico"         valor={ev.tecnico2.nome} />}
-                      </div>
+                        {ev.tipo && (
+                          <span className="text-[11px] text-accent-subtle/60 whitespace-nowrap shrink-0 hidden sm:block">{ev.tipo}</span>
+                        )}
+                        {horario && !aberto && (
+                          <span className="text-[11px] text-accent-subtle/60 tabular-nums whitespace-nowrap shrink-0 hidden md:block">{horario}</span>
+                        )}
+                        <BadgeStatus status={ev.status} />
+                      </button>
 
-                      {/* Notas */}
-                      {(ev.notas_operacionais || ev.Equipamentos) && (
-                        <div className="mt-3 pt-3 border-t border-border/30 flex flex-col gap-1.5">
-                          {ev.notas_operacionais && (
-                            <p className="text-xs text-accent-subtle/80 whitespace-pre-wrap leading-relaxed">{ev.notas_operacionais}</p>
+                      {/* ── Detalhe expandido ── */}
+                      {aberto && (
+                        <div className="px-4 pb-4 border-t border-border/40">
+                          <div className="pt-3 flex flex-wrap gap-x-6 gap-y-2">
+                            <Campo label="Horário" valor={horario} icone={Clock} />
+                            <Campo label="Local"   valor={local}   icone={MapPin} />
+                            {ev.morada && ev.espaco_nome && <Campo label="Morada" valor={ev.morada} icone={MapPin} />}
+                            <Campo label="Tipo"    valor={ev.tipo} />
+                            <Campo label="Responsável" valor={ev.tecnico?.nome ?? ev.responsavel} />
+                            <Campo label="Contacto"    valor={ev.contacto_pelo_evento} />
+                            {ev.dia_instalacao && (
+                              <Campo
+                                label="Instalação"
+                                valor={`${format(new Date(ev.dia_instalacao + 'T00:00:00'), 'd MMM', { locale: pt })}${ev.hora_instalacao ? ` às ${ev.hora_instalacao.slice(0,5)}` : ''}`}
+                                icone={Wrench}
+                              />
+                            )}
+                            {ev.valor_artistico     && <Campo label="Valor artístico"   valor={`${ev.valor_artistico} €`} />}
+                            {ev.valor_apoio_tecnico && <Campo label="Apoio técnico"      valor={`${ev.valor_apoio_tecnico} €`} />}
+                            {ev.tecnico2?.nome      && <Campo label="2º Técnico"         valor={ev.tecnico2.nome} />}
+                          </div>
+                          {(ev.notas_operacionais || ev.Equipamentos) && (
+                            <div className="mt-3 pt-3 border-t border-border/30 flex flex-col gap-1.5">
+                              {ev.notas_operacionais && (
+                                <p className="text-xs text-accent-subtle/80 whitespace-pre-wrap leading-relaxed">{ev.notas_operacionais}</p>
+                              )}
+                              {ev.Equipamentos && (
+                                <p className="text-xs text-accent-subtle/70 whitespace-pre-wrap leading-relaxed">{ev.Equipamentos}</p>
+                              )}
+                            </div>
                           )}
-                          {ev.Equipamentos && (
-                            <p className="text-xs text-accent-subtle/70 whitespace-pre-wrap leading-relaxed">{ev.Equipamentos}</p>
-                          )}
+                          <div className="mt-3 flex items-center gap-3">
+                            <button
+                              onClick={() => abrirEditar(ev)}
+                              className="text-xs text-accent-muted hover:text-accent transition-colors underline underline-offset-2"
+                            >
+                              Editar
+                            </button>
+                            {temNotas && (
+                              <button
+                                onClick={() => setNotasModal(ev)}
+                                className="flex items-center gap-1 text-xs text-accent-subtle/60 hover:text-accent-muted transition-colors"
+                              >
+                                <FileText size={11} />Ver notas completas
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
-
-                      {/* Acções */}
-                      <div className="mt-3 flex items-center gap-3">
-                        <button
-                          onClick={() => abrirEditar(ev)}
-                          className="text-xs text-accent-muted hover:text-accent transition-colors underline underline-offset-2"
-                        >
-                          Editar
-                        </button>
-                        {temNotas && (
-                          <button
-                            onClick={() => setNotasModal(ev)}
-                            className="flex items-center gap-1 text-xs text-accent-subtle/60 hover:text-accent-muted transition-colors"
-                          >
-                            <FileText size={11} />Ver notas completas
-                          </button>
-                        )}
-                      </div>
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+            ))}
           </div>
         )}
       </div>
