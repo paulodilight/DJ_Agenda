@@ -1,4 +1,18 @@
 {
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "apoiot.xclusivedj.app" }],
+      "destination": "/apoiot/login",
+      "permanent": false
+    },
+    {
+      "source": "/login",
+      "has": [{ "type": "host", "value": "apoiot.xclusivedj.app" }],
+      "destination": "/apoiot/login",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/apoiot", "destination": "/apoiot.html" },
     { "source": "/apoiot/(.*)", "destination": "/apoiot.html" },

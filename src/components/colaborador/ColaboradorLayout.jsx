@@ -126,6 +126,7 @@ export function ColaboradorLayout() {
               <Avatar nome={colaborador?.nome} foto={colaborador?.foto_url} tamanho="sm" />
               <span className="text-xs text-accent-muted">{colaborador?.nome}</span>
             </div>
+            <BotaoNotificacoes />
 <button onClick={toggleTheme} title={lightMode ? 'Modo escuro' : 'Modo claro'}
               className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent-subtle hover:text-amber-400 hover:border-amber-400/40 transition-colors">
               {lightMode ? <Moon size={13} /> : <Sun size={13} />}

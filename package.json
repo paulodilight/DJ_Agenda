@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "node C:/Users/dj/OneDrive/Claude/local-dev/guard/predev-guard.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
