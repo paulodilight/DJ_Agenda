@@ -283,6 +283,12 @@ export function DJPerfil() {
   const [fotoFile, setFotoFile]         = useState(null)
   const [fotoPreview, setFotoPreview]   = useState(null)
   const fotoInputRef                    = useRef(null)
+  const [fotoFile2, setFotoFile2]       = useState(null)
+  const [fotoPreview2, setFotoPreview2] = useState(null)
+  const fotoInputRef2                   = useRef(null)
+  const [fotoFile3, setFotoFile3]       = useState(null)
+  const [fotoPreview3, setFotoPreview3] = useState(null)
+  const fotoInputRef3                   = useRef(null)
   const [bioModalAberto, setBioModalAberto] = useState(false)
   const [conviteAberto, setConviteAberto]   = useState(false)
   const [emailEditado, setEmailEditado]     = useState('')
@@ -674,9 +680,20 @@ export function DJPerfil() {
     setFotoFile(file)
     setFotoPreview(URL.createObjectURL(file))
   }
+  const handleFotoChange2 = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFotoFile2(file)
+    setFotoPreview2(URL.createObjectURL(file))
+  }
+  const handleFotoChange3 = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFotoFile3(file)
+    setFotoPreview3(URL.createObjectURL(file))
+  }
 
-  const uploadFoto = async (file) => {
-    const path = `${id}` // fixed path per DJ, upsert replaces previous
+  const uploadFoto = async (file, path) => {
     const { error } = await supabase.storage
       .from('dj-fotos')
       .upload(path, file, { upsert: true, contentType: file.type })
@@ -722,16 +739,20 @@ export function DJPerfil() {
     setPerfilLoading(true)
     setPerfilErro(null)
     try {
-      let foto_url = dj?.foto_url ?? null
-      if (fotoFile) {
-        foto_url = await uploadFoto(fotoFile)
-      }
+      let foto_url  = dj?.foto_url  ?? null
+      let foto2_url = dj?.foto2_url ?? null
+      let foto3_url = dj?.foto3_url ?? null
+      if (fotoFile)  foto_url  = await uploadFoto(fotoFile,  `${id}`)
+      if (fotoFile2) foto2_url = await uploadFoto(fotoFile2, `${id}_2`)
+      if (fotoFile3) foto3_url = await uploadFoto(fotoFile3, `${id}_3`)
       const payload = {
         ...perfilForm,
         valor_sessao:    perfilForm.valor_sessao !== '' ? Number(perfilForm.valor_sessao) : null,
         prioridade_admin: Number(perfilForm.prioridade_admin),
         excluido_admin:  Boolean(perfilForm.excluido_admin),
         foto_url,
+        foto2_url,
+        foto3_url,
       }
       await djsApi.actualizar(id, payload)
 
@@ -937,42 +958,31 @@ export function DJPerfil() {
               </div>
               <div className="px-5 py-4 flex flex-col gap-4">
 
-                {/* Foto */}
-                <div className="flex items-center gap-4">
-                  <div className="relative shrink-0">
-                    {fotoPreview || dj?.foto_url ? (
-                      <img
-                        src={fotoPreview ?? dj.foto_url}
-                        alt="Foto DJ"
-                        className="w-20 h-20 rounded-xl object-cover border border-border"
-                      />
-                    ) : (
-                      <div className="w-20 h-20 rounded-xl bg-surface-2 border border-border flex items-center justify-center">
-                        <Camera size={20} className="text-accent-subtle/40" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <input
-                      ref={fotoInputRef}
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp"
-                      className="hidden"
-                      onChange={handleFotoChange}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fotoInputRef.current?.click()}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-surface-2 text-xs text-accent-muted hover:text-accent hover:border-white/30 transition-colors"
-                    >
-                      <Camera size={12} />
-                      {fotoPreview ? 'Trocar foto' : dj?.foto_url ? 'Substituir foto' : 'Adicionar foto'}
-                    </button>
-                    {fotoFile && (
-                      <p className="text-[11px] text-accent-subtle">{fotoFile.name} · {(fotoFile.size / 1024).toFixed(0)} KB</p>
-                    )}
-                    <p className="text-[10px] text-accent-subtle/50">JPEG, PNG ou WebP · máx 5 MB</p>
-                  </div>
+                {/* Fotos */}
+                <div className="flex gap-4">
+                  {[
+                    { label: 'Foto 1', preview: fotoPreview, stored: dj?.foto_url, ref: fotoInputRef, file: fotoFile, onChange: handleFotoChange },
+                    { label: 'Foto 2', preview: fotoPreview2, stored: dj?.foto2_url, ref: fotoInputRef2, file: fotoFile2, onChange: handleFotoChange2 },
+                    { label: 'Foto 3', preview: fotoPreview3, stored: dj?.foto3_url, ref: fotoInputRef3, file: fotoFile3, onChange: handleFotoChange3 },
+                  ].map(({ label, preview, stored, ref, file, onChange }) => (
+                    <div key={label} className="flex flex-col items-center gap-2">
+                      {preview || stored ? (
+                        <img src={preview ?? stored} alt={label} className="w-20 h-20 rounded-xl object-cover border border-border" />
+                      ) : (
+                        <div className="w-20 h-20 rounded-xl bg-surface-2 border border-border flex items-center justify-center">
+                          <Camera size={20} className="text-accent-subtle/40" />
+                        </div>
+                      )}
+                      <input ref={ref} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" className="hidden" onChange={onChange} />
+                      <button type="button" onClick={() => ref.current?.click()}
+                        className="flex items-center gap-1 px-2 py-1 rounded border border-border bg-surface-2 text-[11px] text-accent-muted hover:text-accent hover:border-white/30 transition-colors">
+                        <Camera size={11} />
+                        {preview ? 'Trocar' : stored ? 'Substituir' : label}
+                      </button>
+                      {file && <p className="text-[10px] text-accent-subtle">{(file.size / 1024).toFixed(0)} KB</p>}
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-accent-subtle/50 self-end pb-1">JPEG, PNG ou WebP · máx 5 MB</p>
                 </div>
 
                 {/* Nome + Nome artístico */}
