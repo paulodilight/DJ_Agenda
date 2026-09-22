@@ -5,8 +5,7 @@ import { useState, useEffect } from 'react'
 import { useColaboradorStore } from '@/store'
 import { Avatar } from './Avatar'
 import { ModalAlterarPin } from './ModalAlterarPin'
-import { BotaoNotificacoes } from './BotaoNotificacoes'
-import { registarSW, limparBadge } from '@/lib/push'
+import { registarSW, limparBadge, estadoPush, ativarPush } from '@/lib/push'
 
 // Mostra o header (logo) e a navegação. Só os esconde em telemóvel DEITADO
 // (landscape pequeno) para não tapar conteúdo. No computador e no telemóvel
@@ -84,10 +83,13 @@ export function ColaboradorLayout() {
     }
   }, [])
 
-  // registar o service worker e limpar o badge do ícone sempre que a app
-  // ganha foco (o técnico "viu" as novidades)
+  // registar o service worker, ativar push automaticamente e limpar badge
   useEffect(() => {
-    registarSW()
+    registarSW().then(() => {
+      estadoPush().then(estado => {
+        if (estado === 'inativo') ativarPush().catch(() => {})
+      })
+    })
     limparBadge()
     const onFocus = () => { if (document.visibilityState === 'visible') limparBadge() }
     document.addEventListener('visibilitychange', onFocus)
@@ -126,7 +128,6 @@ export function ColaboradorLayout() {
               <Avatar nome={colaborador?.nome} foto={colaborador?.foto_url} tamanho="sm" />
               <span className="text-xs text-accent-muted">{colaborador?.nome}</span>
             </div>
-            <BotaoNotificacoes />
 <button onClick={toggleTheme} title={lightMode ? 'Modo escuro' : 'Modo claro'}
               className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent-subtle hover:text-amber-400 hover:border-amber-400/40 transition-colors">
               {lightMode ? <Moon size={13} /> : <Sun size={13} />}
