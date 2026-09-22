@@ -48,6 +48,12 @@ const ESTADO_OPCOES = [
   { value: 'banido',     label: 'Banido' },
 ]
 
+const CATEGORIA_OPCOES = [
+  { value: 'dj_residente', label: 'DJ Residente' },
+  { value: 'artista',      label: 'Artista' },
+  { value: 'dj_convidado', label: 'DJ Convidado' },
+]
+
 const RATINGS = [
   { campo: 'qualidade_artistica', label: 'Qualidade Artística', sub: 'Musicalidade | Energia | Conexão' },
   { campo: 'assiduidade',         label: 'Assiduidade',         sub: 'Frequência | Pontualidade' },
@@ -107,6 +113,7 @@ function BoolToggle({ checked, onChange, label }) {
 const APP_ABAS_OPCOES = [
   { id: 'agenda',           label: 'Agenda',           desc: 'Calendário de datas e actuações' },
   { id: 'dados',            label: 'Dados',             desc: 'Perfil e informação pessoal' },
+  { id: 'presskit',         label: 'Presskit',          desc: 'Fotos, galeria, datas e conteúdos do press kit' },
   { id: 'disponibilidades', label: 'Disponibilidades',  desc: 'Gestão de disponibilidade (em breve)' },
   { id: 'learn',            label: 'Learn',             desc: 'Formação e conteúdos (em breve)' },
   { id: 'club',             label: 'Club',              desc: 'Secção Club (em breve)' },
@@ -483,6 +490,7 @@ export function DJPerfil() {
       rede_social_url:      dj.rede_social_url        ?? '',
       presskit_url:         dj.presskit_url           ?? '',
       estado:               dj.estado                ?? 'activo',
+      categoria:            dj.categoria             ?? 'dj_residente',
       notas:                dj.notas                 ?? '',
       valor_sessao:         dj.valor_sessao != null  ? String(dj.valor_sessao) : '',
       qualidade_artistica:  dj.qualidade_artistica   ?? 0,
@@ -1040,6 +1048,17 @@ export function DJPerfil() {
                     onChange={e => setPerfilForm(f => ({ ...f, presskit_url: e.target.value }))}
                     placeholder="https://..."
                   />
+                </Field>
+
+                {/* Categoria */}
+                <Field label="Categoria">
+                  <select
+                    className={iCls}
+                    value={perfilForm.categoria ?? 'dj_residente'}
+                    onChange={e => setPerfilForm(f => ({ ...f, categoria: e.target.value }))}
+                  >
+                    {CATEGORIA_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
                 </Field>
 
                 {/* Estado + Valor */}

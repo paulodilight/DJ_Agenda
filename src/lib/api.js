@@ -9,6 +9,12 @@ export const djsApi = {
     return data
   },
 
+  async listarArtistas() {
+    const { data, error } = await supabase.from('djs').select('*').eq('categoria', 'artista').order('nome_artistico')
+    if (error) throw error
+    return data ?? []
+  },
+
   async buscar(id) {
     const { data, error } = await supabase.from('djs').select('*').eq('id', id).single()
     if (error) throw error

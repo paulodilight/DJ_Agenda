@@ -6,13 +6,11 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { Alerta } from '@/components/ui/Alerta'
 import { Badge } from '@/components/ui/Badge'
-import { artistasApi } from '@/lib/api'
-import { useUndo } from '@/contexts/UndoContext'
+import { djsApi } from '@/lib/api'
 import { clsx } from 'clsx'
 
 export function Artistas() {
   const navigate = useNavigate()
-  const { pushUndo } = useUndo()
 
   const [artistas, setArtistas] = useState([])
   const [loading, setLoading]   = useState(true)
@@ -25,7 +23,7 @@ export function Artistas() {
   const carregar = () => {
     setLoading(true)
     setErro(null)
-    artistasApi.listar()
+    djsApi.listarArtistas()
       .then(setArtistas)
       .catch(e => setErro(e.message))
       .finally(() => setLoading(false))
@@ -37,13 +35,8 @@ export function Artistas() {
     if (!confirm(`Apagar "${artista.nome}"?`)) return
     setApagando(artista.id)
     try {
-      const backup = { ...artista }
-      await artistasApi.apagar(artista.id)
+      await djsApi.apagar(artista.id)
       carregar()
-      pushUndo({
-        label: `Artista "${artista.nome}" apagado`,
-        undo: async () => { await artistasApi.criar(backup); carregar() },
-      })
     } catch (e) {
       alert(e.message)
     } finally {
@@ -57,11 +50,11 @@ export function Artistas() {
     if (pesquisa.trim()) {
       const q = pesquisa.toLowerCase()
       lista = lista.filter(a =>
-        (a.nome ?? '').toLowerCase().includes(q) ||
+        (a.nome_artistico ?? a.nome ?? '').toLowerCase().includes(q) ||
         (a.bio  ?? '').toLowerCase().includes(q)
       )
     }
-    return lista.sort((a, b) => a.nome.localeCompare(b.nome))
+    return lista.sort((a, b) => (a.nome_artistico || a.nome || '').localeCompare(b.nome_artistico || b.nome || ''))
   }, [artistas, filtroEstado, pesquisa])
 
   const temFiltro = filtroEstado !== 'activo' || pesquisa
@@ -78,7 +71,7 @@ export function Artistas() {
               : artistas.length} artista{artistas.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button variante="primary" tamanho="sm" onClick={() => navigate('/artistas/novo')}>
+        <Button variante="primary" tamanho="sm" onClick={() => navigate('/djs/novo')}>
           <Plus size={14} />Novo Artista
         </Button>
       </div>
@@ -125,7 +118,7 @@ export function Artistas() {
             ? 'Cria o primeiro artista para associar a eventos Xclusive.'
             : 'Tenta ajustar os filtros.'}
           accao={artistas.length === 0
-            ? <Button variante="primary" tamanho="sm" onClick={() => navigate('/artistas/novo')}><Plus size={14} />Novo Artista</Button>
+            ? <Button variante="primary" tamanho="sm" onClick={() => navigate('/djs/novo')}><Plus size={14} />Novo Artista</Button>
             : null}
         />
       )}
@@ -157,11 +150,11 @@ export function Artistas() {
                       ) : (
                         <div className="w-8 h-8 rounded-md bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0">
                           <span className="text-xs font-bold text-violet-400/60">
-                            {artista.nome.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()}
+                            {(artista.nome_artistico || artista.nome || '?').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()}
                           </span>
                         </div>
                       )}
-                      <span className="font-medium text-accent">{artista.nome}</span>
+                      <span className="font-medium text-accent">{artista.nome_artistico || artista.nome}</span>
                     </div>
                   </td>
                   {/* Bio */}
@@ -203,7 +196,7 @@ export function Artistas() {
                   {/* Acções */}
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      <Button variante="ghost" tamanho="sm" onClick={() => navigate(`/artistas/${artista.id}`)} title="Editar perfil">
+                      <Button variante="ghost" tamanho="sm" onClick={() => navigate(`/djs/${artista.id}`)} title="Editar perfil">
                         <Pencil size={13} />
                       </Button>
                       <Button

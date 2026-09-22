@@ -124,9 +124,10 @@ export function DJs() {
   )
 
   const djsFiltrados = useMemo(() => {
-    let lista = catIdsResidentes.size === 0
+    let lista = (catIdsResidentes.size === 0
       ? [...djs]
       : djs.filter(d => (djCatsMap[d.id] ?? []).map(String).some(id => catIdsResidentes.has(id)))
+    ).filter(d => d.categoria !== 'artista')
 
     // Estado
     if (filtroEstado === 'activos') {
