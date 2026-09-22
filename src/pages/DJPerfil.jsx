@@ -1090,8 +1090,8 @@ export function DJPerfil() {
             {/* ── Acesso & Links ── */}
             {(() => {
               const slug     = slugify(dj.nome_artistico || dj.nome)
-              const appUrl   = `https://xclusiveDJ.app/dj/${slug}`
-              const kitUrl   = `https://mypresskitdj.com/${slug}`
+              const appUrl   = `https://area.xclusivedj.app/${slug}`
+              const kitUrl   = `https://www.mypresskit.pro/${slug}`
               const copiar = (texto, key) => {
                 navigator.clipboard.writeText(texto)
                 setCopiado(key)
@@ -1108,7 +1108,7 @@ export function DJPerfil() {
                       variante="primary" tamanho="sm"
                       onClick={() => {
                         const s = slugify(dj.nome_artistico || dj.nome)
-                        const url = `https://xclusiveDJ.app/dj/${s}`
+                        const url = `https://area.xclusivedj.app/${s}`
                         const nome = (dj.nome_artistico || dj.nome || '').split(' ')[0]
 
                         // Datas futuras confirmadas/proposta
@@ -1131,13 +1131,13 @@ Assim que confirmares o teu perfil, as datas ficarão visíveis na tua agenda.` 
 
                         setEmailEditado(`Olá ${nome},
 
-É com prazer que te damos as boas-vindas à XclusiveDJ — a plataforma que utilizamos para gerir toda a programação dos nossos espaços.
+Esta é a nova plataforma que utilizamos para gerir toda a programação dos nossos espaços.
 
-Criámos o teu perfil e está pronto para seres ativada.
+Já criei o teu perfil e está pronto para seres ativado.
 
 ———
 
-O QUE É A XCLUSIVEDNJ.APP
+O QUE É A XCLUSIVEDJ.APP
 
 A Xclusive DJ é a nossa plataforma de gestão de DJ's. É aqui que:
 • Recebes as datas de atuação atribuídas
@@ -1155,16 +1155,36 @@ Acede à tua área pessoal através do link abaixo e completa o teu perfil:
 • Foto de perfil
 • Disponibilidades
 
-👉 Aceder ao meu perfil: ${url}${secaoDatas}
+👉 Aceder ao meu perfil: ${url}
+    User: ${dj.email || '—'}
+    Pass: ${dj.password_app || '—'}
+
+———
+
+Assim que confirmares o teu perfil, as datas ficarão visíveis na tua agenda.
 
 ———
 
 Qualquer dúvida estou disponível.
 
-Bem-vinda à equipa.
+Bem-vindo
 
-Paulo DiLight
-LMD · XclusiveDJ`)
+
+Como instalar a App no telemóvel (PWA)
+
+iPhone (Safari)
+- Abrir o link da aplicação no Safari.
+- Carregar no botão Partilhar (quadrado com seta para cima).
+- Selecionar "Adicionar ao Ecrã Principal".
+- Confirmar em Adicionar.
+
+Android (Chrome)
+- Abrir o link da aplicação no Chrome.
+- Carregar nos 3 pontos no canto superior direito.
+- Selecionar "Instalar aplicação" ou "Adicionar ao ecrã principal".
+- Confirmar a instalação.
+
+Após a instalação, a aplicação ficará disponível no ecrã principal do telemóvel, funcionando de forma semelhante a uma app tradicional.`)
                         setConviteEnviado(false)
                         setConviteErro(null)
                         setConviteAberto(true)
@@ -1708,7 +1728,7 @@ LMD · XclusiveDJ`)
             <div className="px-5 pt-4 shrink-0">
               <p className="text-[10px] font-semibold text-accent-subtle uppercase tracking-wider mb-1">Assunto</p>
               <p className="text-xs text-accent bg-surface-2 border border-border rounded px-3 py-2">
-                Bem-vinda à XclusiveDJ · O teu perfil está pronto
+                Bem-vindo à XclusiveDJ · O teu perfil está pronto
               </p>
             </div>
 
@@ -1764,7 +1784,7 @@ LMD · XclusiveDJ`)
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
                             to: dj.email,
-                            subject: 'Bem-vinda à XclusiveDJ · O teu perfil está pronto',
+                            subject: 'Bem-vindo à XclusiveDJ · O teu perfil está pronto',
                             body: emailEditado,
                           }),
                         })
