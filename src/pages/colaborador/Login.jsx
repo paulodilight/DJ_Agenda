@@ -16,8 +16,13 @@ export function ColaboradorLogin() {
   const [pin, setPin] = useState('')
   const [erro, setErro] = useState(null)
   const [aEntrar, setAEntrar] = useState(false)
-  const entrar = useColaboradorStore((s) => s.entrar)
+  const { entrar, colaborador } = useColaboradorStore()
   const navigate = useNavigate()
+
+  // já está autenticado — vai direto para a app
+  useEffect(() => {
+    if (colaborador) navigate('/apoiot', { replace: true })
+  }, [colaborador, navigate])
 
   useEffect(() => {
     colaboradorApi
