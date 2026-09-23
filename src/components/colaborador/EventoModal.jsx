@@ -108,6 +108,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const [equipConfirmadoEm,   setEquipConfirmadoEm]   = useState(null)
   const [lightboxUrl,    setLightboxUrl]    = useState(null)
   const [notasLidas,     setNotasLidas]     = useState(false)
+  const fotoInicioRef = useRef(null)
 
   const colaborador = useColaboradorStore(s => s.colaborador)
 
@@ -371,7 +372,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   }
 
   const adicionarFoto = async (file) => {
-    if (!file || fotoUploading) return
+    if (!file || fotoUploading || feedbackFotos.length >= 3) return
     setFotoUploading(true)
     const ext = file.name.split('.').pop()
     const path = `${evento.id}/${crypto.randomUUID()}.${ext}`
@@ -442,9 +443,9 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
     if (!assinEvento.assinatura_lmd_at)
       return { emoji: '🟢', label: 'Entrada', campo: 'assinatura_lmd_at', color: 'bg-green-500/15 border-green-500/40 text-green-400 hover:bg-green-500/25' }
     if (!isRecorrente && !assinEvento.assinatura_in_at)
-      return { emoji: '▶️', label: 'Início Evento', campo: 'assinatura_in_at', color: 'bg-amber-400/10 border-amber-400/30 text-amber-400 hover:bg-amber-400/20' }
+      return { emoji: '📷', label: 'Foto/Início Evento', campo: 'assinatura_in_at', isFoto: true, color: 'bg-amber-400/10 border-amber-400/30 text-amber-400 hover:bg-amber-400/20' }
     if (!isRecorrente && !assinEvento.assinatura_fim_evento_at)
-      return { emoji: '⏹️', label: 'Fim Evento', campo: 'assinatura_fim_evento_at', color: 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25' }
+      return { emoji: '📝', label: 'Notas/Saída Evento', campo: 'assinatura_fim_evento_at', color: 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25' }
     if (!assinEvento.assinatura_out_at)
       return { emoji: '🔴', label: 'Saída', campo: 'assinatura_out_at', color: 'bg-red-500/15 border-red-500/30 text-red-400 hover:bg-red-500/25' }
     if (faseLocal !== 'concluido')
@@ -454,6 +455,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
 
   const handleProximoPasso = async () => {
     if (!proximoPasso) return
+    if (proximoPasso.isFoto) {
+      fotoInicioRef.current?.click()
+      return
+    }
     if (proximoPasso.campo) await registarAssinEvento(proximoPasso.campo)
     else await marcarFase('concluido')
   }
@@ -466,25 +471,14 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const progressoPct = (() => {
     if (isLmd) return 0
     let pct = 0
-    if (isRecorrente) {
-      if (assinEvento.assinatura_lmd_at)        pct += 20
-      if (equipConfirmadoEm)                     pct += 20
-      if (notasLidas)                            pct += 10
-      const saidaLists = eventoListas.filter(l => l.fase === 'saida')
-      if (saidaLists.length > 0 && saidaLists.every(l => clSubmetidas.has(l.clId))) pct += 30
-      else if (saidaLists.length === 0 && assinEvento.assinatura_out_at) pct += 30
-      if (faseLocal === 'concluido')             pct += 20
-    } else {
-      if (assinEvento.assinatura_lmd_at)        pct += 10
-      if (assinEvento.assinatura_in_at)          pct += 10
-      if (equipConfirmadoEm)                     pct += 20
-      if (notasLidas)                            pct += 10
-      const saidaLists = eventoListas.filter(l => l.fase === 'saida')
-      if (saidaLists.length > 0 && saidaLists.every(l => clSubmetidas.has(l.clId))) pct += 30
-      else if (saidaLists.length === 0 && assinEvento.assinatura_out_at) pct += 30
-      if (assinEvento.assinatura_fim_evento_at) pct += 10
-      if (faseLocal === 'concluido')             pct += 10
-    }
+    if (equipConfirmadoEm)                     pct += 20
+    if (notasLidas)                             pct += 15
+    if (assinEvento.assinatura_lmd_at)         pct += 15
+    const todosCls = eventoListas
+    if (todosCls.length > 0 && todosCls.every(l => clSubmetidas.has(l.clId))) pct += 20
+    if (assinEvento.assinatura_in_at || feedbackFotos.length > 0) pct += 10
+    if (assinEvento.assinatura_fim_evento_at || execucaoNotas.trim()) pct += 10
+    if (assinEvento.assinatura_out_at)         pct += 10
     return Math.min(pct, 100)
   })()
 
@@ -657,11 +651,14 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
 
         {/* Barra de progresso */}
         {!isLmd && isAtribuido && (
-          <div className="h-1 bg-white/5 shrink-0">
+          <div className="relative h-5 bg-white/5 shrink-0 overflow-hidden">
             <div
-              className={clsx('h-full transition-all duration-500', progressoPct === 100 ? 'bg-green-400/60' : 'bg-amber-400/50')}
+              className="h-full bg-green-500/35 transition-all duration-500"
               style={{ width: `${progressoPct}%` }}
             />
+            <span className="absolute inset-0 flex items-center justify-center text-green-400 font-bold tabular-nums pointer-events-none" style={{ fontSize: 10 }}>
+              — {progressoPct}% —
+            </span>
           </div>
         )}
 
@@ -679,7 +676,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 {tecNomeResp && (
                   <div>
                     <p className="uppercase tracking-wider text-accent-subtle mb-1.5" style={{ fontSize: 10 }}>Responsável</p>
-                    <TecChip nome={tecNomeResp} idx={0} />
+                    <div className="inline-flex items-center gap-1.5">
+                      <TecChip nome={tecNomeResp} idx={0} />
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-400/20 border border-amber-400/50 text-amber-400 font-black" style={{ fontSize: 10 }}>★</span>
+                    </div>
                   </div>
                 )}
                 {outrosTecs.length > 0 && (
@@ -737,7 +737,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 <Campo rotulo="Status" valor={labelEstado(evento.status) || evento.status} />
                 <Campo rotulo="Local"  valor={cliente} />
                 <Campo rotulo="Contacto" valor={evento.contacto_pelo_evento} />
-                <Campo rotulo="Responsável" valor={evento.responsavel} />
                 <Campo rotulo="Morada" valor={evento.morada} isLink full />
                 {evento.notas_operacionais && (
                   <Campo rotulo="Observações" valor={evento.notas_operacionais} full />
@@ -853,7 +852,46 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 ) : null
               })()}
 
-              {/* Equipamentos para o evento */}
+              {/* 1. Notas operacionais */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>
+                    <StickyNote size={12} /> Notas operacionais
+                  </p>
+                  {isAtribuido && (
+                    <button
+                      onClick={() => setNotasLidas(true)}
+                      disabled={notasLidas}
+                      className={clsx(
+                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] transition-all',
+                        notasLidas
+                          ? 'border-green-500/30 bg-green-500/10 text-green-400 cursor-default'
+                          : 'border-amber-400/30 bg-amber-400/10 text-amber-400 hover:bg-amber-400/20'
+                      )}>
+                      {notasLidas ? <><Check size={9} /> Lido</> : 'Confirmar leitura'}
+                    </button>
+                  )}
+                </div>
+                <div className={clsx('whitespace-pre-wrap rounded-xl px-3 py-2.5 border',
+                  evento.notas_operacionais ? 'text-accent-muted bg-surface-2 border-border' : 'text-accent-subtle/40 italic bg-surface-2/40 border-border/40')}
+                  style={{ fontSize: 14 }}>
+                  {evento.notas_operacionais || 'Sem notas.'}
+                </div>
+              </div>
+
+              {/* Notas de preparação */}
+              {evento.notas_preparacao && (
+                <div className="rounded-xl border border-purple-500/20 bg-purple-500/[0.06] px-3 py-3">
+                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-purple-400/70 mb-2" style={{ fontSize: 10 }}>
+                    <StickyNote size={12} /> Notas de preparação
+                  </p>
+                  <p className="text-accent-muted whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
+                    {evento.notas_preparacao}
+                  </p>
+                </div>
+              )}
+
+              {/* 2. Equipamentos para o evento */}
               {equipEvento.length > 0 && (() => {
                 const total  = equipEvento.length
                 const feitos = equipEvento.filter(r => equipEventoChecks.has(r.id)).length
@@ -913,12 +951,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 )
               })()}
 
-              {/* Checklists não-saída */}
-              {eventoListas.filter(l => l.fase !== 'saida').map(lista => (
-                <RenderChecklist key={lista.clId} lista={lista} />
-              ))}
-
-              {/* Equipamentos do técnico + botão QR */}
+              {/* Equipamentos do técnico */}
               <div className="border border-white/10 rounded-xl overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
                   <Boxes size={12} className="text-amber-400 shrink-0" />
@@ -984,44 +1017,12 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 </div>
               </div>
 
-              {/* 3 tipos de notas */}
-              {evento.notas_preparacao && (
-                <div className="rounded-xl border border-purple-500/20 bg-purple-500/[0.06] px-3 py-3">
-                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-purple-400/70 mb-2" style={{ fontSize: 10 }}>
-                    <StickyNote size={12} /> Notas de preparação
-                  </p>
-                  <p className="text-accent-muted whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
-                    {evento.notas_preparacao}
-                  </p>
-                </div>
-              )}
+              {/* 3. Checklist de saída (moved from operação) */}
+              {!isRecorrente && eventoListas.filter(l => l.fase === 'saida').map(lista => (
+                <RenderChecklist key={lista.clId} lista={lista} />
+              ))}
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="flex items-center gap-1.5 uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>
-                    <StickyNote size={12} /> Notas operacionais
-                  </p>
-                  {isAtribuido && (
-                    <button
-                      onClick={() => setNotasLidas(true)}
-                      disabled={notasLidas}
-                      className={clsx(
-                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] transition-all',
-                        notasLidas
-                          ? 'border-green-500/30 bg-green-500/10 text-green-400 cursor-default'
-                          : 'border-amber-400/30 bg-amber-400/10 text-amber-400 hover:bg-amber-400/20'
-                      )}>
-                      {notasLidas ? <><Check size={9} /> Lido</> : 'Confirmar leitura'}
-                    </button>
-                  )}
-                </div>
-                <div className={clsx('whitespace-pre-wrap rounded-xl px-3 py-2.5 border',
-                  evento.notas_operacionais ? 'text-accent-muted bg-surface-2 border-border' : 'text-accent-subtle/40 italic bg-surface-2/40 border-border/40')}
-                  style={{ fontSize: 14 }}>
-                  {evento.notas_operacionais || 'Sem notas.'}
-                </div>
-              </div>
-
+              {/* 4. As minhas notas */}
               {isAtribuido && (
                 <div>
                   <SeccaoTitulo label="As minhas notas" />
@@ -1049,83 +1050,18 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
           {aba === 'operacao' && (
             <div className="flex flex-col gap-4 py-2">
 
-              {/* Checklists de saída — ocultas se recorrente */}
-              {!isRecorrente && eventoListas.filter(l => l.fase === 'saida').length > 0 ? (
+              {/* 1. Checklist Evento (checklists não-saída) */}
+              {eventoListas.filter(l => l.fase !== 'saida').length > 0 ? (
                 <div className="flex flex-col gap-2">
-                  {eventoListas.filter(l => l.fase === 'saida').map(lista => {
-                    const submetida = clSubmetidas.has(lista.clId)
-                    const aGuardar  = clGuardando.has(lista.clId)
-                    const total     = lista.itens.length
-                    const feitos    = lista.itens.filter(it => eventoChecks.has(it.id)).length
-                    return (
-                      <div key={lista.clId} className="rounded-xl border border-white/10 overflow-hidden">
-                        <div className="flex items-center gap-2 px-3 py-2 bg-amber-400/[0.08] border-b border-amber-400/20">
-                          <ListChecks size={12} className={submetida ? 'text-green-400 shrink-0' : 'text-amber-400 shrink-0'} />
-                          <p className={clsx('font-bold uppercase tracking-wider flex-1', submetida ? 'text-green-400' : 'text-amber-400')} style={{ fontSize: 10 }}>{lista.nome}</p>
-                          {submetida ? (
-                            <span className="inline-flex items-center gap-1 text-green-400" style={{ fontSize: 10 }}>
-                              <Lock size={10} /> Guardado
-                            </span>
-                          ) : isAtribuido && total > 0 && (
-                            <button
-                              onClick={() => guardarChecklist(lista.clId)}
-                              disabled={aGuardar}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 disabled:opacity-50 transition-all"
-                              style={{ fontSize: 10 }}>
-                              <Lock size={10} />
-                              {aGuardar ? '…' : `Guardar ${feitos}/${total}`}
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex flex-col">
-                          {lista.itens.map(item => {
-                            const checked = eventoChecks.has(item.id)
-                            return (
-                              <button key={item.id}
-                                onClick={() => toggleCheck(item.id, lista.clId)}
-                                disabled={!isAtribuido || submetida}
-                                className={clsx(
-                                  'flex items-center gap-3 px-3 py-2.5 border-b border-white/5 last:border-0 text-left transition-colors',
-                                  checked ? 'bg-green-500/10' : 'hover:bg-white/5',
-                                  (!isAtribuido || submetida) ? 'cursor-default' : 'cursor-pointer'
-                                )}>
-                                <span className={clsx(
-                                  'w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors',
-                                  checked ? 'bg-green-500/30 border-green-500/60' : 'border-white/20'
-                                )}>
-                                  {checked && <Check size={12} className="text-green-400" />}
-                                </span>
-                                <span className={clsx('flex-1', checked ? 'line-through opacity-50' : 'opacity-80')} style={{ fontSize: 13 }}>
-                                  {item.texto}
-                                </span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {eventoListas.filter(l => l.fase !== 'saida').map(lista => (
+                    <RenderChecklist key={lista.clId} lista={lista} />
+                  ))}
                 </div>
-              ) : !isRecorrente ? (
-                <p className="text-center italic py-4 opacity-40" style={{ fontSize: 13 }}>Sem checklists de saída.</p>
-              ) : null}
-
-              {/* Durante o evento */}
-              {isAtribuido && (
-                <div>
-                  <SeccaoTitulo label="Durante o evento" />
-                  <textarea
-                    value={execucaoNotas}
-                    onChange={e => setExecucaoNotas(e.target.value)}
-                    rows={3}
-                    placeholder="Ocorrências, observações durante o evento…"
-                    style={{ fontSize: 13 }}
-                    className="w-full bg-surface-2 border border-white/20 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/40 resize-none"
-                  />
-                </div>
+              ) : (
+                <p className="text-center italic py-4 opacity-40" style={{ fontSize: 13 }}>Sem checklists de evento.</p>
               )}
 
-              {/* Registo Fotográfico */}
+              {/* 2. Registo Fotográfico (max 3 fotos) */}
               {isAtribuido && (
                 <div>
                   <SeccaoTitulo label="Registo Fotográfico" />
@@ -1143,44 +1079,60 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                       ))}
                     </div>
                   )}
-                  <div className="flex gap-2">
-                    <label className={clsx(
-                      'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
-                      fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
-                    )}>
-                      <Camera size={14} className="text-accent-subtle shrink-0" />
-                      <span className="text-accent-subtle" style={{ fontSize: 12 }}>{fotoUploading ? 'A carregar…' : 'Câmara'}</span>
-                      <input type="file" accept="image/*" capture="environment" className="hidden"
-                        disabled={fotoUploading}
-                        onChange={e => { const f = e.target.files?.[0]; if (f) adicionarFoto(f); e.target.value = '' }} />
-                    </label>
-                    <label className={clsx(
-                      'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
-                      fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
-                    )}>
-                      <ImageIcon size={14} className="text-accent-subtle shrink-0" />
-                      <span className="text-accent-subtle" style={{ fontSize: 12 }}>{fotoUploading ? 'A carregar…' : 'Galeria'}</span>
-                      <input type="file" accept="image/*" multiple className="hidden"
-                        disabled={fotoUploading}
-                        onChange={async e => {
-                          const files = Array.from(e.target.files ?? [])
-                          for (const f of files) await adicionarFoto(f)
-                          e.target.value = ''
-                        }} />
-                    </label>
-                  </div>
+                  {feedbackFotos.length < 3 && (
+                    <div className="flex gap-2">
+                      <label className={clsx(
+                        'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
+                        fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
+                      )}>
+                        <Camera size={14} className="text-accent-subtle shrink-0" />
+                        <span className="text-accent-subtle" style={{ fontSize: 12 }}>{fotoUploading ? 'A carregar…' : 'Câmara'}</span>
+                        <input type="file" accept="image/*" capture="environment" className="hidden"
+                          disabled={fotoUploading}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) adicionarFoto(f); e.target.value = '' }} />
+                      </label>
+                      <label className={clsx(
+                        'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 cursor-pointer transition-colors flex-1',
+                        fotoUploading ? 'opacity-40 cursor-wait' : 'hover:bg-white/5'
+                      )}>
+                        <ImageIcon size={14} className="text-accent-subtle shrink-0" />
+                        <span className="text-accent-subtle" style={{ fontSize: 12 }}>{fotoUploading ? 'A carregar…' : 'Galeria'}</span>
+                        <input type="file" accept="image/*" className="hidden"
+                          disabled={fotoUploading}
+                          onChange={async e => {
+                            const files = Array.from(e.target.files ?? []).slice(0, 3 - feedbackFotos.length)
+                            for (const f of files) await adicionarFoto(f)
+                            e.target.value = ''
+                          }} />
+                      </label>
+                    </div>
+                  )}
+                  {feedbackFotos.length >= 3 && (
+                    <p className="text-accent-subtle/40 text-center italic mt-1" style={{ fontSize: 11 }}>Máximo de 3 fotos atingido.</p>
+                  )}
                 </div>
               )}
 
-              {/* Guardar notas/fotos */}
+              {/* 3. Notas do evento */}
               {isAtribuido && (
-                <div className="flex justify-end">
-                  <button onClick={guardarFeedback} disabled={execucaoSaving}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
-                    style={{ fontSize: 12 }}>
-                    {execucaoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
-                    {execucaoSaving ? 'A guardar…' : execucaoSaved ? 'Guardado' : 'Guardar'}
-                  </button>
+                <div>
+                  <SeccaoTitulo label="Notas do evento" />
+                  <textarea
+                    value={execucaoNotas}
+                    onChange={e => setExecucaoNotas(e.target.value)}
+                    rows={3}
+                    placeholder="Ocorrências, observações durante o evento…"
+                    style={{ fontSize: 13 }}
+                    className="w-full bg-surface-2 border border-white/20 rounded-xl px-3 py-2 text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-white/40 resize-none"
+                  />
+                  <div className="flex justify-end mt-2">
+                    <button onClick={guardarFeedback} disabled={execucaoSaving}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-accent font-medium hover:bg-white/15 disabled:opacity-40 transition-colors"
+                      style={{ fontSize: 12 }}>
+                      {execucaoSaved ? <CheckCircle2 size={12} className="text-green-400" /> : <Save size={12} />}
+                      {execucaoSaving ? 'A guardar…' : execucaoSaved ? 'Guardado' : 'Guardar'}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1205,7 +1157,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 </div>
               )}
 
-              {/* Viatura — mostra quando com_carro está ativo */}
+              {/* Viatura */}
               {isAtribuido && comCarro && (
                 <div>
                   <SeccaoTitulo label="Veículo" />
@@ -1259,67 +1211,68 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
           {aba === 'fecho' && (
             <div className="flex flex-col gap-4 py-2">
 
-              {/* Resumo de estado */}
+              {/* Linhas de resumo */}
               <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-4 flex flex-col gap-3">
                 {(() => {
-                  const saidaLists = eventoListas.filter(l => l.fase === 'saida')
-                  const checklistOk = saidaLists.length === 0 || saidaLists.every(l => clSubmetidas.has(l.clId))
+                  const todosCls = eventoListas
+                  const checklistOk = todosCls.length > 0 && todosCls.every(l => clSubmetidas.has(l.clId))
                   const rows = [
-                    { label: '🟢 Entrada',          val: fmtTs(assinEvento.assinatura_lmd_at) },
-                    ...(!isRecorrente ? [
-                      { label: '▶️ Início Evento',  val: fmtTs(assinEvento.assinatura_in_at) },
-                      { label: '⏹️ Fim Evento',     val: fmtTs(assinEvento.assinatura_fim_evento_at) },
-                    ] : []),
-                    { label: '🔴 Saída',             val: fmtTs(assinEvento.assinatura_out_at) },
-                    { label: '📦 Equip. confirmado', val: equipConfirmadoEm ? 'OK' : null },
-                    { label: '📋 Notas verificadas', val: notasLidas ? 'OK' : null },
-                    ...(!isRecorrente ? [{ label: '✅ Checklist saída', val: checklistOk && saidaLists.length > 0 ? 'OK' : saidaLists.length === 0 ? '—' : null }] : []),
+                    { label: '📦 Equipamento conferido',    val: fmtTs(equipConfirmadoEm),                                    pct: '+20%' },
+                    { label: '✅ Notas confirmadas',          val: notasLidas ? 'OK' : null,                                   pct: '+15%' },
+                    { label: '🟢 Entrada',                    val: fmtTs(assinEvento.assinatura_lmd_at),                       pct: '+15%' },
+                    { label: '✅ Checklist Evento',           val: todosCls.length === 0 ? '—' : checklistOk ? 'OK' : null,   pct: '+20%' },
+                    {
+                      label: '📷 Fotos / início de evento',
+                      val: assinEvento.assinatura_in_at
+                        ? fmtTs(assinEvento.assinatura_in_at) + (feedbackFotos.length > 0 ? ` · ${feedbackFotos.length} foto${feedbackFotos.length > 1 ? 's' : ''}` : '')
+                        : feedbackFotos.length > 0 ? `${feedbackFotos.length} foto${feedbackFotos.length > 1 ? 's' : ''}` : null,
+                      pct: '+10%'
+                    },
+                    {
+                      label: '📝 Notas / Saída do evento',
+                      val: assinEvento.assinatura_fim_evento_at
+                        ? fmtTs(assinEvento.assinatura_fim_evento_at)
+                        : execucaoNotas.trim() ? 'Com notas' : null,
+                      pct: '+10%'
+                    },
+                    { label: '🔴 Saída',                      val: fmtTs(assinEvento.assinatura_out_at),                       pct: '+10%' },
                   ]
-                  return rows.map(({ label, val }) => (
-                    <div key={label} className="flex items-center justify-between">
-                      <span className="text-accent-subtle/70" style={{ fontSize: 13 }}>{label}</span>
-                      <span className={clsx('tabular-nums font-medium', val ? 'text-green-400' : 'text-white/20')} style={{ fontSize: 13 }}>
+                  return rows.map(({ label, val, pct }) => (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className="text-accent-subtle/70 flex-1" style={{ fontSize: 15 }}>{label}</span>
+                      <span className="text-accent-subtle/30 shrink-0 tabular-nums" style={{ fontSize: 10 }}>{pct}</span>
+                      <span className={clsx('tabular-nums font-medium shrink-0 text-right', val && val !== '—' ? 'text-green-400' : val === '—' ? 'text-white/20' : 'text-white/20')} style={{ fontSize: 15 }}>
                         {val || '—'}
                       </span>
                     </div>
                   ))
                 })()}
-
-                {/* Miniaturas de fotos */}
-                {feedbackFotos.length > 0 ? (
-                  <div>
-                    <p className="text-accent-subtle/70 mb-1.5" style={{ fontSize: 13 }}>📸 Fotos ({feedbackFotos.length})</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {feedbackFotos.map((url, idx) => (
-                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
-                          <img src={url} alt={`foto ${idx + 1}`}
-                            className="w-14 h-14 object-cover rounded-lg border border-white/10 hover:opacity-80 transition-opacity" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <span className="text-accent-subtle/70" style={{ fontSize: 13 }}>📸 Fotos</span>
-                    <span className="text-white/20 font-medium" style={{ fontSize: 13 }}>—</span>
-                  </div>
-                )}
-
-                {/* Notas */}
-                {execucaoNotas.trim() ? (
-                  <div>
-                    <p className="text-accent-subtle/70 mb-1" style={{ fontSize: 13 }}>📝 Notas</p>
-                    <p className="text-accent/80 leading-relaxed whitespace-pre-wrap bg-white/[0.03] rounded-lg px-2.5 py-2 border border-white/5" style={{ fontSize: 12 }}>
-                      {execucaoNotas.trim()}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <span className="text-accent-subtle/70" style={{ fontSize: 13 }}>📝 Notas</span>
-                    <span className="text-white/20 font-medium" style={{ fontSize: 13 }}>—</span>
-                  </div>
-                )}
               </div>
+
+              {/* Miniaturas de fotos */}
+              {feedbackFotos.length > 0 && (
+                <div>
+                  <p className="uppercase tracking-wider text-accent-subtle/60 mb-1.5" style={{ fontSize: 10 }}>Fotos</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {feedbackFotos.map((url, idx) => (
+                      <button key={idx} onClick={() => setLightboxUrl(url)}>
+                        <img src={url} alt={`foto ${idx + 1}`}
+                          className="w-16 h-16 object-cover rounded-lg border border-white/10 hover:opacity-80 transition-opacity" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* As minhas notas */}
+              {notasPessoais.trim() && (
+                <div>
+                  <p className="uppercase tracking-wider text-accent-subtle/60 mb-1" style={{ fontSize: 10 }}>As minhas notas</p>
+                  <p className="text-accent/80 leading-relaxed whitespace-pre-wrap bg-white/[0.03] rounded-lg px-2.5 py-2 border border-white/5" style={{ fontSize: 14 }}>
+                    {notasPessoais.trim()}
+                  </p>
+                </div>
+              )}
 
               {/* Concluir Trabalho */}
               {isAtribuido && faseLocal !== 'concluido' && evento.data_evento === hojeISO() && (
@@ -1347,6 +1300,14 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
         {/* Rodapé */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 shrink-0">
           <div className="flex-1 min-w-0">
+            {/* Input oculto para foto de início */}
+            <input ref={fotoInicioRef} type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={async e => {
+                const f = e.target.files?.[0]
+                if (!assinEvento.assinatura_in_at) await registarAssinEvento('assinatura_in_at')
+                if (f) await adicionarFoto(f)
+                e.target.value = ''
+              }} />
             {!isLmd && isAtribuido && proximoPasso && evento.data_evento === hojeISO() && (
               <button
                 onClick={handleProximoPasso}
@@ -1357,6 +1318,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 )}
                 style={{ fontSize: 13 }}>
                 {proximoPasso.emoji} {isBotaoSaving ? '…' : proximoPasso.label}
+                {progressoPct > 0 && <span className="text-green-400 font-bold" style={{ fontSize: 11 }}>{progressoPct}%</span>}
               </button>
             )}
             {!isLmd && faseLocal === 'concluido' && !proximoPasso && evento.data_evento === hojeISO() && (
