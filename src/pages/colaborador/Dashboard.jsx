@@ -191,10 +191,13 @@ export function ColaboradorDashboard() {
     if (!colaborador) return
     let activo = true
     setLoading(true)
+    const comTimeout = (p, ms = 8000) =>
+      Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms))])
+
     Promise.all([
       colaboradorApi.eventosDoTecnico(colaborador.id),
       colaboradorApi.listarColaboradores(),
-      colaboradorApi.tarefasDoColaborador(colaborador.nome),
+      comTimeout(colaboradorApi.tarefasDoColaborador(colaborador.nome)).catch(() => []),
       supabase.from('ocorrencias').select('*, espacos(nome)')
         .in('status', ['aberta', 'em_processo'])
         .order('created_at', { ascending: true })
