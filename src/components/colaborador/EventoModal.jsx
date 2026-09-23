@@ -651,14 +651,19 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
 
         {/* Barra de progresso */}
         {!isLmd && isAtribuido && (
-          <div className="relative h-5 bg-white/5 shrink-0 overflow-hidden">
+          <div className="relative mx-3 my-1 h-5 rounded-full bg-white/8 overflow-hidden shrink-0">
             <div
-              className="h-full bg-green-500/35 transition-all duration-500"
+              className="h-full rounded-full bg-green-500/50 transition-all duration-500"
               style={{ width: `${progressoPct}%` }}
             />
-            <span className="absolute inset-0 flex items-center justify-center text-green-400 font-bold tabular-nums pointer-events-none" style={{ fontSize: 10 }}>
-              — {progressoPct}% —
-            </span>
+            {/* % dentro da barra, alinhado à direita da parte preenchida */}
+            {progressoPct > 0 && (
+              <span
+                className="absolute top-0 bottom-0 flex items-center pr-2 text-white font-bold tabular-nums pointer-events-none transition-all duration-500"
+                style={{ fontSize: 10, right: `${100 - progressoPct}%` }}>
+                {progressoPct}%
+              </span>
+            )}
           </div>
         )}
 
@@ -832,25 +837,7 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
           {aba === 'preparacao' && (
             <div className="flex flex-col gap-3 py-2">
 
-              {/* Progresso */}
-              {(() => {
-                const todosItens = eventoListas.filter(l => l.fase !== 'saida').flatMap(l => l.itens.map(i => i.id))
-                const total = todosItens.length + equipItems.length
-                const feitos = todosItens.filter(id => eventoChecks.has(id)).length + equipItems.filter(i => i.feito).length
-                const pct = total > 0 ? Math.round((feitos / total) * 100) : 0
-                return total > 0 ? (
-                  <div className="rounded-xl bg-white/[0.03] border border-white/8 px-3 py-2.5">
-                    <div className="flex justify-between items-center mb-1.5">
-                      <span className="uppercase tracking-wider text-accent-subtle" style={{ fontSize: 10 }}>Progresso</span>
-                      <span className={clsx('font-bold tabular-nums', pct === 100 ? 'text-green-400' : 'text-amber-400')} style={{ fontSize: 12 }}>{pct}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                      <div className={clsx('h-full rounded-full transition-all', pct === 100 ? 'bg-green-400' : 'bg-amber-400')}
-                        style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                ) : null
-              })()}
+              {/* Progresso preparação removido — usa a barra global no topo */}
 
               {/* 1. Notas operacionais */}
               <div>
@@ -1249,10 +1236,10 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                 })()}
               </div>
 
-              {/* Miniaturas de fotos */}
-              {feedbackFotos.length > 0 && (
-                <div>
-                  <p className="uppercase tracking-wider text-accent-subtle/60 mb-1.5" style={{ fontSize: 10 }}>Fotos</p>
+              {/* Fotos — sempre visível */}
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                <p className="uppercase tracking-wider text-accent-subtle/60 mb-2" style={{ fontSize: 10 }}>📸 Fotos do evento</p>
+                {feedbackFotos.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {feedbackFotos.map((url, idx) => (
                       <button key={idx} onClick={() => setLightboxUrl(url)}>
@@ -1261,8 +1248,20 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="italic text-accent-subtle/40" style={{ fontSize: 13 }}>Não foram adicionadas fotos</p>
+                )}
+              </div>
+
+              {/* Notas do evento — sempre visível */}
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                <p className="uppercase tracking-wider text-accent-subtle/60 mb-2" style={{ fontSize: 10 }}>📝 Notas do evento</p>
+                {execucaoNotas.trim() ? (
+                  <p className="text-accent/80 leading-relaxed whitespace-pre-wrap" style={{ fontSize: 14 }}>{execucaoNotas.trim()}</p>
+                ) : (
+                  <p className="italic text-accent-subtle/40" style={{ fontSize: 13 }}>Não foram adicionadas notas</p>
+                )}
+              </div>
 
               {/* As minhas notas */}
               {notasPessoais.trim() && (
