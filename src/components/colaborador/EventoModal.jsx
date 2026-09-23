@@ -471,11 +471,11 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
   const progressoPct = (() => {
     if (isLmd) return 0
     let pct = 0
-    if (equipConfirmadoEm)                     pct += 20
+    if (equipConfirmadoEm || equipEvento.length === 0) pct += 20
     if (notasLidas)                             pct += 15
     if (assinEvento.assinatura_lmd_at)         pct += 15
     const todosCls = eventoListas
-    if (todosCls.length > 0 && todosCls.every(l => clSubmetidas.has(l.clId))) pct += 20
+    if (todosCls.length === 0 || todosCls.every(l => clSubmetidas.has(l.clId))) pct += 20
     if (assinEvento.assinatura_in_at || feedbackFotos.length > 0) pct += 10
     if (assinEvento.assinatura_fim_evento_at || execucaoNotas.trim()) pct += 10
     if (assinEvento.assinatura_out_at)         pct += 10
@@ -649,23 +649,6 @@ export function EventoModal({ evento, mapaTecnicos = {}, onFechar, tarefas = [] 
           ))}
         </div>
 
-        {/* Barra de progresso */}
-        {!isLmd && isAtribuido && (
-          <div className="relative mx-3 my-1 h-5 rounded-full bg-white/8 overflow-hidden shrink-0">
-            <div
-              className="h-full rounded-full bg-green-500/50 transition-all duration-500"
-              style={{ width: `${progressoPct}%` }}
-            />
-            {/* % dentro da barra, alinhado à direita da parte preenchida */}
-            {progressoPct > 0 && (
-              <span
-                className="absolute top-0 bottom-0 flex items-center pr-2 text-white font-bold tabular-nums pointer-events-none transition-all duration-500"
-                style={{ fontSize: 10, right: `${100 - progressoPct}%` }}>
-                {progressoPct}%
-              </span>
-            )}
-          </div>
-        )}
 
         {/* Conteúdo */}
         <div key={aba}
