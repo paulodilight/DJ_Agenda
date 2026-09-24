@@ -60,6 +60,32 @@ export function DJConvidados() {
   const [categorias, setCategorias]         = useState([])
   const [djCatsMap, setDjCatsMap]           = useState({})
   const [interesseMap, setInteresseMap]     = useState({})
+  const [estadosSaving, setEstadosSaving]   = useState({})
+  const [djsEstado, setDjsEstado]           = useState({})
+
+  const ESTADOS_CICLO = ['activo', 'activo_ext', 'inactivo', 'banido']
+  const ESTADO_ESTILO = {
+    activo:     'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30',
+    activo_ext: 'bg-blue-500/20 text-blue-400 border-blue-500/40 hover:bg-blue-500/30',
+    inactivo:   'bg-white/8 text-accent-muted border-border hover:bg-white/12',
+    banido:     'bg-red-500/20 text-red-400 border-red-500/40 hover:bg-red-500/30',
+  }
+
+  const toggleEstado = async (dj) => {
+    if (estadosSaving[dj.id]) return
+    const estadoAtual = djsEstado[dj.id] ?? dj.estado ?? 'activo'
+    const idx = ESTADOS_CICLO.indexOf(estadoAtual)
+    const novoEstado = ESTADOS_CICLO[(idx + 1) % ESTADOS_CICLO.length]
+    setDjsEstado(prev => ({ ...prev, [dj.id]: novoEstado }))
+    setEstadosSaving(prev => ({ ...prev, [dj.id]: true }))
+    try {
+      await djsApi.actualizar(dj.id, { estado: novoEstado })
+    } catch {
+      setDjsEstado(prev => ({ ...prev, [dj.id]: estadoAtual }))
+    } finally {
+      setEstadosSaving(prev => ({ ...prev, [dj.id]: false }))
+    }
+  }
 
   // Filtros
   const [pesquisa, setPesquisa]       = useState('')
@@ -335,13 +361,18 @@ export function DJConvidados() {
                       }
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variante={
-                        dj.estado === 'activo'     ? 'confirmado' :
-                        dj.estado === 'activo_ext' ? 'proposta'   :
-                        dj.estado === 'banido'     ? 'ban'        : 'default'
-                      }>
-                        {labelEstadoDJ(dj.estado)}
-                      </Badge>
+                      {(() => {
+                        const est = djsEstado[dj.id] ?? dj.estado ?? 'activo'
+                        return (
+                          <button
+                            onClick={e => { e.stopPropagation(); toggleEstado(dj) }}
+                            disabled={estadosSaving[dj.id]}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-colors disabled:opacity-50 cursor-pointer ${ESTADO_ESTILO[est] ?? ESTADO_ESTILO.inactivo}`}
+                          >
+                            {labelEstadoDJ(est)}
+                          </button>
+                        )
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <EstrelasInteresse valor={interesseMap[dj.id]} />
