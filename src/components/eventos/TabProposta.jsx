@@ -56,20 +56,42 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
     setNotasProposta(notasPropostaInicial || '')
     setClienteEditado(espaco?.nome || '')
 
+    const calcApoioTotais = (ev) => {
+      const techTotal = (Number(ev?.valor_apoio_tecnico) || 0)
+        + (Number(ev?.valor_apoio_tecnico_2) || 0)
+        + (ev?.tecnicos_externos || []).reduce((s, t) => s + (Number(t.valor) || 0), 0)
+      const transporteVal = Number(ev?.transporte) || 0
+      const alimentacaoVal = Number(ev?.valor_alimentacao) || 0
+      return { techTotal, transporteVal, alimentacaoVal }
+    }
+
     if (linhasIniciais && linhasIniciais.length > 0) {
       hasInit.current = true
-      setLinhas(linhasIniciais.map(l =>
-        l.tipo === 'separador' ? { _separador: true, label: l.label || '' } : l
-      ))
+      const { techTotal, transporteVal, alimentacaoVal } = calcApoioTotais(evento)
+      let base = linhasIniciais.map(l =>
+        l.tipo === 'separador' ? { _separador: true, label: l.label || '' } : { ...l }
+      )
+      // Sincronizar valores de apoio T nas linhas gravadas
+      const syncApoio = (key, descPadrao, val) => {
+        const idx = base.findIndex(l => l._apoioKey === key || l.descricao === descPadrao)
+        if (idx >= 0) {
+          if (val > 0) base[idx] = { ...base[idx], _apoioKey: key, preco: String(val) }
+          else base.splice(idx, 1)
+        } else if (val > 0) {
+          base.push({ _apoioKey: key, descricao: descPadrao, observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(val) })
+        }
+      }
+      syncApoio('tec', 'Instalação e Apoio Técnico', techTotal)
+      syncApoio('transporte', 'Transporte', transporteVal)
+      syncApoio('alimentacao', 'Alimentação', alimentacaoVal)
+      setLinhas(base)
     } else {
       hasInit.current = false
-      const techTotal = (Number(evento?.valor_apoio_tecnico) || 0) + (Number(evento?.valor_apoio_tecnico_2) || 0)
-      const transporteVal = Number(evento?.transporte) || 0
+      const { techTotal, transporteVal, alimentacaoVal } = calcApoioTotais(evento)
       const extras = []
-      const alimentacaoVal = Number(evento?.valor_alimentacao) || 0
-      if (techTotal > 0) extras.push({ descricao: 'Instalação e Apoio Técnico', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(techTotal) })
-      if (transporteVal > 0) extras.push({ descricao: 'Transporte', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(transporteVal) })
-      if (alimentacaoVal > 0) extras.push({ descricao: 'Alimentação', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(alimentacaoVal) })
+      if (techTotal > 0) extras.push({ _apoioKey: 'tec', descricao: 'Instalação e Apoio Técnico', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(techTotal) })
+      if (transporteVal > 0) extras.push({ _apoioKey: 'transporte', descricao: 'Transporte', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(transporteVal) })
+      if (alimentacaoVal > 0) extras.push({ _apoioKey: 'alimentacao', descricao: 'Alimentação', observacoes: '', qtd: 1, unidade: 'Serv.', preco: String(alimentacaoVal) })
       setLinhas(extras.length > 0 ? extras : [linhaVazia()])
     }
   }, [evento?.id])
