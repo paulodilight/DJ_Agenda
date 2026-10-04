@@ -185,12 +185,14 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
           unidade: 'Uni.',
           preco: r.valor_custo !== '' && r.valor_custo != null ? String(r.valor_custo) : '',
         }))
-      if (newLines.length === 0) return updated
-      const lastEquipIdx = updated.reduce((last, l, i) => l._equipKey ? i : last, -1)
+      const activeKeys = new Set(proprios.map(r => r._key))
+      const filtered = updated.filter(l => !l._equipKey || activeKeys.has(l._equipKey))
+      if (newLines.length === 0) return filtered
+      const lastEquipIdx = filtered.reduce((last, l, i) => l._equipKey ? i : last, -1)
       return [
-        ...updated.slice(0, lastEquipIdx + 1),
+        ...filtered.slice(0, lastEquipIdx + 1),
         ...newLines,
-        ...updated.slice(lastEquipIdx + 1),
+        ...filtered.slice(lastEquipIdx + 1),
       ]
     })
   }, [equipSyncKey])
