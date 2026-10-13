@@ -4,7 +4,7 @@ import { pt } from 'date-fns/locale'
 import { X, Search, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Plus, Wrench, CalendarRange, Clock, ArrowLeftRight, ListChecks, QrCode } from 'lucide-react'
 import { QrScannerModal } from '@/components/equipamentos/QrScannerModal'
 import { useMesStore } from '@/store'
-import { supabase } from '@/lib/supabase'
+import { supabase, supaEventos } from '@/lib/supabase'
 import { supaEventosApi } from '@/lib/supaEventosApi'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -1091,6 +1091,23 @@ export function ApoioTecnico() {
     return Array.from({ length: 7 }, (_, i) => isoData(addDays(lun, i)))
   }, [semanaRef])
 
+  // Tarefas da semana visível (iVO — com timeout de segurança)
+  const [tarefasSemana, setTarefasSemana] = useState([])
+  useEffect(() => {
+    if (vista !== 'semana') return
+    const inicio = semana7[0]
+    const fim    = semana7[6]
+    const timeout = new Promise(r => setTimeout(() => r([]), 8000))
+    const query = supaEventos
+      .from('supa_tarefas')
+      .select('id, tarefa, responsavel, estado, hora, data_conclusao')
+      .gte('data_conclusao', inicio)
+      .lte('data_conclusao', fim)
+      .not('estado', 'in', '("concluída","fechada","cancelada")')
+      .then(({ data }) => data ?? [])
+    Promise.race([query, timeout]).then(setTarefasSemana).catch(() => setTarefasSemana([]))
+  }, [semana7, vista])
+
   // LMD por dia: data → tecIds (explícitos via agendamento ou evento)
   const lmdPorDia = useMemo(() => {
     const m = {}
@@ -1489,21 +1506,6 @@ export function ApoioTecnico() {
                 >
                   {t.tipo === 'fixo' ? 'FIXO' : 'FREE'}
                 </button>
-                {(st.datas > 0 || st.folgas > 0 || st.valor > 0) && (
-                  <span className="flex items-center gap-0.5 text-[11px] opacity-80 font-normal shrink-0">
-                    {[
-                      st.datas  > 0 && ['D', st.datas],
-                      st.folgas > 0 && ['F', st.folgas],
-                      st.valor  > 0 && ['V', Math.round(st.valor)],
-                    ].filter(Boolean).map(([letra, val], i, arr) => (
-                      <span key={i} className="flex items-center gap-0.5">
-                        <span className="opacity-70">{letra}</span>
-                        <span>{val}</span>
-                        {i < arr.length - 1 && <span className="opacity-30 mx-0.5">|</span>}
-                      </span>
-                    ))}
-                  </span>
-                )}
               </div>
             )
           })}
@@ -1607,69 +1609,95 @@ export function ApoioTecnico() {
                     {/* Slots */}
                     <div className="flex-1 overflow-y-auto px-1.5 py-1 flex flex-col gap-1 min-h-0">
 
-                      {/* Eventos normais */}
-                      {linhasEv.map(linha => {
-                        const dropKey = linha.ev?.id ? `ev:${linha.ev.id}` : `${linha.dataStr}|${linha.espaco_id}`
-                        const isDst   = dragOver === dropKey && dragSource && dragSource.dropKey !== dropKey
-                        return (
-                          <div key={linha.ev?.id ?? linha.espaco_id}
-                            onDragOver={e => handleDragOver(e, dropKey)}
-                            onDragLeave={handleDragLeave}
-                            onDrop={e => handleDrop(e, linha)}
-                            onClick={() => setModalEditEvento(linha.ev)}
-                            className={clsx(
-                              'px-1.5 py-1 rounded-lg border cursor-pointer transition-colors',
-                              isDst ? 'bg-accent/10 border-accent/40' : 'bg-surface-2 border-border/50 hover:bg-surface-3'
-                            )}
-                          >
-                            <p className="text-[11px] font-semibold text-white/90 truncate leading-tight uppercase tracking-wide">{linha.espacoNome}</p>
-                            {linha.ev?.evento && <p className="text-[11px] text-blue-300/90 truncate leading-tight">{linha.ev.evento}</p>}
-                            {(linha.ev?.hora_instalacao || linha.ev?.hora_inicio) && (
-                              <div className="flex items-center gap-1.5 text-[12px] text-white/55 tabular-nums leading-tight flex-wrap">
-                                {linha.ev?.hora_instalacao && (
-                                  <span className="flex items-center gap-0.5">
-                                    <Wrench size={9} className="shrink-0 opacity-70" />
-                                    <span className="text-white/35 text-[10px] mr-0.5">Dia {parseInt(dataStr.slice(8, 10))}</span>
-                                    {hhmm(linha.ev.hora_instalacao)}
-                                  </span>
-                                )}
-                                {linha.ev?.hora_inicio && (
-                                  <span className="flex items-center gap-0.5">
-                                    <Clock size={9} className="shrink-0 opacity-70" />{hhmm(linha.ev.hora_inicio)}
-                                  </span>
-                                )}
+                      {/* Tarefas + Eventos intercalados por hora */}
+                      {(() => {
+                        const tarefasDia = tarefasSemana
+                          .filter(t => t.data_conclusao === dataStr)
+                          .filter(t => !filtroTecnico || t.responsavel === filtroTecnico)
+                        // Merge e ordenar por hora
+                        const itens = [
+                          ...linhasEv.map(l => ({ tipo: 'evento', hora: l.ev?.hora_instalacao ?? l.ev?.hora_inicio ?? '99:00', dado: l })),
+                          ...tarefasDia.map(t => ({ tipo: 'tarefa', hora: t.hora ?? '23:59', dado: t })),
+                        ].sort((a, b) => a.hora.localeCompare(b.hora))
+                        return itens.map((item, i) => {
+                          if (item.tipo === 'tarefa') {
+                            const t = item.dado
+                            const corEstado = t.estado === 'em curso' ? 'border-amber-500/30 bg-amber-500/[0.06] text-amber-300'
+                              : t.estado === 'a validar' ? 'border-purple-500/30 bg-purple-500/[0.06] text-purple-300'
+                              : 'border-border/50 bg-surface-2 text-accent-muted'
+                            return (
+                              <div key={`t-${t.id}`} className={clsx('px-1.5 py-0.5 rounded border flex items-center gap-1', corEstado)}>
+                                <span className="text-[9px] font-bold opacity-50 shrink-0 tabular-nums">{t.hora ? t.hora.slice(0,5) : ''}</span>
+                                <span className="text-[10px] font-semibold truncate flex-1">{t.tarefa}</span>
+                                {t.responsavel && <span className="text-[9px] opacity-60 shrink-0">{t.responsavel.split(' ')[0]}</span>}
                               </div>
-                            )}
-                            <div className="flex flex-wrap gap-1 mt-0.5 justify-end items-center">
-                              {linha.ev?.id && (
-                                <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); window.open(`/apoiot/checklist/${linha.ev.id}`, '_blank') }}
-                                  className="text-white/25 hover:text-white/70 transition-colors">
-                                  <ListChecks size={11} />
-                                </button>
+                            )
+                          }
+                          // tipo === 'evento'
+                          const linha = item.dado
+                          const dropKey = linha.ev?.id ? `ev:${linha.ev.id}` : `${linha.dataStr}|${linha.espaco_id}`
+                          const isDst   = dragOver === dropKey && dragSource && dragSource.dropKey !== dropKey
+                          return (
+                            <div key={linha.ev?.id ?? linha.espaco_id}
+                              onDragOver={e => handleDragOver(e, dropKey)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={e => handleDrop(e, linha)}
+                              onClick={() => setModalEditEvento(linha.ev)}
+                              className={clsx(
+                                'px-1.5 py-1 rounded-lg border cursor-pointer transition-colors',
+                                isDst ? 'bg-accent/10 border-accent/40' : 'bg-surface-2 border-border/50 hover:bg-surface-3'
                               )}
-                              {(linha.tecIds ?? []).length > 0
-                                ? (linha.tecIds ?? []).map(tid => {
-                                    const tec = tecnicos.find(t => t.id === tid)
-                                    const cor = tecCorMap[tid]
-                                    if (!tec) return null
-                                    return (
-                                      <span key={tid} draggable
-                                        onDragStart={e => { if (e.target.closest('button')) { e.preventDefault(); return } e.stopPropagation(); handleDragStart(e, linha, tid) }}
-                                        onDragEnd={handleDragEnd}
-                                        className={clsx('group/chip inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border select-none cursor-grab active:cursor-grabbing', cor?.chip ?? 'bg-accent/10 text-accent border-accent/20')}
-                                      >
-                                        {tec.nome.split(' ')[0]}
-                                        <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); e.preventDefault(); removerTecSlot(linha, tid) }}
-                                          className="opacity-0 group-hover/chip:opacity-100 text-[14px] leading-none transition-opacity">×</button>
-                                      </span>
-                                    )
-                                  })
-                                : <p className="text-[11px] italic text-accent-subtle/40">sem técnico</p>
-                              }
+                            >
+                              <p className="text-[11px] font-semibold text-white/90 truncate leading-tight uppercase tracking-wide">{linha.espacoNome}</p>
+                              {linha.ev?.evento && <p className="text-[11px] text-blue-300/90 truncate leading-tight">{linha.ev.evento}</p>}
+                              {(linha.ev?.hora_instalacao || linha.ev?.hora_inicio) && (
+                                <div className="flex items-center gap-1.5 text-[12px] text-white/55 tabular-nums leading-tight flex-wrap">
+                                  {linha.ev?.hora_instalacao && (
+                                    <span className="flex items-center gap-0.5">
+                                      <Wrench size={9} className="shrink-0 opacity-70" />
+                                      <span className="text-white/35 text-[10px] mr-0.5">Dia {parseInt(dataStr.slice(8, 10))}</span>
+                                      {hhmm(linha.ev.hora_instalacao)}
+                                    </span>
+                                  )}
+                                  {linha.ev?.hora_inicio && (
+                                    <span className="flex items-center gap-0.5">
+                                      <Clock size={9} className="shrink-0 opacity-70" />{hhmm(linha.ev.hora_inicio)}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              <div className="flex flex-wrap gap-1 mt-0.5 justify-end items-center">
+                                {linha.ev?.id && (
+                                  <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); window.open(`/apoiot/checklist/${linha.ev.id}`, '_blank') }}
+                                    className="text-white/25 hover:text-white/70 transition-colors">
+                                    <ListChecks size={11} />
+                                  </button>
+                                )}
+                                {(linha.tecIds ?? []).length > 0
+                                  ? (linha.tecIds ?? []).map(tid => {
+                                      const tec = tecnicos.find(t => t.id === tid)
+                                      const cor = tecCorMap[tid]
+                                      if (!tec) return null
+                                      return (
+                                        <span key={tid} draggable
+                                          onDragStart={e => { if (e.target.closest('button')) { e.preventDefault(); return } e.stopPropagation(); handleDragStart(e, linha, tid) }}
+                                          onDragEnd={handleDragEnd}
+                                          className={clsx('group/chip inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border select-none cursor-grab active:cursor-grabbing', cor?.chip ?? 'bg-accent/10 text-accent border-accent/20')}
+                                        >
+                                          {tec.nome.split(' ')[0]}
+                                          <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); e.preventDefault(); removerTecSlot(linha, tid) }}
+                                            className="opacity-0 group-hover/chip:opacity-100 text-[14px] leading-none transition-opacity">×</button>
+                                        </span>
+                                      )
+                                    })
+                                  : <p className="text-[11px] italic text-accent-subtle/40">sem técnico</p>
+                                }
+                              </div>
                             </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })
+                      })()}
+
 
                       <button onClick={() => setModalEditEvento({ data_evento: dataStr })}
                         className="w-full text-center text-[11px] text-accent-subtle/40 hover:text-accent-subtle py-0.5 transition-colors">

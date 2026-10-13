@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, MapPin, CalendarDays,
   Settings, LogOut, Mic2, Bell, Music2, Scale, Send,
   ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Star, Headphones, Guitar, Undo2, RefreshCw, Building2, ShieldCheck, ClipboardList,
-  UserCheck, GraduationCap, Mic, Gem, Wallet, Package, Handshake,
+  UserCheck, GraduationCap, Mic, Gem, Wallet, Package, Handshake, Briefcase,
 } from 'lucide-react'
 import { useAuthStore, useMesStore, useAppStore } from '@/store'
 import { configuracoesApi } from '@/lib/api'
@@ -72,10 +72,11 @@ const navAgenda = [
 ]
 
 const navRH = [
-  { para: '/djs',        icone: Users,  label: 'DJs' },
-  { para: '/convidados', icone: Star,   label: 'DJ Convidados' },
-  { para: '/artistas',   icone: Guitar, label: 'Artistas' },
-  { para: '/espacos',    icone: MapPin, label: 'Clientes' },
+  { para: '/djs',        icone: Users,     label: 'DJs' },
+  { para: '/convidados', icone: Star,      label: 'DJ Convidados' },
+  { para: '/artistas',   icone: Guitar,    label: 'Artistas' },
+  { para: '/espacos',    icone: MapPin,    label: 'Clientes' },
+  { para: '/staff',      icone: Briefcase, label: 'Staff' },
 ]
 
 const navClub = [
