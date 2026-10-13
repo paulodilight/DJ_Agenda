@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { useMesStore, useColaboradorStore } from '@/store'
 import { EventoModal } from '@/components/colaborador/EventoModal'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
-import { corTecnico } from '@/utils/tecnicoColor'
+import { corTecnico, corPorChave } from '@/utils/tecnicoColor'
 import { useAssinaturaDia } from '@/hooks/useAssinaturaDia'
 
 const isoData = (d) => format(d, 'yyyy-MM-dd')
@@ -517,6 +517,7 @@ export function ColaboradorAgenda() {
   const nomeMes = cap(format(new Date(dataInicio + 'T00:00:00'), 'MMMM yyyy', { locale: pt }))
 
   const [tecnicos, setTecnicos]   = useState([])
+  const [staffCores, setStaffCores] = useState({}) // nome → cor
   const [eventos, setEventos]     = useState([])
   const [evTecnicos, setEvTecs]   = useState([])
   const [agendamentos, setAgends] = useState([])
@@ -552,15 +553,23 @@ export function ColaboradorAgenda() {
       } else {
         setEvTecs([]); setEventos([]); setMeusIds(new Set())
       }
+      supabase.from('staff').select('nome, cor').eq('ativo', true).then(({ data }) => {
+        if (!activo) return
+        const m = {}
+        ;(data ?? []).forEach(s => { if (s.cor) m[s.nome] = s.cor })
+        setStaffCores(m)
+      })
     }).catch(console.error).finally(() => activo && setLoading(false))
     return () => { activo = false }
   }, [colaborador, dataInicio, dataFimQuery])
 
   const tecCorMap = useMemo(() => {
     const m = {}
-    tecnicos.forEach((t, i) => { m[t.id] = corTecnico(t.nome, i) })
+    tecnicos.forEach((t, i) => {
+      m[t.id] = staffCores[t.nome] ? corPorChave(staffCores[t.nome]) : corTecnico(t.nome, i)
+    })
     return m
-  }, [tecnicos])
+  }, [tecnicos, staffCores])
 
   const evTecIdx = useMemo(() => {
     const m = {}
