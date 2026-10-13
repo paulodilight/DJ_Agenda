@@ -1806,7 +1806,7 @@ export function ApoioTecnico() {
                             else setModalEditEvento({ espaco_id: i4djEspacoId, data_evento: dataStr })
                           }}
                           className={clsx(
-                            'shrink-0 border-t px-1.5 py-0.5 h-[48px] overflow-hidden transition-colors cursor-pointer',
+                            'shrink-0 border-t px-1.5 py-0.5 h-[36px] overflow-hidden transition-colors cursor-pointer',
                             isDropLmd ? 'bg-red-500/20 border-red-500/40' :
                             hasTecs   ? 'bg-red-500/[0.06] border-red-700/20' :
                             'bg-transparent border-border/15'
