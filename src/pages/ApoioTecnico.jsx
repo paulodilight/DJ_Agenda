@@ -1447,10 +1447,10 @@ export function ApoioTecnico() {
         </div>
 
         {/* Linha 2 — apoio + vista + pesquisa */}
-        <div className="px-5 py-2 flex items-center gap-1 flex-wrap">
+        <div className="px-5 py-1 flex items-center gap-1 flex-wrap">
           <span className="text-[10px] font-semibold text-accent-subtle uppercase tracking-widest mr-2">Apoio</span>
           <button onClick={() => setFiltroTecnico('')}
-            className={clsx('px-3 py-1.5 rounded text-xs transition-colors border',
+            className={clsx('px-2.5 py-1 rounded text-xs transition-colors border',
               filtroTecnico === '' ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
             Todos
           </button>
@@ -1481,8 +1481,8 @@ export function ApoioTecnico() {
                 onClick={() => setFiltroTecnico(filtroTecnico === s.nome ? '' : s.nome)}
                 title={`Filtrar: ${s.nome}${tec ? ' · Arrastar para atribuir' : ''}`}
                 className={clsx(
-                  'flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-all border select-none',
-                  tec ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                  'flex items-center gap-2 px-2.5 py-1 rounded text-xs transition-all border select-none cursor-pointer',
+                  tec && 'active:cursor-grabbing',
                   isDraggingThis && 'opacity-40 scale-95',
                   cor?.chip ?? 'bg-surface-2 text-accent-muted border-border',
                   filtroTecnico === s.nome
