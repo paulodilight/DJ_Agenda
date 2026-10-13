@@ -1541,8 +1541,9 @@ export function ApoioTecnico() {
             return (
               <div
                 key={s.id}
-                draggable={!!tec}
-                onDragStart={tec ? e => {
+                draggable
+                onDragStart={e => {
+                  if (!tec) return
                   e.dataTransfer.effectAllowed = 'move'
                   const ghost = document.createElement('span')
                   ghost.textContent = s.nome
@@ -1556,13 +1557,12 @@ export function ApoioTecnico() {
                   e.dataTransfer.setData('tecnicoId', tec.id)
                   e.dataTransfer.setData('eventoId', '')
                   e.dataTransfer.setData('dropKey', '')
-                } : undefined}
-                onDragEnd={tec ? () => { dragSourceRef.current = null; setDragSource(null) } : undefined}
+                }}
+                onDragEnd={() => { dragSourceRef.current = null; setDragSource(null) }}
                 onClick={() => setFiltroTecnico(filtroTecnico === s.nome ? '' : s.nome)}
-                title={`Filtrar: ${s.nome}${tec ? ' · Arrastar para atribuir' : ''}`}
+                title={`Filtrar: ${s.nome} · Arrastar para atribuir`}
                 className={clsx(
-                  'flex items-center gap-2 px-2.5 py-1 rounded text-xs transition-all border select-none cursor-pointer',
-                  tec && 'active:cursor-grabbing',
+                  'flex items-center gap-2 px-2.5 py-1 rounded text-xs transition-all border select-none cursor-grab active:cursor-grabbing',
                   isDraggingThis && 'opacity-40 scale-95',
                   cor?.chip ?? 'bg-surface-2 text-accent-muted border-border',
                   filtroTecnico === s.nome
