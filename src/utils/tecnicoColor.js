@@ -84,6 +84,10 @@ function normalizar(nome) {
     .replace(/[̀-ͯ]/g, '')
 }
 
+export function corPorChave(chave) {
+  return ESTILOS[chave] ?? null
+}
+
 export function corTecnico(nome, indexFallback = 0) {
   const chave = normalizar(nome)
   const cor = MAPA_NOMES[chave] ?? PALETA_FALLBACK[indexFallback % PALETA_FALLBACK.length]

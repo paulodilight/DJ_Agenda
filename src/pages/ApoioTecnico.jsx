@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addDays, parseISO, isSameMonth } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { X, Search, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Plus, Wrench, CalendarRange, Clock, ArrowLeftRight, ListChecks, QrCode } from 'lucide-react'
+import { X, Search, AlignJustify, BarChart3, Pencil, Info, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Plus, Wrench, CalendarRange, Clock, ArrowLeftRight, ListChecks, QrCode, Check } from 'lucide-react'
 import { QrScannerModal } from '@/components/equipamentos/QrScannerModal'
 import { useMesStore } from '@/store'
 import { supabase, supaEventos } from '@/lib/supabase'
@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
 import { clsx } from 'clsx'
-import { corTecnico } from '@/utils/tecnicoColor'
+import { corTecnico, corPorChave } from '@/utils/tecnicoColor'
 import { FormEvento } from '@/components/eventos/FormEvento'
 
 const isoData    = (d) => format(d, 'yyyy-MM-dd')
@@ -801,6 +801,85 @@ function ModalDia({ dataStr, tecnicos, tecCorMap, lmdPorDia, preparacoesPorDia, 
   )
 }
 
+const ESTADOS_TAREFA = ['a fazer', 'em curso', 'a validar', 'concluída', 'fechada', 'cancelada']
+
+function ModalEditTarefa({ tarefa, staffAtivo, onFechar, onGuardado }) {
+  const [form, setForm] = useState({
+    tarefa:         tarefa.tarefa ?? '',
+    estado:         tarefa.estado ?? 'a fazer',
+    responsavel:    tarefa.responsavel ?? '',
+    hora:           tarefa.hora ?? '',
+    data_conclusao: tarefa.data_conclusao ?? '',
+  })
+  const [salvando, setSalvando] = useState(false)
+
+  async function gravar() {
+    setSalvando(true)
+    const { data, error } = await supaEventos
+      .from('supa_tarefas')
+      .update({ tarefa: form.tarefa, estado: form.estado, responsavel: form.responsavel || null, hora: form.hora || null, data_conclusao: form.data_conclusao || null })
+      .eq('id', tarefa.id)
+      .select()
+      .single()
+    setSalvando(false)
+    if (!error && data) onGuardado(data)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && onFechar()}>
+      <div className="bg-surface-1 border border-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <p className="text-sm font-bold text-accent">Editar Tarefa</p>
+          <button onClick={onFechar} className="text-accent-subtle hover:text-accent transition-colors"><X size={16} /></button>
+        </div>
+        <div className="px-5 py-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle">Tarefa</label>
+            <input value={form.tarefa} onChange={e => setForm(f => ({ ...f, tarefa: e.target.value }))}
+              className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm text-accent" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle">Estado</label>
+              <select value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}
+                className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm text-accent">
+                {ESTADOS_TAREFA.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle">Hora</label>
+              <input type="time" value={form.hora} onChange={e => setForm(f => ({ ...f, hora: e.target.value }))}
+                className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm text-accent" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle">Responsável</label>
+              <select value={form.responsavel} onChange={e => setForm(f => ({ ...f, responsavel: e.target.value }))}
+                className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm text-accent">
+                <option value="">—</option>
+                {staffAtivo.map(s => <option key={s.id} value={s.nome}>{s.nome}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-accent-subtle">Data</label>
+              <input type="date" value={form.data_conclusao} onChange={e => setForm(f => ({ ...f, data_conclusao: e.target.value }))}
+                className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm text-accent" />
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-3 border-t border-border flex justify-end gap-2">
+          <Button variante="secundario" onClick={onFechar}>Cancelar</Button>
+          <button onClick={gravar} disabled={salvando || !form.tarefa.trim()}
+            className="flex items-center gap-1.5 rounded-xl border border-status-confirmado/40 bg-status-confirmado/10 px-4 py-2 text-sm font-semibold text-status-confirmado hover:bg-status-confirmado/20 disabled:opacity-40 transition-all">
+            <Check size={14} /> Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ApoioTecnico() {
   const { anoMes, setAnoMes } = useMesStore()
   const [loading, setLoading]           = useState(true)
@@ -872,7 +951,7 @@ export function ApoioTecnico() {
         .not('estado', 'in', '("cancelado","sem_efeito","faltou")'),
     ])
     if (!tRes.error) setTecnicos(tRes.data ?? [])
-    supabase.from('staff').select('id, nome, cargo').eq('ativo', true).order('nome').then(({ data }) => setStaffAtivo(data ?? []))
+    supabase.from('staff').select('id, nome, cargo, cor').eq('ativo', true).order('nome').then(({ data }) => setStaffAtivo(data ?? []))
     if (!eRes.error) setEspacos(eRes.data ?? [])
     if (!agRes.error) setAgendamentos(agRes.data ?? [])
     if (!evRes.error) {
@@ -1095,6 +1174,7 @@ export function ApoioTecnico() {
 
   // Tarefas da semana visível (iVO — com timeout de segurança)
   const [tarefasSemana, setTarefasSemana] = useState([])
+  const [modalTarefa, setModalTarefa]     = useState(null) // tarefa a editar
   useEffect(() => {
     if (vista !== 'semana') return
     const inicio = semana7[0]
@@ -1456,7 +1536,7 @@ export function ApoioTecnico() {
           </button>
           {staffAtivo.map(s => {
             const tec = tecnicos.find(t => t.nome === s.nome)
-            const cor = tec ? tecCorMap[tec.id] : null
+            const cor = s.cor ? corPorChave(s.cor) : (tec ? tecCorMap[tec.id] : null)
             const isDraggingThis = tec && dragSource?.tecnicoId === tec.id && dragSource?.dropKey === null
             return (
               <div
@@ -1611,7 +1691,7 @@ export function ApoioTecnico() {
                               : t.estado === 'a validar' ? 'border-purple-500/30 bg-purple-500/[0.06] text-purple-300'
                               : 'border-border/50 bg-surface-2 text-accent-muted'
                             return (
-                              <div key={`t-${t.id}`} className={clsx('px-1.5 py-0.5 rounded border flex items-center gap-1', corEstado)}>
+                              <div key={`t-${t.id}`} onClick={() => setModalTarefa(t)} className={clsx('px-1.5 py-0.5 rounded border flex items-center gap-1 cursor-pointer hover:brightness-125 transition-all', corEstado)}>
                                 <span className="text-[9px] font-bold opacity-50 shrink-0 tabular-nums">{t.hora ? t.hora.slice(0,5) : ''}</span>
                                 <span className="text-[10px] font-semibold truncate flex-1">{t.tarefa}</span>
                                 {t.responsavel && <span className="text-[9px] opacity-60 shrink-0">{t.responsavel.split(' ')[0]}</span>}
@@ -1997,6 +2077,9 @@ export function ApoioTecnico() {
         onFechar={() => setModalEditEvento(null)}
         onGuardado={() => { setModalEditEvento(null); carregarComScroll() }}
       />
+
+      {/* Modal edição de tarefa iVO */}
+      {modalTarefa && <ModalEditTarefa tarefa={modalTarefa} staffAtivo={staffAtivo} onFechar={() => setModalTarefa(null)} onGuardado={t => { setModalTarefa(null); setTarefasSemana(prev => prev.map(x => x.id === t.id ? t : x)) }} />}
 
       {/* Modal Preparação (read-only) */}
       {modalPrep && (() => {
