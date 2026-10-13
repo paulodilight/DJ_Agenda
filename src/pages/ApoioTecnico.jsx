@@ -805,6 +805,7 @@ export function ApoioTecnico() {
   const { anoMes, setAnoMes } = useMesStore()
   const [loading, setLoading]           = useState(true)
   const [tecnicos, setTecnicos]         = useState([])
+  const [staffAtivo, setStaffAtivo]     = useState([])
   const [agendamentos, setAgendamentos] = useState([])
   const [eventos, setEventos]           = useState([])
   const [evTecnicos, setEvTecnicos]     = useState([])  // evento_tecnicos
@@ -871,6 +872,7 @@ export function ApoioTecnico() {
         .not('estado', 'in', '("cancelado","sem_efeito","faltou")'),
     ])
     if (!tRes.error) setTecnicos(tRes.data ?? [])
+    supabase.from('staff').select('id, nome, cargo').eq('ativo', true).order('nome').then(({ data }) => setStaffAtivo(data ?? []))
     if (!eRes.error) setEspacos(eRes.data ?? [])
     if (!agRes.error) setAgendamentos(agRes.data ?? [])
     if (!evRes.error) {
@@ -1452,60 +1454,43 @@ export function ApoioTecnico() {
               filtroTecnico === '' ? 'bg-surface-3 text-accent border-white/20 font-medium' : 'bg-surface-2 text-accent-muted border-border hover:text-accent')}>
             Todos
           </button>
-          {tecnicos.map(t => {
-            const cor  = tecCorMap[t.id]
-            const st   = tecStats[t.id] ?? { datas: 0, folgas: 0, valor: 0 }
-            const isDraggingThis = dragSource?.tecnicoId === t.id && dragSource?.dropKey === null
+          {staffAtivo.map(s => {
+            const tec = tecnicos.find(t => t.nome === s.nome)
+            const cor = tec ? tecCorMap[tec.id] : null
+            const isDraggingThis = tec && dragSource?.tecnicoId === tec.id && dragSource?.dropKey === null
             return (
               <div
-                key={t.id}
-                draggable
-                onDragStart={e => {
+                key={s.id}
+                draggable={!!tec}
+                onDragStart={tec ? e => {
                   e.dataTransfer.effectAllowed = 'move'
                   const ghost = document.createElement('span')
-                  ghost.textContent = t.nome
-                  ghost.style.cssText = `position:fixed;top:-100px;left:-100px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;background:${cor ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.08)'};color:white;border:1px solid rgba(255,255,255,0.2);`
+                  ghost.textContent = s.nome
+                  ghost.style.cssText = `position:fixed;top:-100px;left:-100px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);`
                   document.body.appendChild(ghost)
                   e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 12)
                   setTimeout(() => document.body.removeChild(ghost), 0)
-                  const paletteSrc = { dropKey: null, tecnicoId: t.id, eventoId: null, agId: null }
+                  const paletteSrc = { dropKey: null, tecnicoId: tec.id, eventoId: null, agId: null }
                   dragSourceRef.current = paletteSrc
                   setDragSource(paletteSrc)
-                  e.dataTransfer.setData('tecnicoId', t.id)
+                  e.dataTransfer.setData('tecnicoId', tec.id)
                   e.dataTransfer.setData('eventoId', '')
                   e.dataTransfer.setData('dropKey', '')
-                }}
-                onDragEnd={() => { dragSourceRef.current = null; setDragSource(null) }}
-                onClick={() => setFiltroTecnico(filtroTecnico === t.nome ? '' : t.nome)}
-                title={`Filtrar: ${t.nome} · Arrastar para atribuir`}
+                } : undefined}
+                onDragEnd={tec ? () => { dragSourceRef.current = null; setDragSource(null) } : undefined}
+                onClick={() => setFiltroTecnico(filtroTecnico === s.nome ? '' : s.nome)}
+                title={`Filtrar: ${s.nome}${tec ? ' · Arrastar para atribuir' : ''}`}
                 className={clsx(
                   'flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-all border select-none',
-                  'cursor-grab active:cursor-grabbing',
+                  tec ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
                   isDraggingThis && 'opacity-40 scale-95',
                   cor?.chip ?? 'bg-surface-2 text-accent-muted border-border',
-                  filtroTecnico === t.nome
+                  filtroTecnico === s.nome
                     ? 'font-medium ring-1 ring-white/20'
                     : 'opacity-50 hover:opacity-90'
                 )}
               >
-                <span className={clsx('font-semibold', cor?.text ?? 'text-accent-muted')}>{t.nome}</span>
-                <button
-                  onClick={async e => {
-                    e.stopPropagation()
-                    const novoTipo = t.tipo === 'fixo' ? 'freelancer' : 'fixo'
-                    await supabase.from('tecnicos').update({ tipo: novoTipo }).eq('id', t.id)
-                    carregar()
-                  }}
-                  title={t.tipo === 'fixo' ? 'Fixo — clique para mudar para Freelancer' : 'Freelancer — clique para mudar para Fixo'}
-                  className={clsx(
-                    'text-[9px] font-bold px-1 py-0.5 rounded border transition-all shrink-0',
-                    t.tipo === 'fixo'
-                      ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
-                      : 'bg-surface-3 text-accent-subtle/50 border-border/50 hover:text-accent-subtle'
-                  )}
-                >
-                  {t.tipo === 'fixo' ? 'FIXO' : 'FREE'}
-                </button>
+                <span className={clsx('font-semibold', cor?.text ?? 'text-accent-muted')}>{s.nome}</span>
               </div>
             )
           })}
