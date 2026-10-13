@@ -1183,8 +1183,7 @@ export function ApoioTecnico() {
     const query = supaEventos
       .from('supa_tarefas')
       .select('id, tarefa, responsavel, estado, hora, data_conclusao')
-      .gte('data_conclusao', inicio)
-      .lte('data_conclusao', fim)
+      .or(`and(data_conclusao.gte.${inicio},data_conclusao.lte.${fim}),data_conclusao.is.null`)
       .not('estado', 'in', '("concluída","fechada","cancelada")')
       .then(({ data }) => data ?? [])
     Promise.race([query, timeout]).then(setTarefasSemana).catch(() => setTarefasSemana([]))
@@ -1536,7 +1535,7 @@ export function ApoioTecnico() {
           </button>
           {staffAtivo.map(s => {
             const tec = tecnicos.find(t => t.nome === s.nome)
-            const cor = s.cor ? corPorChave(s.cor) : (tec ? tecCorMap[tec.id] : null)
+            const cor = s.cor ? corPorChave(s.cor) : null
             const isDraggingThis = tec && dragSource?.tecnicoId === tec.id && dragSource?.dropKey === null
             return (
               <div
@@ -1676,8 +1675,9 @@ export function ApoioTecnico() {
 
                       {/* Tarefas + Eventos intercalados por hora */}
                       {(() => {
+                        const diaParaNulas = semana7.includes(hojeStr) ? hojeStr : semana7[0]
                         const tarefasDia = tarefasSemana
-                          .filter(t => t.data_conclusao === dataStr)
+                          .filter(t => t.data_conclusao ? t.data_conclusao === dataStr : dataStr === diaParaNulas)
                           .filter(t => !filtroTecnico || t.responsavel === filtroTecnico)
                         // Merge e ordenar por hora
                         const itens = [
