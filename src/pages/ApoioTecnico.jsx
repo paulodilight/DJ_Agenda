@@ -1687,9 +1687,9 @@ export function ApoioTecnico() {
                         return itens.map((item, i) => {
                           if (item.tipo === 'tarefa') {
                             const t = item.dado
-                            const corEstado = t.estado === 'em curso' ? 'border-amber-500/30 bg-amber-500/[0.06] text-amber-300'
-                              : t.estado === 'a validar' ? 'border-purple-500/30 bg-purple-500/[0.06] text-purple-300'
-                              : 'border-border/50 bg-surface-2 text-accent-muted'
+                            const corResp = staffAtivo.find(s => s.nome === t.responsavel)?.cor
+                            const corChipStyles = corResp ? corPorChave(corResp) : null
+                            const corEstado = corChipStyles?.chip ?? 'border-border/50 bg-surface-2 text-accent-muted'
                             return (
                               <div key={`t-${t.id}`} onClick={() => setModalTarefa(t)} className={clsx('px-1.5 py-0.5 rounded border flex items-center gap-1 cursor-pointer hover:brightness-125 transition-all', corEstado)}>
                                 <span className="text-[9px] font-bold opacity-50 shrink-0 tabular-nums">{t.hora ? t.hora.slice(0,5) : ''}</span>

@@ -7,7 +7,7 @@ import {
 import { pt } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, List, Star, Wrench, X, PenLine, Package } from 'lucide-react'
 import { clsx } from 'clsx'
-import { supabase } from '@/lib/supabase'
+import { supabase, supaEventos } from '@/lib/supabase'
 import { useMesStore, useColaboradorStore } from '@/store'
 import { EventoModal } from '@/components/colaborador/EventoModal'
 import { LoadingPage } from '@/components/ui/LoadingSpinner'
@@ -307,7 +307,24 @@ function PillFolgaCard({ folgaIds, tecnicos, tecCorMap, compact = false }) {
   )
 }
 
-function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, folgasIdx, lmdAgendIdx, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick, onPrepClick }) {
+// ── Pill de tarefa ────────────────────────────────────────────────────────────
+function PillTarefa({ tarefa, staffCores }) {
+  const cor = tarefa.responsavel ? corPorChave(staffCores[tarefa.responsavel]) : null
+  return (
+    <div className={clsx(
+      'w-full text-left rounded border px-2 py-1 flex items-start gap-1.5',
+      cor?.chip ?? 'border-border/50 bg-surface-2 text-accent-muted',
+    )}>
+      <span className="text-[10px] mt-0.5 shrink-0">✓</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold truncate">{tarefa.tarefa}</p>
+        {tarefa.hora && <p className="text-[10px] opacity-60">{tarefa.hora.slice(0, 5)}</p>}
+      </div>
+    </div>
+  )
+}
+
+function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, eventosPorDia, lmdPorDia, folgasIdx, lmdAgendIdx, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, tarefasSemana, staffCores, onEventoClick, onLmdClick, onPrepClick }) {
 
   if (!paisagem) {
     // Portrait: strip de 7 dias + detalhe do dia selecionado
@@ -372,6 +389,9 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
                 )
               })
           }
+          {(tarefasSemana ?? [])
+            .filter(t => t.data_conclusao ? t.data_conclusao === diaSeleccionado : diaSeleccionado === (semana7.includes(hojeStr) ? hojeStr : semana7[0]))
+            .map(t => <PillTarefa key={`t-${t.id}`} tarefa={t} staffCores={staffCores ?? {}} />)}
           <PillLmdCard lmdIds={lmdPorDia[diaSeleccionado]} lmdAgendDia={lmdAgendIdx?.[diaSeleccionado]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
           <PillFolgaCard folgaIds={folgasIdx?.[diaSeleccionado]} tecnicos={tecnicos} tecCorMap={tecCorMap} />
         </div>
@@ -429,6 +449,9 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
                     onClick={() => onEventoClick(ev)} />
                 )
               })}
+              {(tarefasSemana ?? [])
+                .filter(t => t.data_conclusao ? t.data_conclusao === dataStr : dataStr === (semana7.includes(hojeStr) ? hojeStr : semana7[0]))
+                .map(t => <PillTarefa key={`t-${t.id}`} tarefa={t} staffCores={staffCores ?? {}} />)}
             </div>
             <PillLmdCard lmdIds={lmdPorDia[dataStr]} lmdAgendDia={lmdAgendIdx?.[dataStr]} tecnicos={tecnicos} tecCorMap={tecCorMap} compact />
             <PillFolgaCard folgaIds={folgasIdx?.[dataStr]} tecnicos={tecnicos} tecCorMap={tecCorMap} compact />
@@ -440,11 +463,14 @@ function VistaSemana({ semana7, paisagem, diaSeleccionado, setDiaSeleccionado, e
 }
 
 // ── Vista Dia ─────────────────────────────────────────────────────────────────
-function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, onEventoClick, onLmdClick, onPrepClick }) {
+function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, preparacoesPorDia, meusIds, espacosIdx, tecnicos, tecCorMap, evTecIdx, colaborador, tarefasSemana, staffCores, onEventoClick, onLmdClick, onPrepClick }) {
   const evsDia    = eventosPorDia[diaSeleccionado] ?? []
   const prepsDia  = preparacoesPorDia[diaSeleccionado] ?? []
   const temMeuLmd = (lmdPorDia[diaSeleccionado] ?? []).includes(colaborador?.id)
   const nomeDia   = cap(format(parseISO(diaSeleccionado), 'EEEE, d MMMM', { locale: pt }))
+  const tarefasDia = (tarefasSemana ?? []).filter(t =>
+    t.data_conclusao ? t.data_conclusao === diaSeleccionado : diaSeleccionado === hojeStr
+  )
   return (
     <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
       <p className="text-[12px] font-bold uppercase tracking-widest text-accent-subtle capitalize mb-1">{nomeDia}</p>
@@ -454,7 +480,8 @@ function VistaDia({ diaSeleccionado, eventosPorDia, lmdPorDia, preparacoesPorDia
           tecNome={tecnicos.find(t => t.id === ev.tecnico_id)?.nome}
           onClick={() => onPrepClick?.(ev)} />
       ))}
-      {evsDia.length === 0 && !temMeuLmd && prepsDia.length === 0
+      {tarefasDia.map(t => <PillTarefa key={`t-${t.id}`} tarefa={t} staffCores={staffCores ?? {}} />)}
+      {evsDia.length === 0 && !temMeuLmd && prepsDia.length === 0 && tarefasDia.length === 0
         ? <p className="text-center text-accent-subtle/40 text-[15px] py-8">Sem eventos neste dia.</p>
         : evsDia.map(ev => {
             const meu    = meusIds.has(ev.id)
@@ -523,6 +550,7 @@ export function ColaboradorAgenda() {
   const [agendamentos, setAgends] = useState([])
   const [espacos, setEspacos]     = useState([])
   const [meusIds, setMeusIds]     = useState(new Set())
+  const [tarefasSemana, setTarefasSemana] = useState([])
 
   useEffect(() => {
     if (!colaborador) return
@@ -562,6 +590,18 @@ export function ColaboradorAgenda() {
     }).catch(console.error).finally(() => activo && setLoading(false))
     return () => { activo = false }
   }, [colaborador, dataInicio, dataFimQuery])
+
+  useEffect(() => {
+    if (!colaborador) return
+    const primeiro = colaborador.nome?.trim().split(/\s+/)[0]
+    if (!primeiro) return
+    let activo = true
+    supaEventos.rpc('tarefas_do_colaborador', { p_nome: primeiro }).then(({ data }) => {
+      if (!activo) return
+      setTarefasSemana(data ?? [])
+    }).catch(() => {})
+    return () => { activo = false }
+  }, [colaborador])
 
   const tecCorMap = useMemo(() => {
     const m = {}
@@ -753,7 +793,7 @@ export function ColaboradorAgenda() {
           preparacoesPorDia={preparacoesPorDia}
           meusIds={meusIds} espacosIdx={espacosIdx}
           tecnicos={tecnicos} tecCorMap={tecCorMap} evTecIdx={evTecIdx}
-          colaborador={colaborador}
+          colaborador={colaborador} tarefasSemana={tarefasSemana} staffCores={staffCores}
           onEventoClick={abrirEvento} onLmdClick={setLmdAberto} onPrepClick={setPrepAberta} />
       )}
       {vista === 'dia' && (
@@ -761,7 +801,7 @@ export function ColaboradorAgenda() {
           eventosPorDia={eventosPorDia} lmdPorDia={lmdPorDia} preparacoesPorDia={preparacoesPorDia}
           meusIds={meusIds} espacosIdx={espacosIdx}
           tecnicos={tecnicos} tecCorMap={tecCorMap} evTecIdx={evTecIdx}
-          colaborador={colaborador}
+          colaborador={colaborador} tarefasSemana={tarefasSemana} staffCores={staffCores}
           onEventoClick={abrirEvento} onLmdClick={setLmdAberto} onPrepClick={setPrepAberta} />
       )}
 
