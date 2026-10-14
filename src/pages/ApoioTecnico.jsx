@@ -1113,12 +1113,16 @@ export function ApoioTecnico() {
     return idx
   }, [slots])
 
-  // Mapa tecnico_id → estilos de cor
+  // Mapa tecnico_id → estilos de cor (usa staff.cor quando disponível)
   const tecCorMap = useMemo(() => {
+    const staffCoresMap = {}
+    staffAtivo.forEach(s => { if (s.cor) staffCoresMap[s.nome] = s.cor })
     const m = {}
-    tecnicos.forEach((t, i) => { m[t.id] = corTecnico(t.nome, i) })
+    tecnicos.forEach((t, i) => {
+      m[t.id] = staffCoresMap[t.nome] ? corPorChave(staffCoresMap[t.nome]) : corTecnico(t.nome, i)
+    })
     return m
-  }, [tecnicos])
+  }, [tecnicos, staffAtivo])
 
   // Só espaços com actividade no mês + LMD sempre presente
   const espacosActivos = useMemo(() => {
