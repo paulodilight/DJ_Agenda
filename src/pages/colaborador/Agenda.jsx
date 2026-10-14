@@ -563,13 +563,17 @@ export function ColaboradorAgenda() {
         .select('id, espaco_id, evento, data_evento, hora_inicio, hora_fim, hora_instalacao, dia_instalacao, status, tecnico_id, todos_tecnicos, notas_operacionais, Equipamentos, notas_colaborador, contacto_pelo_evento, morada, tipo, rider_url, fotos_urls, data_preparacao, notas_preparacao')
         .gte('data_evento', dataInicio).lte('data_evento', dataFimQuery).neq('status', 'cancelado'),
       supabase.from('agendamentos_tecnicos').select('*').gte('data', dataInicio).lte('data', dataFimQuery),
-    ]).then(async ([tRes, eRes, evRes, agRes]) => {
+      supabase.from('staff').select('nome, cor').eq('ativo', true),
+    ]).then(async ([tRes, eRes, evRes, agRes, stRes]) => {
       if (!activo) return
       const tecs = tRes.data ?? []
       const evs  = evRes.data ?? []
       setTecnicos(tecs)
       setEspacos(eRes.data ?? [])
       setAgends(agRes.data ?? [])
+      const coresMap = {}
+      ;(stRes.data ?? []).forEach(s => { if (s.cor) coresMap[s.nome] = s.cor })
+      setStaffCores(coresMap)
       if (evs.length > 0) {
         const { data: etData } = await supabase
           .from('evento_tecnicos').select('evento_id, tecnico_id').in('evento_id', evs.map(e => e.id))
@@ -581,12 +585,6 @@ export function ColaboradorAgenda() {
       } else {
         setEvTecs([]); setEventos([]); setMeusIds(new Set())
       }
-      supabase.from('staff').select('nome, cor').eq('ativo', true).then(({ data }) => {
-        if (!activo) return
-        const m = {}
-        ;(data ?? []).forEach(s => { if (s.cor) m[s.nome] = s.cor })
-        setStaffCores(m)
-      })
     }).catch(console.error).finally(() => activo && setLoading(false))
     return () => { activo = false }
   }, [colaborador, dataInicio, dataFimQuery])
