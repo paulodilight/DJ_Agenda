@@ -150,7 +150,11 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
           return match ? { ...l, _artistaKey: match._artistaKey, preco: match.preco } : l
         })
         const taggedKeys = new Set(tagged.filter(l => l._artistaKey).map(l => l._artistaKey))
-        const missing = artLines.filter(l => !taggedKeys.has(l._artistaKey))
+        const prevDescs = new Set(prev.map(l => (l.descricao || '').toLowerCase().trim()))
+        const missing = artLines.filter(l =>
+          !taggedKeys.has(l._artistaKey) &&
+          !prevDescs.has((l.descricao || '').toLowerCase().trim())
+        )
         return missing.length > 0 ? [...tagged, ...missing] : tagged
       }
 
