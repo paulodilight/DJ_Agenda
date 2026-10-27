@@ -126,7 +126,7 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       const existingArtKeys = new Set(prev.filter(l => l._artistaKey).map(l => l._artistaKey))
 
       if (existingArtKeys.size > 0) {
-        // Artistas já posicionados — actualizar só descricao/preco, preservar observacoes do utilizador
+        // Artistas já posicionados com _artistaKey — actualizar só descricao/preco, preservar posição
         const artMap = Object.fromEntries(artLines.map(l => [l._artistaKey, l]))
         return prev.map(l => {
           if (!l._artistaKey) return l
@@ -135,10 +135,28 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
         })
       }
 
-      // Nenhum artista guardado ainda — colocar no topo
+      if (artLines.length === 0) {
+        const withoutArtista = prev.filter(l => !l._artistaKey)
+        return withoutArtista.length > 0 ? withoutArtista : [linhaVazia()]
+      }
+
+      if (hasInit.current) {
+        // Linhas gravadas carregadas mas sem _artistaKey (dados antigos) — associar por descrição
+        // preservando a posição já gravada, sem reordenar
+        const artByDesc = Object.fromEntries(artLines.map(l => [(l.descricao || '').toLowerCase(), l]))
+        const tagged = prev.map(l => {
+          if (l._artistaKey) return l
+          const match = artByDesc[(l.descricao || '').toLowerCase()]
+          return match ? { ...l, _artistaKey: match._artistaKey, preco: match.preco } : l
+        })
+        const taggedKeys = new Set(tagged.filter(l => l._artistaKey).map(l => l._artistaKey))
+        const missing = artLines.filter(l => !taggedKeys.has(l._artistaKey))
+        return missing.length > 0 ? [...tagged, ...missing] : tagged
+      }
+
+      // Proposta nova sem linhas gravadas — colocar artistas no topo
       const withoutArtista = prev.filter(l => !l._artistaKey)
-      if (artLines.length === 0) return withoutArtista.length > 0 ? withoutArtista : [linhaVazia()]
-      return [...artLines, ...withoutArtista]
+      return [...artLines, ...(withoutArtista.length > 0 ? withoutArtista : [linhaVazia()])]
     })
   }, [artistaSyncKey])
 
