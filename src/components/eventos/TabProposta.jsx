@@ -141,21 +141,16 @@ export function TabProposta({ evento, espacos = [], equipRows = {}, equipamentos
       }
 
       if (hasInit.current) {
-        // Linhas gravadas carregadas mas sem _artistaKey (dados antigos) — associar por descrição
-        // preservando a posição já gravada, sem reordenar
-        const artByDesc = Object.fromEntries(artLines.map(l => [(l.descricao || '').toLowerCase(), l]))
+        // Linhas gravadas — associar por descrição normalizada, preservar posição
+        // Nunca auto-adicionar artistas não encontrados: proposta gravada é gerida pelo utilizador
+        const norm = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim()
+        const artByDesc = Object.fromEntries(artLines.map(l => [norm(l.descricao), l]))
         const tagged = prev.map(l => {
           if (l._artistaKey) return l
-          const match = artByDesc[(l.descricao || '').toLowerCase()]
+          const match = artByDesc[norm(l.descricao)]
           return match ? { ...l, _artistaKey: match._artistaKey, preco: match.preco } : l
         })
-        const taggedKeys = new Set(tagged.filter(l => l._artistaKey).map(l => l._artistaKey))
-        const prevDescs = new Set(prev.map(l => (l.descricao || '').toLowerCase().trim()))
-        const missing = artLines.filter(l =>
-          !taggedKeys.has(l._artistaKey) &&
-          !prevDescs.has((l.descricao || '').toLowerCase().trim())
-        )
-        return missing.length > 0 ? [...tagged, ...missing] : tagged
+        return tagged
       }
 
       // Proposta nova sem linhas gravadas — colocar artistas no topo
