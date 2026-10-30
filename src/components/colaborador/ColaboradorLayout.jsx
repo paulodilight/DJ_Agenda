@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useColaboradorStore } from '@/store'
 import { Avatar } from './Avatar'
 import { ModalAlterarPin } from './ModalAlterarPin'
+import { BotaoNotificacoes } from './BotaoNotificacoes'
 import { registarSW, limparBadge, estadoPush, ativarPush } from '@/lib/push'
 
 // Mostra o header (logo) e a navegação. Só os esconde em telemóvel DEITADO
@@ -133,6 +134,7 @@ export function ColaboradorLayout() {
               {lightMode ? <Moon size={13} /> : <Sun size={13} />}
               <span>{lightMode ? 'Noite' : 'Dia'}</span>
             </button>
+            <BotaoNotificacoes />
             <button onClick={() => setModalPin(true)} title="Alterar PIN"
               className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent-subtle hover:text-amber-400 hover:border-amber-400/40 transition-colors">
               <KeyRound size={13} />
