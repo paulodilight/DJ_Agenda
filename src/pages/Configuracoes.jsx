@@ -206,8 +206,11 @@ export function Configuracoes() {
   const guardarNovoLembrete = async () => {
     if (!novoLembrete.texto_titulo.trim()) return
     setAdicionando(true)
-    const { data } = await supabase.from('notif_regras').insert(novoLembrete).select().single()
-    if (data) {
+    const { data, error } = await supabase.from('notif_regras').insert(novoLembrete).select().single()
+    if (error) {
+      console.error('notif_regras insert:', error)
+      alert(`Erro ao guardar: ${error.message}`)
+    } else if (data) {
       setLembretes(prev => [...prev, data])
       setNovoLembrete({ tipo: 'evento', offset_minutos: 60, texto_titulo: '', texto_corpo: '' })
     }
