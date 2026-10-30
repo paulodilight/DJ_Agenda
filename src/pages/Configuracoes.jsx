@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Settings, AlertTriangle, Ban, ScrollText, Car, Tag, Percent, Clock, Receipt, Bell } from 'lucide-react'
+import { Settings, AlertTriangle, Ban, ScrollText, Car, Tag, Percent, Clock, Receipt, Bell, Plus, Trash2 } from 'lucide-react'
 import { configuracoesApi, regrasAtuacaoApi } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
@@ -181,6 +181,46 @@ export function Configuracoes() {
   const [ativarValorQualidade, setAtivarValorQualidade] = useState(true)
   const [novidadeGeral, setNovidadeGeral] = useState({ id: null, titulo: '', texto: '', imagem_url: '', ativo: false })
   const [novidadeGeralSaving, setNovidadeGeralSaving] = useState(false)
+
+  // Lembretes Push
+  const [lembretes, setLembretes] = useState([])
+  const [lembretesLoading, setLembretesLoading] = useState(true)
+  const [novoLembrete, setNovoLembrete] = useState({ tipo: 'evento', offset_minutos: 60, texto_titulo: '', texto_corpo: '' })
+  const [adicionando, setAdicionando] = useState(false)
+
+  useEffect(() => {
+    supabase.from('notif_regras').select('*').order('tipo').order('offset_minutos', { ascending: false })
+      .then(({ data }) => { setLembretes(data ?? []); setLembretesLoading(false) })
+  }, [])
+
+  const toggleLembrete = async (id, ativo) => {
+    await supabase.from('notif_regras').update({ ativo }).eq('id', id)
+    setLembretes(prev => prev.map(l => l.id === id ? { ...l, ativo } : l))
+  }
+
+  const eliminarLembrete = async (id) => {
+    await supabase.from('notif_regras').delete().eq('id', id)
+    setLembretes(prev => prev.filter(l => l.id !== id))
+  }
+
+  const guardarNovoLembrete = async () => {
+    if (!novoLembrete.texto_titulo.trim()) return
+    setAdicionando(true)
+    const { data } = await supabase.from('notif_regras').insert(novoLembrete).select().single()
+    if (data) {
+      setLembretes(prev => [...prev, data])
+      setNovoLembrete({ tipo: 'evento', offset_minutos: 60, texto_titulo: '', texto_corpo: '' })
+    }
+    setAdicionando(false)
+  }
+
+  const offsetLabel = (min) => {
+    if (min < 0) return `${Math.abs(min)} min depois`
+    if (min < 60) return `${min} min antes`
+    if (min === 60) return '1h antes'
+    if (min < 1440) return `${Math.round(min / 60)}h antes`
+    return `${Math.round(min / 1440)} dia(s) antes`
+  }
 
   useEffect(() => {
     supabase.from('novidades').select('*').eq('tipo', 'geral').maybeSingle()
@@ -782,7 +822,7 @@ export function Configuracoes() {
       </Card>
 
       {/* ── Notificações ── */}
-      <Card className="mb-6">
+      <Card className="mb-4">
         <CardHeader>
           <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Notificações</p>
         </CardHeader>
@@ -793,6 +833,131 @@ export function Configuracoes() {
             label="Notificações WhatsApp activas"
             descricao="Envia confirmações e lembretes de atuação via WhatsApp através do n8n."
           />
+        </CardBody>
+      </Card>
+
+      {/* ── Lembretes Push ── */}
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Bell size={13} className="text-accent-muted" />
+            <p className="text-xs font-semibold text-accent-muted uppercase tracking-wider">Lembretes Push — App Apoio T</p>
+          </div>
+          <p className="text-[10px] text-accent-subtle mt-1">
+            Notificações enviadas automaticamente para todos os técnicos com a app instalada.
+            Variáveis: <span className="font-mono text-accent-muted">{'{nome}'} {'{hora}'} {'{espaco}'}</span>
+          </p>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-3">
+          {lembretesLoading ? (
+            <p className="text-xs text-accent-subtle">A carregar…</p>
+          ) : (
+            <>
+              {/* Lista de regras */}
+              {lembretes.length === 0 && (
+                <p className="text-xs text-accent-subtle/50 italic">Sem lembretes configurados.</p>
+              )}
+              {lembretes.map(l => (
+                <div key={l.id} className={clsx(
+                  'flex items-start gap-2 rounded-lg border px-3 py-2.5 transition-opacity',
+                  l.ativo ? 'border-border bg-surface-2' : 'border-border/30 bg-surface-1 opacity-50'
+                )}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={clsx(
+                        'text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border',
+                        l.tipo === 'evento'
+                          ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                          : 'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                      )}>
+                        {l.tipo === 'evento' ? 'Evento' : 'Atuação'}
+                      </span>
+                      <span className="text-[11px] font-semibold text-amber-400">{offsetLabel(l.offset_minutos)}</span>
+                    </div>
+                    <p className="text-xs text-accent mt-1 font-medium">{l.texto_titulo}</p>
+                    {l.texto_corpo && <p className="text-[11px] text-accent-subtle">{l.texto_corpo}</p>}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                    <button
+                      onClick={() => toggleLembrete(l.id, !l.ativo)}
+                      className={clsx(
+                        'w-7 h-3.5 rounded-full transition-colors relative shrink-0',
+                        l.ativo ? 'bg-status-confirmado' : 'bg-surface-3'
+                      )}
+                    >
+                      <div className={clsx('absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-transform shadow-sm', l.ativo ? 'left-[14px]' : 'left-0.5')} />
+                    </button>
+                    <button onClick={() => eliminarLembrete(l.id)} className="text-accent-subtle/40 hover:text-red-400 transition-colors">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Formulário de novo lembrete */}
+              <div className="border border-dashed border-border/50 rounded-lg p-3 flex flex-col gap-2 mt-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-subtle">Novo lembrete</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-accent-subtle mb-1 block">Tipo</label>
+                    <select
+                      value={novoLembrete.tipo}
+                      onChange={e => setNovoLembrete(p => ({ ...p, tipo: e.target.value }))}
+                      className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
+                    >
+                      <option value="evento">Evento (Apoio T)</option>
+                      <option value="atuacao">Atuação DJ</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-accent-subtle mb-1 block">Quando</label>
+                    <select
+                      value={novoLembrete.offset_minutos}
+                      onChange={e => setNovoLembrete(p => ({ ...p, offset_minutos: Number(e.target.value) }))}
+                      className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-accent focus:outline-none focus:border-accent/40"
+                    >
+                      {[
+                        { v: 1440 * 2, l: '2 dias antes' },
+                        { v: 1440,     l: '1 dia antes' },
+                        { v: 480,      l: '8h antes' },
+                        { v: 240,      l: '4h antes' },
+                        { v: 120,      l: '2h antes' },
+                        { v: 60,       l: '1h antes' },
+                        { v: 30,       l: '30 min antes' },
+                        { v: 15,       l: '15 min antes' },
+                        { v: 5,        l: '5 min antes' },
+                        { v: -10,      l: '10 min depois' },
+                        { v: -30,      l: '30 min depois' },
+                      ].map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-accent-subtle mb-1 block">Título da notificação</label>
+                  <input
+                    type="text"
+                    value={novoLembrete.texto_titulo}
+                    onChange={e => setNovoLembrete(p => ({ ...p, texto_titulo: e.target.value }))}
+                    placeholder="ex: 🔔 Evento em 4h · {hora}"
+                    className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-accent/40"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-accent-subtle mb-1 block">Corpo (opcional)</label>
+                  <input
+                    type="text"
+                    value={novoLembrete.texto_corpo}
+                    onChange={e => setNovoLembrete(p => ({ ...p, texto_corpo: e.target.value }))}
+                    placeholder="ex: {nome} — Boa sorte!"
+                    className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs text-accent placeholder:text-accent-subtle/40 focus:outline-none focus:border-accent/40"
+                  />
+                </div>
+                <Button size="sm" onClick={guardarNovoLembrete} loading={adicionando} className="self-start">
+                  <Plus size={12} className="mr-1" /> Adicionar
+                </Button>
+              </div>
+            </>
+          )}
         </CardBody>
       </Card>
 
