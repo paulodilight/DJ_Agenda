@@ -67,7 +67,7 @@ const safeParse = (s, fb) => { try { return s ? JSON.parse(s) : fb } catch { ret
 
 const vazio = {
   dj_id: '', dj_externo: '', espaco_id: '', data: '', hora_inicio: '22:00', hora_fim: '02:00',
-  valor: '', margem: '', estado: 'proposta', evento: '', notas: '', tipo_slot: '', subtipo_key: '',
+  valor: '', margem: '', estado: 'proposta', evento: '', local_nome: '', local_morada: '', notas: '', tipo_slot: '', subtipo_key: '',
   transporte: '', extras: '', notas_contas: '', estado_pagamento: 'pendente', forma_pagamento: '',
   setup_slot_1: '', setup_slot_2: '', setup_slot_3: '', soundcheck: '', turno_id: '',
 }
@@ -180,6 +180,8 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         hora_inicio: slot.hora_inicio?.slice(0, 5) ?? '22:00',
         hora_fim: slot.hora_fim?.slice(0, 5) ?? '02:00',
         evento: slot.evento ?? '',
+        local_nome: slot.local_nome ?? '',
+        local_morada: slot.local_morada ?? '',
         notas: slot.notas ?? '',
         estado: slot.estado ?? 'confirmado',
         dj_externo: !slot.dj_id && slot.dj_nome ? slot.dj_nome : '',
@@ -539,8 +541,10 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
         estado_pagamento: form.estado_pagamento || null,
         forma_pagamento:  form.forma_pagamento  || null,
         tipo_slot:  isConvidado ? 'convidado' : (form.tipo_slot || 'residente'),
-        evento:     form.evento?.trim() || null,
-        notas:      form.notas?.trim() || null,
+        evento:       form.evento?.trim() || null,
+        local_nome:   form.local_nome?.trim() || null,
+        local_morada: form.local_morada?.trim() || null,
+        notas:        form.notas?.trim() || null,
         origem:     'manual',
         ...(eventoId != null ? { evento_id: eventoId } : !slot?.id ? { evento_id: null } : {}),
         setup_slot_1: form.setup_slot_1 || null,
@@ -939,6 +943,9 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                 </button>
               </div>
 
+              <Input label="Local" value={form.local_nome} onChange={set('local_nome')} placeholder="Ex: Aeroporto Internacional de Lisboa" />
+              <Input label="Morada" value={form.local_morada} onChange={set('local_morada')} placeholder="Ex: Rua C, Aeroporto Internacional de Lisboa" />
+
               <Textarea
                 label="Observações"
                 value={form.notas}
@@ -1065,6 +1072,9 @@ export function FormSlot({ aberto, slot, onFechar, onGuardado, simplificado = fa
                   <CalendarPlus size={13} />
                 </button>
               </div>
+
+              <Input label="Local" value={form.local_nome} onChange={set('local_nome')} placeholder="Ex: Aeroporto Internacional de Lisboa" />
+              <Input label="Morada" value={form.local_morada} onChange={set('local_morada')} placeholder="Ex: Rua C, Aeroporto Internacional de Lisboa" />
 
               <Textarea
                 label="Observações"
