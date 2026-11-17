@@ -26,6 +26,13 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)))
 }
 
+function mesmaChave(sub, chave) {
+  const atual = sub.options?.applicationServerKey
+  if (!atual) return true // o navegador não diz qual é: não mexe
+  const a = new Uint8Array(atual)
+  return a.length === chave.length && a.every((v, i) => v === chave[i])
+}
+
 // ── Registo do service worker (idempotente) ───────────────────────────────────
 export async function registarSW() {
   if (!('serviceWorker' in navigator)) return null
@@ -43,7 +50,10 @@ export async function estadoPush() {
   if (Notification.permission === 'denied') return 'bloqueado'
   const reg = await navigator.serviceWorker.getRegistration()
   const sub = reg ? await reg.pushManager.getSubscription() : null
-  return sub ? 'ativo' : 'inativo'
+  if (!sub) return 'inativo'
+  // Feita com a chave antiga: conta como inativa, para a app a refazer.
+  if (VAPID_PUBLIC_KEY && !mesmaChave(sub, urlBase64ToUint8Array(VAPID_PUBLIC_KEY))) return 'inativo'
+  return 'ativo'
 }
 
 // ── Ativar notificações (tem de ser chamado a partir de um gesto do utilizador) ─
@@ -57,11 +67,19 @@ export async function ativarPush() {
   const reg = (await navigator.serviceWorker.getRegistration()) || (await registarSW())
   await navigator.serviceWorker.ready
 
+  const chave = urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
   let sub = await reg.pushManager.getSubscription()
+  // Subscrição feita com outra chave VAPID (as chaves foram trocadas): refaz.
+  if (sub && !mesmaChave(sub, chave)) {
+    const antigo = sub.toJSON().endpoint
+    await sub.unsubscribe().catch(() => {})
+    await supabase.from('push_subscriptions').delete().eq('endpoint', antigo)
+    sub = null
+  }
   if (!sub) {
     sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      applicationServerKey: chave,
     })
   }
 
