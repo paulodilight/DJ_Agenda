@@ -74,6 +74,9 @@ export function Equipamentos() {
   const [editandoGrupo, setEditandoGrupo]      = useState(null)
   const [editFormCat, setEditFormCat]           = useState({})
   const [aGuardarCatalog, setAGuardarCatalog]   = useState(false)
+  const [acordeaoAberto, setAcordeaoAberto]     = useState(new Set())
+  const [buscaCat, setBuscaCat]                 = useState('')
+  const [filtroCatCatalog, setFiltroCatCatalog] = useState('Todos')
 
   // Histórico expansível
   const [historicoAberto, setHistoricoAberto] = useState(null) // eq.id
@@ -351,9 +354,18 @@ export function Equipamentos() {
           }
           gruposMap[key].unidades.push(eq)
         })
-        const grupos = Object.values(gruposMap).sort((a, b) => a.nome.localeCompare(b.nome))
+        const todosGrupos = Object.values(gruposMap).sort((a, b) => a.nome.localeCompare(b.nome))
+        const grupos = todosGrupos.filter(g => {
+          const matchBusca = !buscaCat || g.nome.toLowerCase().includes(buscaCat.toLowerCase())
+          const matchCat = filtroCatCatalog === 'Todos' || g.categoria === filtroCatCatalog
+          return matchBusca && matchCat
+        })
 
         const thCat = 'text-left px-4 py-2.5 font-semibold uppercase tracking-wider text-[10px] text-accent-subtle'
+
+        const toggleAcordeao = (nome) => setAcordeaoAberto(s => {
+          const n = new Set(s); n.has(nome) ? n.delete(nome) : n.add(nome); return n
+        })
 
         const guardarCatalog = async (grupo) => {
           setAGuardarCatalog(true)
@@ -377,14 +389,50 @@ export function Equipamentos() {
           setModal({ modo: 'criar' })
         }
 
+        const apagarUnidade = async (u) => {
+          if (!window.confirm(`Apagar "${u.qr_code || u.nome}"?`)) return
+          await equipamentosApi.apagar(u.id)
+          await carregar()
+        }
+
         return (
           <div>
+            {/* Pesquisa + filtros */}
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
+              <div className="flex gap-1 flex-wrap">
+                {['Todos', ...equipamentosApi.categorias].map(c => (
+                  <button key={c} onClick={() => setFiltroCatCatalog(c)}
+                    className={clsx('px-3 py-1 rounded-md text-xs font-medium border transition-colors',
+                      filtroCatCatalog === c
+                        ? 'bg-status-confirmado/15 border-status-confirmado/40 text-status-confirmado'
+                        : 'border-border text-accent-muted hover:text-accent hover:bg-surface-2')}>
+                    {c}
+                    {c !== 'Todos' && (
+                      <span className="ml-1.5 text-[10px] opacity-60">
+                        {todosGrupos.filter(g => g.categoria === c).length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="relative ml-auto">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent-subtle" />
+                <input value={buscaCat} onChange={e => setBuscaCat(e.target.value)} placeholder="Pesquisar…"
+                  className="pl-8 pr-8 py-1.5 bg-surface-1 border border-border rounded-lg text-xs text-accent placeholder-accent-subtle focus:outline-none focus:border-white/20 w-48" />
+                {buscaCat && (
+                  <button onClick={() => setBuscaCat('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-accent-subtle hover:text-accent">
+                    <X size={11} />
+                  </button>
+                )}
+              </div>
+            </div>
+
             {loading ? (
               <div className="text-center py-16 text-accent-subtle text-sm">A carregar…</div>
             ) : grupos.length === 0 ? (
               <div className="text-center py-16 text-accent-subtle">
                 <Package size={32} className="mx-auto mb-3 opacity-30" />
-                <p className="text-sm">Nenhum equipamento encontrado.</p>
+                <p className="text-sm">{buscaCat || filtroCatCatalog !== 'Todos' ? 'Nenhum resultado.' : 'Nenhum equipamento encontrado.'}</p>
               </div>
             ) : (
               <div className="rounded-xl overflow-hidden border border-border">
@@ -394,7 +442,7 @@ export function Equipamentos() {
                       <tr className="border-b border-border bg-surface-0">
                         <th className={thCat}>Nome</th>
                         <th className={thCat}>Categoria</th>
-                        <th className={thCat}>Unidades (QR)</th>
+                        <th className={thCat}>Unidades</th>
                         <th className={clsx(thCat, 'text-right')}>Custo (€)</th>
                         <th className={clsx(thCat, 'text-right')}>Aluguer/dia (€)</th>
                         <th className={thCat}>Notas</th>
@@ -404,89 +452,123 @@ export function Equipamentos() {
                     <tbody>
                       {grupos.map(grupo => {
                         const editing = editandoGrupo === grupo.nome
+                        const multi = grupo.unidades.length > 1
+                        const aberto = acordeaoAberto.has(grupo.nome)
                         return (
-                          <tr key={grupo.nome} className="border-b border-border/40 hover:bg-surface-2 transition-colors group">
-                            <td className="px-4 py-3 font-semibold text-accent max-w-[200px]">
-                              <span className="block truncate" title={grupo.nome}>{grupo.nome}</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              {editing ? (
-                                <select value={editFormCat.categoria} onChange={e => setEditFormCat(f => ({ ...f, categoria: e.target.value }))}
-                                  className="bg-surface-2 border border-border rounded px-2 py-1 text-xs text-accent focus:outline-none focus:border-white/20">
-                                  <option value="">—</option>
-                                  {equipamentosApi.categorias.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                              ) : (
-                                grupo.categoria
-                                  ? <span className={clsx('px-1.5 py-0.5 rounded border font-medium text-[10px]', badgeCategoria(grupo.categoria))}>{grupo.categoria}</span>
-                                  : <span className="text-accent-subtle/30">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex flex-wrap gap-1">
-                                {grupo.unidades.map(u => (
-                                  <span key={u.id} className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-accent-muted border border-border whitespace-nowrap">
-                                    {u.qr_code || <span className="italic text-accent-subtle/40">sem QR</span>}
+                          <Fragment key={grupo.nome}>
+                            <tr className="border-b border-border/40 hover:bg-surface-2 transition-colors group">
+                              <td className="px-4 py-3 font-semibold text-accent max-w-[200px]">
+                                <span className="block truncate" title={grupo.nome}>{grupo.nome}</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {editing ? (
+                                  <select value={editFormCat.categoria} onChange={e => setEditFormCat(f => ({ ...f, categoria: e.target.value }))}
+                                    className="bg-surface-2 border border-border rounded px-2 py-1 text-xs text-accent focus:outline-none focus:border-white/20">
+                                    <option value="">—</option>
+                                    {equipamentosApi.categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                ) : (
+                                  grupo.categoria
+                                    ? <span className={clsx('px-1.5 py-0.5 rounded border font-medium text-[10px]', badgeCategoria(grupo.categoria))}>{grupo.categoria}</span>
+                                    : <span className="text-accent-subtle/30">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                {multi ? (
+                                  <button onClick={() => toggleAcordeao(grupo.nome)}
+                                    className="flex items-center gap-1 text-[10px] text-accent-muted hover:text-accent transition-colors">
+                                    <span className="tabular-nums">{grupo.unidades.length} unidades</span>
+                                    {aberto ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                                  </button>
+                                ) : (
+                                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-accent-muted border border-border whitespace-nowrap">
+                                    {grupo.unidades[0].qr_code || <span className="italic text-accent-subtle/40">sem QR</span>}
                                   </span>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-right tabular-nums">
-                              {editing ? (
-                                <input type="number" step="0.01" min="0" value={editFormCat.valor_custo}
-                                  onChange={e => setEditFormCat(f => ({ ...f, valor_custo: e.target.value }))}
-                                  className="w-20 bg-surface-2 border border-border rounded px-2 py-1 text-xs text-right text-accent focus:outline-none focus:border-white/20" />
-                              ) : (
-                                <span className="text-accent">{grupo.valor_custo != null ? Number(grupo.valor_custo).toFixed(2) : '—'}</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right tabular-nums">
-                              {editing ? (
-                                <input type="number" step="0.01" min="0" value={editFormCat.valor_aluguer_dia}
-                                  onChange={e => setEditFormCat(f => ({ ...f, valor_aluguer_dia: e.target.value }))}
-                                  className="w-20 bg-surface-2 border border-border rounded px-2 py-1 text-xs text-right text-accent focus:outline-none focus:border-white/20" />
-                              ) : (
-                                <span className={grupo.valor_aluguer_dia ? 'text-accent' : 'text-accent-subtle/40'}>
-                                  {grupo.valor_aluguer_dia != null ? Number(grupo.valor_aluguer_dia).toFixed(2) : '—'}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 max-w-[160px]">
-                              {editing ? (
-                                <input value={editFormCat.notas} onChange={e => setEditFormCat(f => ({ ...f, notas: e.target.value }))}
-                                  placeholder="Notas…"
-                                  className="w-full bg-surface-2 border border-border rounded px-2 py-1 text-xs text-accent placeholder-accent-subtle focus:outline-none focus:border-white/20" />
-                              ) : (
-                                <span className="text-accent-muted truncate block" title={grupo.notas}>{grupo.notas || <span className="text-accent-subtle/30">—</span>}</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-3">
-                              {editing ? (
-                                <div className="flex items-center gap-1">
-                                  <button onClick={() => guardarCatalog(grupo)} disabled={aGuardarCatalog}
-                                    className="px-2.5 py-1 rounded bg-status-confirmado/15 border border-status-confirmado/30 text-status-confirmado text-[10px] font-semibold hover:bg-status-confirmado/25 disabled:opacity-50 transition-colors">
-                                    {aGuardarCatalog ? '…' : 'Guardar'}
-                                  </button>
-                                  <button onClick={() => setEditandoGrupo(null)}
-                                    className="p-1 rounded hover:bg-surface-3 text-accent-subtle hover:text-accent transition-colors">
-                                    <X size={12} />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={() => { setEditandoGrupo(grupo.nome); setEditFormCat({ categoria: grupo.categoria ?? '', valor_custo: grupo.valor_custo ?? 0, valor_aluguer_dia: grupo.valor_aluguer_dia ?? 0, notas: grupo.notas ?? '' }) }}
-                                    className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors" title="Editar">
-                                    <Pencil size={12} />
-                                  </button>
-                                  <button onClick={() => novaUnidade(grupo)}
-                                    className="flex items-center gap-0.5 px-1.5 py-1 rounded hover:bg-surface-3 text-accent-muted hover:text-status-confirmado text-[10px] transition-colors" title="Nova unidade">
-                                    <Plus size={10} /> un.
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right tabular-nums">
+                                {editing ? (
+                                  <input type="number" step="0.01" min="0" value={editFormCat.valor_custo}
+                                    onChange={e => setEditFormCat(f => ({ ...f, valor_custo: e.target.value }))}
+                                    className="w-20 bg-surface-2 border border-border rounded px-2 py-1 text-xs text-right text-accent focus:outline-none focus:border-white/20" />
+                                ) : (
+                                  <span className="text-accent">{grupo.valor_custo != null ? Number(grupo.valor_custo).toFixed(2) : '—'}</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right tabular-nums">
+                                {editing ? (
+                                  <input type="number" step="0.01" min="0" value={editFormCat.valor_aluguer_dia}
+                                    onChange={e => setEditFormCat(f => ({ ...f, valor_aluguer_dia: e.target.value }))}
+                                    className="w-20 bg-surface-2 border border-border rounded px-2 py-1 text-xs text-right text-accent focus:outline-none focus:border-white/20" />
+                                ) : (
+                                  <span className={grupo.valor_aluguer_dia ? 'text-accent' : 'text-accent-subtle/40'}>
+                                    {grupo.valor_aluguer_dia != null ? Number(grupo.valor_aluguer_dia).toFixed(2) : '—'}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 max-w-[160px]">
+                                {editing ? (
+                                  <input value={editFormCat.notas} onChange={e => setEditFormCat(f => ({ ...f, notas: e.target.value }))}
+                                    placeholder="Notas…"
+                                    className="w-full bg-surface-2 border border-border rounded px-2 py-1 text-xs text-accent placeholder-accent-subtle focus:outline-none focus:border-white/20" />
+                                ) : (
+                                  <span className="text-accent-muted truncate block" title={grupo.notas}>{grupo.notas || <span className="text-accent-subtle/30">—</span>}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3">
+                                {editing ? (
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => guardarCatalog(grupo)} disabled={aGuardarCatalog}
+                                      className="px-2.5 py-1 rounded bg-status-confirmado/15 border border-status-confirmado/30 text-status-confirmado text-[10px] font-semibold hover:bg-status-confirmado/25 disabled:opacity-50 transition-colors">
+                                      {aGuardarCatalog ? '…' : 'Guardar'}
+                                    </button>
+                                    <button onClick={() => setEditandoGrupo(null)}
+                                      className="p-1 rounded hover:bg-surface-3 text-accent-subtle hover:text-accent transition-colors">
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={() => { setEditandoGrupo(grupo.nome); setEditFormCat({ categoria: grupo.categoria ?? '', valor_custo: grupo.valor_custo ?? 0, valor_aluguer_dia: grupo.valor_aluguer_dia ?? 0, notas: grupo.notas ?? '' }) }}
+                                      className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors" title="Editar">
+                                      <Pencil size={12} />
+                                    </button>
+                                    <button onClick={() => novaUnidade(grupo)}
+                                      className="flex items-center gap-0.5 px-1.5 py-1 rounded hover:bg-surface-3 text-accent-muted hover:text-status-confirmado text-[10px] transition-colors" title="Nova unidade">
+                                      <Plus size={10} /> un.
+                                    </button>
+                                    {!multi && (
+                                      <button onClick={() => apagarUnidade(grupo.unidades[0])}
+                                        className="p-1 rounded hover:bg-surface-3 text-accent-subtle hover:text-red-400 transition-colors" title="Apagar">
+                                        <Trash2 size={12} />
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                            {/* Acordeão — lista de unidades para grupos múltiplos */}
+                            {multi && aberto && (
+                              <tr className="border-b border-border/30 bg-surface-0">
+                                <td colSpan={7} className="px-6 py-3">
+                                  <div className="flex flex-col gap-1.5 pl-4 border-l-2 border-border">
+                                    {grupo.unidades.map(u => (
+                                      <div key={u.id} className="flex items-center justify-between gap-3 group/unit py-0.5">
+                                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-accent-muted border border-border whitespace-nowrap">
+                                          {u.qr_code || <span className="italic text-accent-subtle/40">sem QR</span>}
+                                        </span>
+                                        <button onClick={() => apagarUnidade(u)}
+                                          className="opacity-0 group-hover/unit:opacity-100 p-1 rounded hover:bg-surface-3 text-accent-subtle hover:text-red-400 transition-all shrink-0" title="Apagar unidade">
+                                          <Trash2 size={11} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
                         )
                       })}
                     </tbody>
