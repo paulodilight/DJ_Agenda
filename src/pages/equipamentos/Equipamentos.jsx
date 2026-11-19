@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
-import { Package, Plus, Search, X, QrCode, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, LogIn, LogOut, Clock, Boxes } from 'lucide-react'
+import { Package, Plus, Search, X, QrCode, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp, LogIn, LogOut, Clock, Boxes, Handshake, Printer } from 'lucide-react'
 import { clsx } from 'clsx'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { equipamentosApi } from '@/lib/equipamentosApi'
+import { alugueresApi } from '@/lib/alugueresApi'
 import { QrScannerModal } from '@/components/equipamentos/QrScannerModal'
 import { GestaoStocks } from '@/components/equipamentos/GestaoStocks'
+import { ContratoAluguer } from '@/pages/alugueres/ContratoAluguer'
 
 const VAZIO = { nome: '', categoria: '', qr_code: '', valor_custo: '', valor_aluguer_dia: '', notas: '' }
 
@@ -21,6 +23,18 @@ function badgeCategoria(cat) {
     'Estrutura': 'bg-orange-500/15 text-orange-300 border-orange-500/25',
   }
   return mapa[cat] ?? 'bg-surface-3 text-accent-muted border-border'
+}
+
+function fmtDia(iso) {
+  if (!iso) return '—'
+  return format(new Date(iso), 'dd/MM/yyyy', { locale: pt })
+}
+
+const ESTADO_INFO = {
+  reserva:   { label: 'Reserva',   cls: 'bg-blue-500/10 text-blue-300 border-blue-500/20' },
+  em_curso:  { label: 'Em curso',  cls: 'bg-amber-500/10 text-amber-300 border-amber-500/20' },
+  concluido: { label: 'Concluído', cls: 'bg-status-confirmado/10 text-status-confirmado border-status-confirmado/20' },
+  cancelado: { label: 'Cancelado', cls: 'bg-red-500/10 text-red-400 border-red-500/20' },
 }
 
 function fmtData(iso) {
@@ -50,10 +64,30 @@ export function Equipamentos() {
   const [notasEntrada, setNotasEntrada]   = useState('')
   const [a_entrando, setAEntrando]        = useState(false)
 
+  // Alugueres
+  const [alugueres, setAlugueres]           = useState([])
+  const [loadingAl, setLoadingAl]           = useState(false)
+  const [contrato, setContrato]             = useState(null)
+  const [filtroEstadoAl, setFiltroEstadoAl] = useState('todos')
+
+  // Catálogo
+  const [editandoGrupo, setEditandoGrupo]      = useState(null)
+  const [editFormCat, setEditFormCat]           = useState({})
+  const [aGuardarCatalog, setAGuardarCatalog]   = useState(false)
+
   // Histórico expansível
   const [historicoAberto, setHistoricoAberto] = useState(null) // eq.id
   const [historicoData, setHistoricoData]     = useState({})  // { [id]: records[] }
   const [historicoLoading, setHistoricoLoading] = useState(false)
+
+  const carregarAlugueres = useCallback(async () => {
+    setLoadingAl(true)
+    try { setAlugueres(await alugueresApi.listar()) }
+    catch (e) { console.error(e) }
+    finally { setLoadingAl(false) }
+  }, [])
+
+  useEffect(() => { if (aba === 'alugueres') carregarAlugueres() }, [aba, carregarAlugueres])
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -182,13 +216,21 @@ export function Equipamentos() {
             </button>
           </div>
         )}
+        {aba === 'catalogo' && (
+          <button onClick={abrirCriar}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-status-confirmado/15 border border-status-confirmado/30 text-status-confirmado text-xs font-semibold hover:bg-status-confirmado/25 transition-colors">
+            <Plus size={13} /> Novo Equipamento
+          </button>
+        )}
       </div>
 
       {/* ── Abas ── */}
       <div className="flex gap-1 border-b border-border mb-4">
         {[
-          { id: 'saidas', label: 'Saídas e entradas' },
-          { id: 'stocks', label: 'Stock Estúdios' },
+          { id: 'saidas',    label: 'Saídas e entradas' },
+          { id: 'stocks',    label: 'Stock Estúdios' },
+          { id: 'alugueres', label: 'Alugueres' },
+          { id: 'catalogo',  label: 'Equipamentos' },
         ].map(a => (
           <button key={a.id} onClick={() => setAba(a.id)}
             className={clsx('px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px flex items-center gap-1.5',
@@ -201,6 +243,260 @@ export function Equipamentos() {
 
       {/* ── Aba Stock Estúdios ── */}
       {aba === 'stocks' && <GestaoStocks equipamentos={equipamentos} loading={loading} />}
+
+      {/* ── Aba Alugueres ── */}
+      {aba === 'alugueres' && (() => {
+        const ESTADOS_AL = [
+          { id: 'todos',     label: 'Todos' },
+          { id: 'reserva',   label: 'Reserva' },
+          { id: 'em_curso',  label: 'Em curso' },
+          { id: 'concluido', label: 'Concluído' },
+          { id: 'cancelado', label: 'Cancelado' },
+        ]
+        const thAl = 'text-left px-4 py-2.5 font-semibold uppercase tracking-wider text-[10px] text-accent-subtle'
+        const listagem = filtroEstadoAl === 'todos' ? alugueres : alugueres.filter(a => a.estado === filtroEstadoAl)
+
+        return (
+          <div>
+            {/* filtros + refresh */}
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <div className="flex gap-1 flex-wrap">
+                {ESTADOS_AL.map(e => (
+                  <button key={e.id} onClick={() => setFiltroEstadoAl(e.id)}
+                    className={clsx('px-3 py-1 rounded-md text-xs font-medium border transition-colors',
+                      filtroEstadoAl === e.id
+                        ? 'bg-status-confirmado/15 border-status-confirmado/40 text-status-confirmado'
+                        : 'border-border text-accent-muted hover:text-accent hover:bg-surface-2')}>
+                    {e.label}
+                    {e.id !== 'todos' && (
+                      <span className="ml-1.5 text-[10px] opacity-60">
+                        {alugueres.filter(a => a.estado === e.id).length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button onClick={carregarAlugueres} className="ml-auto p-1.5 rounded hover:bg-surface-2 text-accent-subtle hover:text-accent transition-colors">
+                <RefreshCw size={13} />
+              </button>
+            </div>
+
+            {loadingAl ? (
+              <div className="text-center py-16 text-accent-subtle text-sm">A carregar…</div>
+            ) : listagem.length === 0 ? (
+              <div className="text-center py-16 text-accent-subtle">
+                <Handshake size={32} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Nenhum aluguer encontrado.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl overflow-hidden border border-border">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse min-w-[700px]">
+                    <thead>
+                      <tr className="border-b border-border bg-surface-0">
+                        <th className={thAl}>Nº</th>
+                        <th className={thAl}>Cliente</th>
+                        <th className={thAl}>Estado</th>
+                        <th className={thAl}>Saída prevista</th>
+                        <th className={thAl}>Entrada prevista</th>
+                        <th className={clsx(thAl, 'text-center')}>Itens</th>
+                        <th className={clsx(thAl, 'text-right')}>Total</th>
+                        <th className="px-3 py-2.5 w-16" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {listagem.map(al => {
+                        const info = ESTADO_INFO[al.estado] ?? { label: al.estado, cls: 'bg-surface-3 text-accent-muted border-border' }
+                        return (
+                          <tr key={al.id} className="border-b border-border/40 hover:bg-surface-2 transition-colors group">
+                            <td className="px-4 py-2.5 font-mono text-[11px] text-accent-muted">{al.numero ?? '—'}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="font-semibold text-accent truncate max-w-[160px]" title={al.aluguer_clientes?.nome}>{al.aluguer_clientes?.nome ?? '—'}</div>
+                              {al.aluguer_clientes?.telefone && <div className="text-[10px] text-accent-subtle">{al.aluguer_clientes.telefone}</div>}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-semibold border', info.cls)}>{info.label}</span>
+                            </td>
+                            <td className="px-4 py-2.5 text-accent-muted tabular-nums">{fmtDia(al.data_saida_prevista)}</td>
+                            <td className="px-4 py-2.5 text-accent-muted tabular-nums">{fmtDia(al.data_entrada_prevista)}</td>
+                            <td className="px-4 py-2.5 text-center text-accent-muted">{al.aluguer_itens?.length ?? 0}</td>
+                            <td className="px-4 py-2.5 text-right font-semibold text-accent tabular-nums">
+                              {al.valor_total != null ? `${Number(al.valor_total).toFixed(2)} €` : '—'}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <button onClick={() => setContrato(al)} title="Imprimir contrato"
+                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-all">
+                                <Printer size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* ── Aba Catálogo de Equipamentos ── */}
+      {aba === 'catalogo' && (() => {
+        const gruposMap = {}
+        equipamentos.forEach(eq => {
+          const key = eq.nome
+          if (!gruposMap[key]) {
+            gruposMap[key] = { nome: eq.nome, categoria: eq.categoria, valor_custo: eq.valor_custo, valor_aluguer_dia: eq.valor_aluguer_dia, notas: eq.notas, unidades: [] }
+          }
+          gruposMap[key].unidades.push(eq)
+        })
+        const grupos = Object.values(gruposMap).sort((a, b) => a.nome.localeCompare(b.nome))
+
+        const thCat = 'text-left px-4 py-2.5 font-semibold uppercase tracking-wider text-[10px] text-accent-subtle'
+
+        const guardarCatalog = async (grupo) => {
+          setAGuardarCatalog(true)
+          try {
+            const dados = {
+              categoria: editFormCat.categoria,
+              valor_custo: editFormCat.valor_custo !== '' ? parseFloat(String(editFormCat.valor_custo).replace(',', '.')) : 0,
+              valor_aluguer_dia: editFormCat.valor_aluguer_dia !== '' ? parseFloat(String(editFormCat.valor_aluguer_dia).replace(',', '.')) : 0,
+              notas: editFormCat.notas,
+            }
+            await Promise.all(grupo.unidades.map(u => equipamentosApi.actualizar(u.id, dados)))
+            setEditandoGrupo(null)
+            await carregar()
+          } catch (e) { console.error(e) }
+          finally { setAGuardarCatalog(false) }
+        }
+
+        const novaUnidade = (grupo) => {
+          setForm({ nome: grupo.nome, categoria: grupo.categoria ?? '', qr_code: '', valor_custo: grupo.valor_custo ?? '', valor_aluguer_dia: grupo.valor_aluguer_dia ?? '', notas: grupo.notas ?? '' })
+          setErro(null)
+          setModal({ modo: 'criar' })
+        }
+
+        return (
+          <div>
+            {loading ? (
+              <div className="text-center py-16 text-accent-subtle text-sm">A carregar…</div>
+            ) : grupos.length === 0 ? (
+              <div className="text-center py-16 text-accent-subtle">
+                <Package size={32} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Nenhum equipamento encontrado.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl overflow-hidden border border-border">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse min-w-[840px]">
+                    <thead>
+                      <tr className="border-b border-border bg-surface-0">
+                        <th className={thCat}>Nome</th>
+                        <th className={thCat}>Categoria</th>
+                        <th className={thCat}>Unidades (QR)</th>
+                        <th className={clsx(thCat, 'text-right')}>Custo (€)</th>
+                        <th className={clsx(thCat, 'text-right')}>Aluguer/dia (€)</th>
+                        <th className={thCat}>Notas</th>
+                        <th className="px-3 py-2.5 w-28" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {grupos.map(grupo => {
+                        const editing = editandoGrupo === grupo.nome
+                        return (
+                          <tr key={grupo.nome} className="border-b border-border/40 hover:bg-surface-2 transition-colors group">
+                            <td className="px-4 py-3 font-semibold text-accent max-w-[200px]">
+                              <span className="block truncate" title={grupo.nome}>{grupo.nome}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {editing ? (
+                                <select value={editFormCat.categoria} onChange={e => setEditFormCat(f => ({ ...f, categoria: e.target.value }))}
+                                  className="bg-surface-2 border border-border rounded px-2 py-1 text-xs text-accent focus:outline-none focus:border-white/20">
+                                  <option value="">—</option>
+                                  {equipamentosApi.categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                              ) : (
+                                grupo.categoria
+                                  ? <span className={clsx('px-1.5 py-0.5 rounded border font-medium text-[10px]', badgeCategoria(grupo.categoria))}>{grupo.categoria}</span>
+                                  : <span className="text-accent-subtle/30">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-1">
+                                {grupo.unidades.map(u => (
+                                  <span key={u.id} className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-accent-muted border border-border whitespace-nowrap">
+                                    {u.qr_code || <span className="italic text-accent-subtle/40">sem QR</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums">
+                              {editing ? (
+                                <input type="number" step="0.01" min="0" value={editFormCat.valor_custo}
+                                  onChange={e => setEditFormCat(f => ({ ...f, valor_custo: e.target.value }))}
+                                  className="w-20 bg-surface-2 border border-border rounded px-2 py-1 text-xs text-right text-accent focus:outline-none focus:border-white/20" />
+                              ) : (
+                                <span className="text-accent">{grupo.valor_custo != null ? Number(grupo.valor_custo).toFixed(2) : '—'}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums">
+                              {editing ? (
+                                <input type="number" step="0.01" min="0" value={editFormCat.valor_aluguer_dia}
+                                  onChange={e => setEditFormCat(f => ({ ...f, valor_aluguer_dia: e.target.value }))}
+                                  className="w-20 bg-surface-2 border border-border rounded px-2 py-1 text-xs text-right text-accent focus:outline-none focus:border-white/20" />
+                              ) : (
+                                <span className={grupo.valor_aluguer_dia ? 'text-accent' : 'text-accent-subtle/40'}>
+                                  {grupo.valor_aluguer_dia != null ? Number(grupo.valor_aluguer_dia).toFixed(2) : '—'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 max-w-[160px]">
+                              {editing ? (
+                                <input value={editFormCat.notas} onChange={e => setEditFormCat(f => ({ ...f, notas: e.target.value }))}
+                                  placeholder="Notas…"
+                                  className="w-full bg-surface-2 border border-border rounded px-2 py-1 text-xs text-accent placeholder-accent-subtle focus:outline-none focus:border-white/20" />
+                              ) : (
+                                <span className="text-accent-muted truncate block" title={grupo.notas}>{grupo.notas || <span className="text-accent-subtle/30">—</span>}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3">
+                              {editing ? (
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => guardarCatalog(grupo)} disabled={aGuardarCatalog}
+                                    className="px-2.5 py-1 rounded bg-status-confirmado/15 border border-status-confirmado/30 text-status-confirmado text-[10px] font-semibold hover:bg-status-confirmado/25 disabled:opacity-50 transition-colors">
+                                    {aGuardarCatalog ? '…' : 'Guardar'}
+                                  </button>
+                                  <button onClick={() => setEditandoGrupo(null)}
+                                    className="p-1 rounded hover:bg-surface-3 text-accent-subtle hover:text-accent transition-colors">
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => { setEditandoGrupo(grupo.nome); setEditFormCat({ categoria: grupo.categoria ?? '', valor_custo: grupo.valor_custo ?? 0, valor_aluguer_dia: grupo.valor_aluguer_dia ?? 0, notas: grupo.notas ?? '' }) }}
+                                    className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors" title="Editar">
+                                    <Pencil size={12} />
+                                  </button>
+                                  <button onClick={() => novaUnidade(grupo)}
+                                    className="flex items-center gap-0.5 px-1.5 py-1 rounded hover:bg-surface-3 text-accent-muted hover:text-status-confirmado text-[10px] transition-colors" title="Nova unidade">
+                                    <Plus size={10} /> un.
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ── Aba Saídas e entradas ── */}
       {aba === 'saidas' && <>
@@ -771,6 +1067,7 @@ export function Equipamentos() {
       )}
 
       {scanner && <QrScannerModal onClose={() => { setScanner(false); carregar() }} />}
+      {contrato && <ContratoAluguer aluguer={contrato} onClose={() => setContrato(null)} />}
     </div>
   )
 }
