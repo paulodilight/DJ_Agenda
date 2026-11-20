@@ -350,7 +350,7 @@ export function Equipamentos() {
         equipamentos.forEach(eq => {
           const key = eq.nome
           if (!gruposMap[key]) {
-            gruposMap[key] = { nome: eq.nome, categoria: eq.categoria, valor_custo: eq.valor_custo, valor_aluguer_dia: eq.valor_aluguer_dia, notas: eq.notas, unidades: [] }
+            gruposMap[key] = { nome: eq.nome, categoria: eq.categoria, valor_custo: eq.valor_custo, valor_aluguer_dia: eq.valor_aluguer_dia, notas: eq.notas, extra_estudio: eq.extra_estudio ?? false, chave_estudio: eq.chave_estudio ?? '', unidades: [] }
           }
           gruposMap[key].unidades.push(eq)
         })
@@ -375,6 +375,8 @@ export function Equipamentos() {
               valor_custo: editFormCat.valor_custo !== '' ? parseFloat(String(editFormCat.valor_custo).replace(',', '.')) : 0,
               valor_aluguer_dia: editFormCat.valor_aluguer_dia !== '' ? parseFloat(String(editFormCat.valor_aluguer_dia).replace(',', '.')) : 0,
               notas: editFormCat.notas,
+              extra_estudio: editFormCat.extra_estudio,
+              chave_estudio: editFormCat.chave_estudio || null,
             }
             await Promise.all(grupo.unidades.map(u => equipamentosApi.actualizar(u.id, dados)))
             setEditandoGrupo(null)
@@ -446,6 +448,7 @@ export function Equipamentos() {
                         <th className={clsx(thCat, 'text-right')}>Custo (€)</th>
                         <th className={clsx(thCat, 'text-right')}>Aluguer/dia (€)</th>
                         <th className={thCat}>Notas</th>
+                        <th className={thCat}>Estúdio</th>
                         <th className="px-3 py-2.5 w-28" />
                       </tr>
                     </thead>
@@ -515,6 +518,26 @@ export function Equipamentos() {
                                   <span className="text-accent-muted truncate block" title={grupo.notas}>{grupo.notas || <span className="text-accent-subtle/30">—</span>}</span>
                                 )}
                               </td>
+                              <td className="px-4 py-3">
+                                {editing ? (
+                                  <div className="flex flex-col gap-1">
+                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                      <input type="checkbox" checked={editFormCat.extra_estudio} onChange={e => setEditFormCat(f => ({ ...f, extra_estudio: e.target.checked }))}
+                                        className="w-3.5 h-3.5 rounded accent-status-confirmado" />
+                                      <span className="text-[10px] text-accent-muted">Extra</span>
+                                    </label>
+                                    {editFormCat.extra_estudio && (
+                                      <input value={editFormCat.chave_estudio} onChange={e => setEditFormCat(f => ({ ...f, chave_estudio: e.target.value }))}
+                                        placeholder="CDJ-2000NXS2"
+                                        className="w-24 bg-surface-2 border border-border rounded px-2 py-1 text-[10px] text-accent placeholder-accent-subtle/50 focus:outline-none focus:border-white/20" />
+                                    )}
+                                  </div>
+                                ) : (
+                                  grupo.extra_estudio
+                                    ? <span className="px-1.5 py-0.5 rounded border text-[10px] font-medium bg-blue-500/10 border-blue-500/30 text-blue-400" title={grupo.chave_estudio || ''}>🏢 {grupo.chave_estudio || 'Extra'}</span>
+                                    : <span className="text-accent-subtle/30">—</span>
+                                )}
+                              </td>
                               <td className="px-3 py-3">
                                 {editing ? (
                                   <div className="flex items-center gap-1">
@@ -530,7 +553,7 @@ export function Equipamentos() {
                                 ) : (
                                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
-                                      onClick={() => { setEditandoGrupo(grupo.nome); setEditFormCat({ categoria: grupo.categoria ?? '', valor_custo: grupo.valor_custo ?? 0, valor_aluguer_dia: grupo.valor_aluguer_dia ?? 0, notas: grupo.notas ?? '' }) }}
+                                      onClick={() => { setEditandoGrupo(grupo.nome); setEditFormCat({ categoria: grupo.categoria ?? '', valor_custo: grupo.valor_custo ?? 0, valor_aluguer_dia: grupo.valor_aluguer_dia ?? 0, notas: grupo.notas ?? '', extra_estudio: grupo.extra_estudio ?? false, chave_estudio: grupo.chave_estudio ?? '' }) }}
                                       className="p-1 rounded hover:bg-surface-3 text-accent-muted hover:text-accent transition-colors" title="Editar">
                                       <Pencil size={12} />
                                     </button>
@@ -551,7 +574,7 @@ export function Equipamentos() {
                             {/* Acordeão — lista de unidades para grupos múltiplos */}
                             {multi && aberto && (
                               <tr className="border-b border-border/30 bg-surface-0">
-                                <td colSpan={7} className="px-6 py-3">
+                                <td colSpan={8} className="px-6 py-3">
                                   <div className="flex flex-col gap-1.5 pl-4 border-l-2 border-border">
                                     {grupo.unidades.map(u => (
                                       <div key={u.id} className="flex items-center justify-between gap-3 group/unit py-0.5">
